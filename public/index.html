@@ -365,6 +365,16 @@ select,textarea{font:inherit;color:var(--ink);background:var(--surface);border:1
 /* ===== Perapian tampilan (mobile): grid efek padat, daftar lencana bisa digulir ===== */
 .bpk{max-height:300px;overflow-y:auto;padding:4px}
 @media(max-width:560px){.fxg{grid-template-columns:repeat(3,minmax(0,1fr));gap:8px}.fxi{padding:16px 4px 10px;font-size:.82rem}.fxi b{font-size:.82rem}.bpk{grid-template-columns:repeat(2,minmax(0,1fr))}}
+/* ===== Kuis Lisan ===== */
+.mode.lsn{background:linear-gradient(135deg,#0b5d3b,#2EAD5C);grid-column:1/-1}.mode.lsn .btn{color:#0b5d3b}
+.lf{font-family:"Amiri","Traditional Arabic","Scheherazade New",serif;font-size:clamp(2.4rem,10vw,3.8rem);line-height:1.6;text-align:center;margin:6px 0 14px;padding:10px 8px;border-radius:18px;background:var(--bg);border:1px solid var(--line);overflow-wrap:anywhere}
+.lfin{font-family:"Amiri","Traditional Arabic",serif;font-size:1.4rem}
+.oqa{padding:8px 0;border-bottom:1px solid var(--line)}.oqa p{margin:0}.oqa .a{font-weight:700}
+.ost{padding:10px 14px;margin:8px 0;border-radius:14px;border:1px solid var(--line);border-left:5px solid var(--line);background:var(--bg)}
+.ost p{margin:2px 0}.ost.ok{border-left-color:#1f9d55}.ost.no{border-left-color:#d64545}
+.olr{display:flex;justify-content:space-between;align-items:center;gap:12px;padding:10px 0;border-bottom:1px solid var(--line)}.olr:last-child{border:0}
+.olr .lf{font-size:1.8rem;margin:0;padding:4px 14px;flex:none}
+.ostep .meta{margin-bottom:6px}
 </style>
 </head>
 <body>
@@ -373,7 +383,7 @@ select,textarea{font:inherit;color:var(--ink);background:var(--surface);border:1
   <aside class="side">
     <div class="brand"><img src="/logo.png" alt="Al-Miftah – Mudah Belajar Membaca Kitab"></div>
     <button class="nav" data-v="home">Beranda</button>
-    <button class="nav" data-v="daily">Harian</button><button class="nav" data-v="board">Leaderboard</button><button class="nav" data-v="shop">Toko</button><button class="nav" data-v="ach">Pencapaian</button>
+    <button class="nav" data-v="daily">Harian</button><button class="nav" data-v="oral">Kuis Lisan</button><button class="nav" data-v="board">Leaderboard</button><button class="nav" data-v="shop">Toko</button><button class="nav" data-v="ach">Pencapaian</button>
     <button class="nav" data-v="admin" id="navAdmin" hidden>Panel Admin</button>
     <div class="sp"></div>
     <button class="nav" data-v="profile" id="who"></button>
@@ -441,7 +451,7 @@ const closeMenu = () => $('#app').classList.remove('open');
 function go(v, a) {
   closeMenu(); if (me) renderChip();
   document.querySelectorAll('.nav[data-v], .bn[data-v]').forEach(b => b.classList.toggle('active', b.dataset.v === v));
-  ({ auth: vAuth, home: vHome, board: vBoard, daily: vDaily, shop: vShop, ach: vAch, admin: vAdmin, profile: vProfile })[v](a);
+  ({ auth: vAuth, home: vHome, board: vBoard, daily: vDaily, oral: vOral, shop: vShop, ach: vAch, admin: vAdmin, profile: vProfile })[v](a);
   $('.scroll').scrollTop = 0;
 }
 
@@ -1013,6 +1023,76 @@ function vDailyResult(r, wrong) {
   $('#dn').onclick = () => go(r.pass ? 'daily' : 'home');
 }
 
+/* ---------- Kuis Lisan (murid) ---------- */
+async function vOral() {
+  V.innerHTML = '<p class="muted">Memuat…</p>';
+  let d; try { d = await api('oral'); } catch (e) { V.textContent = e.message; return; }
+  const left = Math.max(0, d.max - d.used);
+  V.innerHTML = `<h1>Kuis Lisan</h1>
+    <div class="card"><p style="margin:0 0 8px">Praktek lafadz seperti di depan ustadz: kamu diberi satu lafadz, lalu menjawab langkah demi langkah (kalimat apa, tandanya, mu'rab atau mabni, dan seterusnya) dengan tulisanmu sendiri.</p>
+      <p class="muted" style="margin:0">Jawaban dinilai dari maksudnya, bukan harus sama persis dengan kunci. Sisa latihan hari ini: <b>${left}</b> lafadz.</p></div>
+    <div class="grid jgrid">` + [1, 2, 3, 4].map((j, n) => {
+      const c = d.counts[j] || 0, s = d.stats[j];
+      return `<div class="card jc" style="--i:${n};${jst(j)}"><div class="jh"><span class="tag">Jilid ${j}</span><span class="jst">${c} lafadz</span></div>
+        <p class="muted" style="margin:0 0 12px">${s ? s.n + ' lafadz dijawab · ' + Math.round(s.c / s.t * 100) + '% langkah benar' : c ? 'Belum pernah dicoba' : 'Soal belum tersedia'}</p>
+        <button class="btn" data-oj="${j}"${c && left ? '' : ' disabled'}>${c ? (left ? 'Mulai latihan' : 'Batas hari ini tercapai') : 'Segera hadir'}</button></div>`;
+    }).join('') + '</div>';
+  V.querySelectorAll('[data-oj]').forEach(b => b.onclick = async () => {
+    b.disabled = true;
+    try { vOralQuiz(await api('oral/start', { jilid: +b.dataset.oj, n: d.n }), +b.dataset.oj); }
+    catch (e) { alert(e.message); b.disabled = false; }
+  });
+}
+function vOralQuiz(d, j) {
+  const items = d.items, sum = []; let i = 0;
+  const head = (it, frac) => `<div class="bar"><i style="width:${frac * 100}%"></i></div>
+    <div class="meta"><span class="muted">🗣️ Jilid ${j} · Lafadz ${i + 1}/${items.length}${it.bab ? ' · ' + esc(it.bab) : ''}</span></div>
+    <div class="lf" lang="ar" dir="rtl">${esc(it.lafadz)}</div>`;
+  const ask = () => {
+    const it = items[i], ans = []; let s = 0, busy = false;
+    const draw = () => {
+      const last = s === it.steps.length - 1;
+      V.innerHTML = `<div class="card jc" style="${jst(j)}">${head(it, (i + s / it.steps.length) / items.length)}
+        ${s ? `<div>${ans.map((a, n) => `<div class="oqa"><p class="muted">${n + 1}. ${esc(it.steps[n])}</p><p class="a" dir="auto">${a ? esc(a) : '<i class="muted">(dikosongkan)</i>'}</p></div>`).join('')}</div>` : ''}
+        <h2 dir="auto" style="margin-top:14px">${s + 1}. ${esc(it.steps[s])}</h2>
+        <input id="oa" dir="auto" maxlength="200" placeholder="Tulis jawabanmu…" autocomplete="off" autocapitalize="off" spellcheck="false">
+        <div class="err" id="oe"></div>
+        <div class="row"><span class="muted" style="margin:0;font-size:.85rem">Bebas: bahasa Indonesia atau Arab</span><button class="btn" id="onx">${last ? 'Periksa jawaban' : 'Lanjut →'}</button></div></div>`;
+      const inp = $('#oa'), btn = $('#onx'); inp.focus();
+      const next = async () => {
+        if (busy) return;
+        ans[s] = inp.value.trim();
+        if (!last) { s++; draw(); return; }
+        busy = true; btn.disabled = true; inp.disabled = true; btn.textContent = 'Sedang diperiksa…'; $('#oe').textContent = '';
+        try { show(await api('oral/grade', { token: d.token, item: it.id, answers: ans })); }
+        catch (e) { busy = false; btn.disabled = false; inp.disabled = false; btn.textContent = 'Kirim ulang'; $('#oe').textContent = e.message; }
+      };
+      btn.onclick = next; inp.onkeydown = e => { if (e.key === 'Enter') next(); };
+    };
+    const show = r => {
+      sum.push({ it, r });
+      const perfect = r.correct === r.total;
+      V.innerHTML = `<div class="card jc" style="${jst(j)}">${head(it, (i + 1) / items.length)}
+        <span class="chip pop">${perfect ? '✅ Semua benar, masya Allah!' : r.correct + ' dari ' + r.total + ' langkah benar'}</span>
+        ${r.steps.map((x, n) => `<div class="ost ${x.ok ? 'ok' : 'no'}"><p class="muted">${n + 1}. ${esc(x.q)}</p><p dir="auto"><b>${x.s ? esc(x.s) : '(dikosongkan)'}</b> ${x.ok ? '✅' : '❌'}</p>${x.ok ? '' : `<p class="muted" dir="auto">${x.fb ? esc(x.fb) + ' ' : ''}Jawaban contoh: <b>${esc(x.model)}</b></p>`}</div>`).join('')}
+        <div class="row"><span></span><button class="btn" id="onn">${i < items.length - 1 ? 'Lafadz berikutnya →' : 'Lihat hasil'}</button></div></div>`;
+      if (perfect) burst(innerWidth / 2, 130, 24);
+      $('#onn').onclick = () => { if (i < items.length - 1) { i++; ask(); } else result(); };
+    };
+    draw();
+  };
+  const result = () => {
+    const c = sum.reduce((a, x) => a + x.r.correct, 0), t = sum.reduce((a, x) => a + x.r.total, 0), p = t ? Math.round(c / t * 100) : 0;
+    V.innerHTML = `<div class="card res jc" style="${jst(j)}"><div class="big">${p >= 90 ? '🏆' : p >= 70 ? '🎉' : p >= 40 ? '👍' : '💪'}</div><span class="tag">Hasil Kuis Lisan · Jilid ${j}</span>
+      <h1>${c} / ${t}</h1><p class="muted">langkah benar (${p}%) dari ${sum.length} lafadz</p>
+      <div style="text-align:left">${sum.map(x => `<div class="olr"><div class="lf" lang="ar" dir="rtl">${esc(x.it.lafadz)}</div><b>${x.r.correct}/${x.r.total}</b></div>`).join('')}</div>
+      <div class="row"><button class="btn" id="oh">Kembali</button><button class="btn ghost" id="oa2">Latihan lagi</button></div></div>`;
+    if (p >= 70) [0, 250].forEach(t2 => setTimeout(() => burst(innerWidth / 2, 130, 30), t2));
+    $('#oh').onclick = () => go('home'); $('#oa2').onclick = () => go('oral');
+  };
+  ask();
+}
+
 /* ---------- Beranda ---------- */
 const JC = { 1: ['#C5DA2B', '#6F8A0A', '#1b2400'], 2: ['#2BA3E6', '#0E5C9C', '#04263f'], 3: ['#A94BC0', '#6A2A94', '#2a0a36'], 4: ['#F5A31A', '#B85C00', '#2b1500'] };
 const jst = j => `--c:${JC[j][0]};--d:${JC[j][1]};--fg:${JC[j][2]}`;
@@ -1054,6 +1134,9 @@ function vHome() {
       <div class="mode fst"><span class="ico">⚡</span><span class="tag">⚡ Cepat Tepat</span><h2>Tiap soal berpacu dengan waktu</h2>
         <p>Mulai 10 detik per soal, makin cepat sampai 5 detik. Nilai minimal 80 untuk memutar hadiah. Satu kesempatan per hari.</p>
         <div class="ft"><small id="fst">Satu kesempatan per hari</small><button class="btn" id="fastGo">Buka</button></div></div>
+      <div class="mode lsn"><span class="ico">🗣️</span><span class="tag">🗣️ Kuis Lisan</span><h2>Praktek lafadz, jawab dengan tulisanmu</h2>
+        <p>Diberi satu lafadz, lalu jawab langkah demi langkah: kalimat apa, tandanya, mu'rab atau mabni, i'rab, dan alasannya. Dinilai dari maksud jawabanmu.</p>
+        <div class="ft"><small>Latihan tanpa batas waktu</small><button class="btn" id="oralGo">Buka</button></div></div>
       <div class="mode ${tat ? 'tth' : 'off'}"><span class="ico">${tat ? '📚' : '🔒'}</span><span class="tag">${tat ? '📚' : '🔒'} Mode Tathbiq</span><h2>Soal acak dari semua jilid</h2>
         <p>${tat ? '3 nyawa. Naik tahap tiap 10 soal: Tathbiq 1 sampai 6, lalu Takhossus. XP tanpa batas!' : 'Selesaikan semua quest Jilid 1–4 (minimal ' + PASS() + '% benar di tiap level) untuk membuka mode ini.'}</p>
         <div class="ft"><small>${tat ? 'Rekor ' + (me.best['0:endless'] || 0) + ' XP · Tahap ' + (me.tstage ? STG[me.tstage - 1][0] : '-') : 'Jilid selesai: ' + [1, 2, 3, 4].filter(JD).length + '/4'}</small><button class="btn" id="endStart"${tat ? '' : ' disabled'}>${tat ? 'Mulai' : '🔒 Terkunci'}</button></div></div>
@@ -1065,7 +1148,7 @@ function vHome() {
         return `<button class="lvl ${cl}" data-j="${j}" data-l="${k}"><span class="ic">${ic}</span><b>${nm}</b><small>${c} soal${grOf(j, k) ? ' · <span class="gr">' + grOf(j, k)[0] + '</span>' : ''}</small><span class="xp">${b}/${x} XP</span><i class="pb"><u style="width:${b / x * 100}%"></u></i>${grOf(j, k) ? '<span class="done" title="' + grOf(j, k)[0] + '">' + grOf(j, k)[1] + '</span>' : ''}</button>`;
       }).join('') + `</div></div>`).join('') + `</div>`;
   count($('#tx'), tot);
-  $('#dailyGo').onclick = () => go('daily'); $('#fastGo').onclick = () => go('daily');
+  $('#dailyGo').onclick = () => go('daily'); $('#fastGo').onclick = () => go('daily'); $('#oralGo').onclick = () => go('oral');
   $('#endStart').onclick = async () => { try { vEndless(await api('endless/start', {})); } catch (e) { alert(e.message); } };
   setTimeout(() => { const g = $('#pg'); if (g) { g.style.background = rk[3]; g.style.width = frac * 100 + '%'; } }, 80);
   V.querySelectorAll('.lvl').forEach(b => b.onclick = async () => {
@@ -1257,6 +1340,7 @@ const GUIDE = {
     <li><b>Pencapaian rank:</b> Bronze, Silver, Gold, Platinum, Diamond, dan Legend diraih dari total XP. Tiga teratas di leaderboard mendapat bingkai khusus: api 🔥 (juara 1), petir ⚡ (juara 2), dan percikan aura ✨ (juara 3).</li>
     <li><b>Gold dan Toko:</b> tiap rekor baru memberi Gold sebanyak XP-nya.@@GOLDINFO@@ Belanjakan di menu <b>Toko</b> untuk efek yang muncul saat jawabanmu benar, dari yang sederhana sampai petir dan galaksi. Efek bisa dicoba dulu, dan membeli tidak mengurangi XP atau rankmu.</li>
     <li><b>Kuis Harian:</b> 10 soal acak dari semua jilid, sekali sehari dan tidak bisa diulang. Nilai minimal 80 memberi satu kali spin hadiah Gold, sampai 1000! Jangan tutup halaman sebelum selesai, karena kesempatan hari itu langsung terpakai.</li>
+    <li><b>Kuis Lisan:</b> latihan praktek lafadz. Kamu diberi satu lafadz Arab lalu menjawab pertanyaan berurutan (kalimat apa, tandanya, mu'rab atau mabni, i'rab, dan alasannya) dengan tulisanmu sendiri, boleh bahasa Indonesia atau Arab. Jawaban dinilai dari maksudnya, jadi tidak harus sama persis dengan kunci. Latihan ini belum menambah XP.</li>
     <li><b>Pencapaian dan lencana:</b> menu <b>Pencapaian</b> berisi puluhan target, dari streak harian, nilai sempurna, jawaban beruntun, sampai koleksi Toko. Tiap pencapaian memberi Gold sekali, ada juga yang tersembunyi. Di <b>Profil</b> kamu bisa memasang sampai 3 lencana yang tampil di leaderboard dan profilmu. Hari Jumat tidak memutus streak.</li></ul>`,
   tat: `<ul class="gl"><li><b>Syarat:</b> Mode Tathbiq terbuka setelah semua quest Jilid 1–4 selesai (minimal 60% benar di tiap level).</li>
     <li><b>Mode Tathbiq:</b> soal acak dari semua jilid, tanpa pengulangan, dengan <b>3 nyawa</b>. Salah 3 kali, permainan selesai.</li>
@@ -1566,8 +1650,8 @@ const loadX = () => window.XLSX ? Promise.resolve() : xlsxP ||= new Promise((ok,
 let admTab = 'stat';
 const ago = t => { if (!t) return 'belum pernah'; const m = (Date.now() - new Date(t)) / 6e4; return m < 1 ? 'baru saja' : m < 60 ? Math.floor(m) + ' menit lalu' : m < 1440 ? Math.floor(m / 60) + ' jam lalu' : Math.floor(m / 1440) + ' hari lalu'; };
 function vAdmin() {
-  V.innerHTML = `<h1>Panel Admin</h1><div class="tabs">${[['stat', '📊 Statistik'], ['soal', '📝 Kelola soal'], ['user', '👥 Kelola murid'], ['lap', '🚩 Laporan' + (me.reports ? ' (' + me.reports + ')' : '')]].map(([k, n]) => `<button data-t="${k}" class="${k === admTab ? 'on' : ''}">${n}</button>`).join('')}</div><div id="ab"></div>`;
-  const show = t => { admTab = t; V.querySelectorAll('[data-t]').forEach(x => x.classList.toggle('on', x.dataset.t === t)); const ab = $('#ab'); ab.innerHTML = ''; ({ stat: adminStats, soal: adminSoal, user: adminUsers, lap: adminReports })[t](ab); };
+  V.innerHTML = `<h1>Panel Admin</h1><div class="tabs">${[['stat', '📊 Statistik'], ['soal', '📝 Kelola soal'], ['oral', '🗣️ Soal lisan'], ['user', '👥 Kelola murid'], ['lap', '🚩 Laporan' + (me.reports ? ' (' + me.reports + ')' : '')]].map(([k, n]) => `<button data-t="${k}" class="${k === admTab ? 'on' : ''}">${n}</button>`).join('')}</div><div id="ab"></div>`;
+  const show = t => { admTab = t; V.querySelectorAll('[data-t]').forEach(x => x.classList.toggle('on', x.dataset.t === t)); const ab = $('#ab'); ab.innerHTML = ''; ({ stat: adminStats, soal: adminSoal, oral: adminOral, user: adminUsers, lap: adminReports })[t](ab); };
   V.querySelectorAll('[data-t]').forEach(b => b.onclick = () => show(b.dataset.t));
   show(admTab);
 }
@@ -1625,6 +1709,142 @@ async function adminSoal(box) {
     catch (e) { $('#err').textContent = e.message; }
   };
   adminQuestions();
+}
+
+/* ---------- Admin: soal lisan ---------- */
+/* Satu lafadz = daftar langkah {q: pertanyaan, a: [jawaban benar...], n: catatan penilai}. Jumlah langkah bebas (1–12) dan boleh beda tiap lafadz. */
+const STD_Q = ['Kalimat apa?', 'Tandanya apa?', "Mu'rab atau mabni?", 'Yang mana?', "I'rab-nya apa?", "Apa tanda i'rab-nya?", 'Karena apa?'];
+let oJ = 0, oQ = '', oOff = 0;
+const OPAGE = 30;
+function oEditor(r, done) {
+  r = r || { jilid: oJ || 1, bab: '', lafadz: '', steps: [], active: true };
+  let st = (r.steps || []).map(s => ({ q: s.q, a: s.a.join(' | '), n: s.n || '' }));
+  if (!st.length) st = STD_Q.map(q => ({ q, a: '', n: '' }));
+  const m = document.createElement('div'); m.className = 'modal';
+  m.innerHTML = `<div class="box"><h2>${r.id ? 'Edit lafadz' : 'Tambah lafadz'}</h2>
+    <select id="oej">${[1, 2, 3, 4].map(j => `<option value="${j}"${j === r.jilid ? ' selected' : ''}>Jilid ${j}</option>`).join('')}</select>
+    <input id="oebab" dir="auto" maxlength="60" placeholder="Bab (opsional)" value="${esc(r.bab || '')}" autocomplete="off">
+    <input id="oelf" class="lfin" dir="rtl" lang="ar" maxlength="100" placeholder="Lafadz, mis. زَيْدٌ" value="${esc(r.lafadz)}" autocomplete="off">
+    <label class="chk"><input type="checkbox" id="oeact"${r.active === false ? '' : ' checked'}> Aktif (muncul di kuis murid)</label>
+    <p class="muted" style="font-size:.85rem">Pertanyaan diajukan berurutan. Pisahkan variasi jawaban benar dengan tanda <b>|</b> (jawaban pertama dipakai sebagai jawaban contoh). Hapus pertanyaan yang tidak relevan untuk lafadz ini, misalnya i'rab untuk lafadz mabni. Kolom catatan opsional, untuk memberi petunjuk khusus ke penilai.</p>
+    <div id="oest"></div>
+    <div class="row" style="margin:0 0 4px"><button class="btn ghost" id="oeadd" type="button">+ Pertanyaan</button><button class="btn ghost" id="oetpl" type="button">Isi 7 pertanyaan standar</button></div>
+    <div class="err" id="oee"></div><div class="row"><button class="btn ghost" id="oex">Batal</button><button class="btn" id="oes">Simpan</button></div></div>`;
+  document.body.appendChild(m);
+  const pull = () => m.querySelectorAll('.ostep').forEach(b => { const i = +b.dataset.i; ['q', 'a', 'n'].forEach(f => { st[i][f] = b.querySelector(`[data-f=${f}]`).value; }); });
+  const draw = () => {
+    m.querySelector('#oest').innerHTML = st.map((s, i) => `<div class="card ostep" data-i="${i}" style="padding:12px;margin-bottom:10px"><div class="meta"><b>Pertanyaan ${i + 1}</b><button class="btn ghost del" type="button" data-rm="${i}">Hapus</button></div>
+      <input data-f="q" dir="auto" maxlength="120" placeholder="Pertanyaan" value="${esc(s.q)}" autocomplete="off">
+      <input data-f="a" dir="auto" placeholder="Jawaban benar (variasi dipisah | )" value="${esc(s.a)}" autocomplete="off">
+      <input data-f="n" dir="auto" maxlength="200" placeholder="Catatan untuk penilai (opsional)" value="${esc(s.n)}" autocomplete="off"></div>`).join('') || '<p class="muted">Belum ada pertanyaan.</p>';
+    m.querySelectorAll('[data-rm]').forEach(b => b.onclick = () => { pull(); st.splice(+b.dataset.rm, 1); draw(); });
+  };
+  draw();
+  const close = () => m.remove(); m.querySelector('#oex').onclick = close; m.onclick = e => { if (e.target === m) close(); };
+  m.querySelector('#oeadd').onclick = () => { if (st.length >= 12) return; pull(); st.push({ q: '', a: '', n: '' }); draw(); };
+  m.querySelector('#oetpl').onclick = () => { pull(); const have = new Set(st.map(s => s.q.trim())); STD_Q.forEach(q => { if (!have.has(q) && st.length < 12) st.push({ q, a: '', n: '' }); }); draw(); };
+  m.querySelector('#oes').onclick = async () => {
+    pull(); const g = id => m.querySelector('#' + id);
+    const steps = st.filter(s => s.q.trim() || s.a.trim()).map(s => ({ q: s.q.trim(), a: s.a.split('|').map(x => x.trim()).filter(Boolean), n: s.n.trim() }));
+    if (steps.some(s => !s.q || !s.a.length)) { g('oee').textContent = 'Setiap pertanyaan harus punya teks pertanyaan dan minimal satu jawaban benar.'; return; }
+    try {
+      await api('admin/oral-save', { id: r.id || 0, jilid: +g('oej').value, bab: g('oebab').value, lafadz: g('oelf').value, active: g('oeact').checked, steps });
+      close(); toast(r.id ? 'Lafadz diperbarui' : 'Lafadz ditambahkan', '✅'); done();
+    } catch (e) { g('oee').textContent = e.message; }
+  };
+}
+async function adminOral(box) {
+  loadX().catch(() => {});
+  box.innerHTML = '<p class="muted">Memuat…</p>';
+  let d0; try { d0 = await api('admin/oral?jilid=0&offset=0'); } catch (e) { box.textContent = e.message; return; }
+  if (!$('#ab')) return;
+  const refresh = () => adminOral(box);
+  let imp = [];
+  box.innerHTML = `<div class="grid">` + [1, 2, 3, 4].map(j => `<div class="card jc" style="${jst(j)}"><span class="tag">Jilid ${j}</span><h2>${d0.counts[j] || 0} lafadz</h2></div>`).join('') + `</div>
+    <div class="card"><h2>Unggah dari Excel</h2><p class="muted">Kolom: <code>jilid, bab, lafadz, q1, a1, q2, a2, …</code> (sampai 12 pasang). <code>qN</code> = pertanyaan ke-N, <code>aN</code> = jawaban benar; pisahkan variasi jawaban dengan <code>|</code>. Jumlah pertanyaan boleh berbeda tiap lafadz, kosongkan pasangan yang tidak dipakai. Bab boleh kosong.</p>
+      <div class="row" style="margin:0 0 12px"><button class="btn ghost" id="otp">Unduh template Excel</button></div>
+      <input type="file" id="ofl" accept=".xlsx,.xls,.csv">
+      <label class="chk"><input type="checkbox" id="orp"> Ganti lafadz lama pada jilid yang ada di file</label>
+      <div class="muted" id="opv"></div><div class="err" id="oer"></div><button class="btn" id="oup" disabled>Unggah lafadz</button></div>
+    <div class="card" id="om"><h2>Kelola lafadz</h2>
+      <div class="tabs">${['Semua', 1, 2, 3, 4].map((x, n) => `<button data-oj="${n}" class="${n === oJ ? 'on' : ''}">${n ? 'Jilid ' + x : x}</button>`).join('')}</div>
+      <input type="search" id="oq" placeholder="Cari lafadz, bab, atau pertanyaan…" value="${esc(oQ)}" autocomplete="off">
+      <div class="row" style="margin:0 0 12px"><button class="btn" id="oadd">+ Tambah lafadz</button><button class="btn ghost del" id="odel" disabled>Hapus terpilih</button></div>
+      <div class="row" style="margin:0 0 12px"><button class="btn ghost" id="oexp">⬇️ Unduh semua lafadz</button></div>
+      <div id="ol" class="muted">Memuat…</div></div>`;
+  const hdr = ['jilid', 'bab', 'lafadz']; for (let k = 1; k <= 12; k++) hdr.push('q' + k, 'a' + k);
+  $('#otp').onclick = async () => {
+    try { await loadX(); } catch (e) { alert(e.message); return; }
+    const ex = [1, 'CONTOH (hapus baris ini)', 'زَيْدٌ', 'Kalimat apa?', 'Isim|اسم', 'Tandanya apa?', 'Tanwin|التنوين', "Mu'rab atau mabni?", "Mu'rab|معرب", 'Yang mana?', "Mu'rab bil harakat", "I'rab-nya apa?", "Rofa'|Marfu'|رفع", "Apa tanda i'rab-nya?", 'Dhammah|ضمة', 'Karena apa?', 'Karena isim mufrad'];
+    const w = XLSX.utils.aoa_to_sheet([hdr, ex]); w['!cols'] = [{ wch: 6 }, { wch: 16 }, { wch: 16 }, ...hdr.slice(3).map(() => ({ wch: 22 }))];
+    const pt = XLSX.utils.aoa_to_sheet([['Kolom', 'Keterangan'], ['jilid', 'Wajib. Angka 1–4.'], ['bab', 'Opsional.'], ['lafadz', 'Wajib. Lafadz Arab yang ditanyakan (boleh berharakat).'], ['q1, q2, …', 'Pertanyaan ke-1, ke-2, dst. Diajukan berurutan. Maksimal 12.'], ['a1, a2, …', 'Jawaban benar untuk pertanyaan yang sama. Variasi jawaban dipisah tanda | (jawaban pertama jadi jawaban contoh).'], ['Catatan', 'Baris contoh hanya untuk menunjukkan format. Hapus atau ganti isinya sesuai kitab sebelum diunggah. Kolom catatan penilai diisi lewat tombol Edit di panel ini.']]);
+    pt['!cols'] = [{ wch: 14 }, { wch: 100 }];
+    const b = XLSX.utils.book_new(); XLSX.utils.book_append_sheet(b, w, 'Lafadz'); XLSX.utils.book_append_sheet(b, pt, 'Petunjuk'); XLSX.writeFile(b, 'template-soal-lisan.xlsx');
+  };
+  $('#ofl').onchange = async e => {
+    const f = e.target.files[0]; if (!f) return;
+    try {
+      await loadX();
+      const wb = XLSX.read(await f.arrayBuffer());
+      imp = XLSX.utils.sheet_to_json(wb.Sheets[wb.SheetNames[0]], { defval: '' }).map(o => {
+        const n = {}; for (const k in o) n[k.trim().toLowerCase()] = String(o[k]).trim();
+        const steps = []; for (let k = 1; k <= 12; k++) { const q = n['q' + k], a = n['a' + k]; if (q || a) steps.push({ q: q || '', a: (a || '').split('|').map(x => x.trim()).filter(Boolean) }); }
+        return { jilid: +n.jilid, bab: (n.bab || '').replace(/\s+/g, ' '), lafadz: n.lafadz || '', steps };
+      });
+      const per = {}; imp.forEach(r => { per[r.jilid] = (per[r.jilid] || 0) + 1; });
+      $('#opv').innerHTML = imp.length + ' baris terbaca' + Object.keys(per).sort().map(j => '<br>Jilid ' + esc(j) + ': ' + per[j] + ' lafadz').join('');
+      $('#oup').disabled = !imp.length; $('#oer').textContent = '';
+    } catch (x) { $('#oer').textContent = /^Gagal memuat/.test(x.message) ? x.message : 'File tidak bisa dibaca.'; }
+  };
+  $('#oup').onclick = async () => {
+    try { const r = await api('admin/oral-import', { rows: imp, replace: $('#orp').checked }); alert(r.added + ' lafadz ditambahkan.'); refresh(); }
+    catch (e) { $('#oer').textContent = e.message; }
+  };
+  let t, seq = 0, rows = [];
+  const sel = () => [...$('#ol').querySelectorAll('input[type=checkbox]:checked')].map(x => +x.dataset.id);
+  const sync = () => { const n = sel().length; $('#odel').disabled = !n; $('#odel').textContent = n ? `Hapus terpilih (${n})` : 'Hapus terpilih'; };
+  const load = async () => {
+    const my = ++seq;
+    try {
+      const d = await api(`admin/oral?jilid=${oJ}&q=${encodeURIComponent(oQ)}&offset=${oOff}`);
+      if (my !== seq || !$('#ol')) return;
+      if (!d.rows.length && oOff > 0) { oOff = Math.max(0, oOff - OPAGE); return load(); }
+      rows = d.rows;
+      $('#ol').innerHTML = (d.rows.length ? d.rows.map((r, n) => `<div class="urow qrow"><label class="chk"><input type="checkbox" data-id="${r.id}" aria-label="Pilih lafadz"></label>
+        <div style="flex:1;min-width:0"><span class="chip">Jilid ${r.jilid}</span>${r.bab ? ' <span class="chip">' + esc(r.bab) + '</span>' : ''}${r.active ? '' : ' <span class="chip">nonaktif</span>'}
+        <div class="lfin" dir="rtl" lang="ar" style="margin:6px 0">${esc(r.lafadz)}</div>
+        <div class="qopt" dir="auto">${r.steps.map((s, i) => `${i + 1}. ${esc(s.q)} <b>${esc(s.a[0])}${s.a.length > 1 ? ' (+' + (s.a.length - 1) + ')' : ''}</b>`).join(' · ')}</div></div>
+        <button class="btn ghost" data-e="${n}">Edit</button></div>`).join('') : 'Belum ada lafadz.') +
+        `<div class="pager"><button class="btn ghost" id="opv2"${oOff ? '' : ' disabled'}>← Sebelumnya</button><span class="muted" style="margin:0">${d.total ? oOff + 1 + '–' + (oOff + d.rows.length) + ' dari ' + d.total : ''}</span><button class="btn ghost" id="onx2"${oOff + OPAGE < d.total ? '' : ' disabled'}>Berikutnya →</button></div>`;
+      sync();
+      $('#ol').querySelectorAll('input[type=checkbox]').forEach(x => x.onchange = sync);
+      $('#ol').querySelectorAll('[data-e]').forEach(b => b.onclick = () => oEditor(rows[+b.dataset.e], refresh));
+      $('#opv2').onclick = () => { oOff = Math.max(0, oOff - OPAGE); load(); };
+      $('#onx2').onclick = () => { oOff += OPAGE; load(); };
+    } catch (e) { $('#ol').textContent = e.message; }
+  };
+  $('#om').querySelectorAll('[data-oj]').forEach(b => b.onclick = () => { oJ = +b.dataset.oj; oOff = 0; $('#om').querySelectorAll('[data-oj]').forEach(x => x.classList.toggle('on', x === b)); load(); });
+  $('#oq').oninput = e => { oQ = e.target.value.trim(); oOff = 0; clearTimeout(t); t = setTimeout(load, 250); };
+  $('#oadd').onclick = () => oEditor(null, refresh);
+  $('#odel').onclick = async () => {
+    const ids = sel(); if (!ids.length) return;
+    if (!confirm(`Hapus ${ids.length} lafadz terpilih? Tindakan ini tidak bisa dibatalkan.`)) return;
+    try { await api('admin/oral-delete', { ids }); toast(ids.length + ' lafadz dihapus', '🗑️'); refresh(); } catch (e) { alert(e.message); }
+  };
+  $('#oexp').onclick = async e => {
+    const b = e.currentTarget, t0 = b.textContent; b.disabled = true; b.textContent = 'Menyiapkan…';
+    try {
+      const [d] = await Promise.all([api('admin/oral-export'), loadX()]);
+      if (!d.rows.length) { alert('Bank soal lisan masih kosong.'); return; }
+      const aoa = [hdr].concat(d.rows.map(r => { const row = [r.jilid, r.bab || '', r.lafadz]; for (let k = 0; k < 12; k++) { const s = r.steps[k]; row.push(s ? s.q : '', s ? s.a.join('|') : ''); } return row; }));
+      const ws = XLSX.utils.aoa_to_sheet(aoa); ws['!cols'] = [{ wch: 6 }, { wch: 16 }, { wch: 16 }, ...hdr.slice(3).map(() => ({ wch: 22 }))];
+      const wb = XLSX.utils.book_new(); XLSX.utils.book_append_sheet(wb, ws, 'Lafadz');
+      XLSX.writeFile(wb, 'bank-soal-lisan-' + new Date().toISOString().slice(0, 10) + '.xlsx');
+      toast(d.rows.length + ' lafadz diunduh', '⬇️');
+    } catch (x) { alert(x.message); }
+    finally { b.disabled = false; b.textContent = t0; }
+  };
+  load();
 }
 
 /* ---------- Admin: detail statistik satu murid ---------- */
