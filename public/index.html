@@ -375,6 +375,8 @@ select,textarea{font:inherit;color:var(--ink);background:var(--surface);border:1
 .olr{display:flex;justify-content:space-between;align-items:center;gap:12px;padding:10px 0;border-bottom:1px solid var(--line)}.olr:last-child{border:0}
 .olr .lf{font-size:1.8rem;margin:0;padding:4px 14px;flex:none}
 .ostep .meta{margin-bottom:6px}
+/* Kuis Lisan: tombol level per jilid */
+.olv{display:flex;flex-wrap:wrap;gap:8px}.olv .btn{flex:1 1 auto;white-space:nowrap}.olv .btn small{font-weight:500;opacity:.8}
 </style>
 </head>
 <body>
@@ -1027,26 +1029,27 @@ function vDailyResult(r, wrong) {
 async function vOral() {
   V.innerHTML = '<p class="muted">Memuat…</p>';
   let d; try { d = await api('oral'); } catch (e) { V.textContent = e.message; return; }
-  const left = Math.max(0, d.max - d.used);
+  const unl = !!d.unl, left = unl ? Infinity : Math.max(0, d.max - d.used), OLV = { easy: ['Mudah', '🌱'], medium: ['Sedang', '⚡'], hard: ['Sulit', '🔥'] };
   V.innerHTML = `<h1>Kuis Lisan</h1>
     <div class="card"><p style="margin:0 0 8px">Praktek lafadz seperti di depan ustadz: kamu diberi satu lafadz, lalu menjawab langkah demi langkah (kalimat apa, tandanya, mu'rab atau mabni, dan seterusnya) dengan tulisanmu sendiri.</p>
-      <p class="muted" style="margin:0">Jawaban dinilai dari maksudnya, bukan harus sama persis dengan kunci. Sisa latihan hari ini: <b>${left}</b> lafadz.</p></div>
+      <p class="muted" style="margin:0">Jawaban dinilai dari maksudnya, bukan harus sama persis dengan kunci. ${unl ? 'Akun admin: <b>tanpa batas</b> latihan.' : 'Sisa latihan hari ini: <b>' + left + '</b> lafadz.'} Pilih level: makin tinggi, makin banyak lafadz dalam satu sesi, dan lafadz diambil dari sebanyak mungkin bab.</p></div>
     <div class="grid jgrid">` + [1, 2, 3, 4].map((j, n) => {
       const c = d.counts[j] || 0, s = d.stats[j];
       return `<div class="card jc" style="--i:${n};${jst(j)}"><div class="jh"><span class="tag">Jilid ${j}</span><span class="jst">${c} lafadz</span></div>
         <p class="muted" style="margin:0 0 12px">${s ? s.n + ' lafadz dijawab · ' + Math.round(s.c / s.t * 100) + '% langkah benar' : c ? 'Belum pernah dicoba' : 'Soal belum tersedia'}</p>
-        <button class="btn" data-oj="${j}"${c && left ? '' : ' disabled'}>${c ? (left ? 'Mulai latihan' : 'Batas hari ini tercapai') : 'Segera hadir'}</button></div>`;
+        ${c ? `<div class="olv">${Object.entries(d.lv).map(([k, n]) => `<button class="btn${k === 'easy' ? '' : ' ghost'}" data-oj="${j}" data-ol="${k}"${left ? '' : ' disabled'}>${OLV[k][1]} ${OLV[k][0]}<small> · ${Math.min(n, c)} lafadz</small></button>`).join('')}</div>${left ? '' : '<p class="muted" style="margin:8px 0 0">Batas hari ini tercapai</p>'}` : '<button class="btn" disabled>Segera hadir</button>'}</div>`;
     }).join('') + '</div>';
   V.querySelectorAll('[data-oj]').forEach(b => b.onclick = async () => {
-    b.disabled = true;
-    try { vOralQuiz(await api('oral/start', { jilid: +b.dataset.oj, n: d.n }), +b.dataset.oj); }
-    catch (e) { alert(e.message); b.disabled = false; }
+    V.querySelectorAll('[data-oj]').forEach(x => x.disabled = true);
+    try { vOralQuiz(await api('oral/start', { jilid: +b.dataset.oj, level: b.dataset.ol }), +b.dataset.oj); }
+    catch (e) { alert(e.message); V.querySelectorAll('[data-oj]').forEach(x => x.disabled = !left); }
   });
 }
 function vOralQuiz(d, j) {
   const items = d.items, sum = []; let i = 0;
+  const lvt = ({ easy: ' · 🌱 Mudah', medium: ' · ⚡ Sedang', hard: ' · 🔥 Sulit' })[d.level] || '';
   const head = (it, frac) => `<div class="bar"><i style="width:${frac * 100}%"></i></div>
-    <div class="meta"><span class="muted">🗣️ Jilid ${j} · Lafadz ${i + 1}/${items.length}${it.bab ? ' · ' + esc(it.bab) : ''}</span></div>
+    <div class="meta"><span class="muted">🗣️ Jilid ${j}${lvt} · Lafadz ${i + 1}/${items.length}${it.bab ? ' · ' + esc(it.bab) : ''}</span></div>
     <div class="lf" lang="ar" dir="rtl">${esc(it.lafadz)}</div>`;
   const ask = () => {
     const it = items[i], ans = []; let s = 0, busy = false;
@@ -1083,7 +1086,7 @@ function vOralQuiz(d, j) {
   };
   const result = () => {
     const c = sum.reduce((a, x) => a + x.r.correct, 0), t = sum.reduce((a, x) => a + x.r.total, 0), p = t ? Math.round(c / t * 100) : 0;
-    V.innerHTML = `<div class="card res jc" style="${jst(j)}"><div class="big">${p >= 90 ? '🏆' : p >= 70 ? '🎉' : p >= 40 ? '👍' : '💪'}</div><span class="tag">Hasil Kuis Lisan · Jilid ${j}</span>
+    V.innerHTML = `<div class="card res jc" style="${jst(j)}"><div class="big">${p >= 90 ? '🏆' : p >= 70 ? '🎉' : p >= 40 ? '👍' : '💪'}</div><span class="tag">Hasil Kuis Lisan · Jilid ${j}${lvt}</span>
       <h1>${c} / ${t}</h1><p class="muted">langkah benar (${p}%) dari ${sum.length} lafadz</p>
       <div style="text-align:left">${sum.map(x => `<div class="olr"><div class="lf" lang="ar" dir="rtl">${esc(x.it.lafadz)}</div><b>${x.r.correct}/${x.r.total}</b></div>`).join('')}</div>
       <div class="row"><button class="btn" id="oh">Kembali</button><button class="btn ghost" id="oa2">Latihan lagi</button></div></div>`;
