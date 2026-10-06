@@ -297,7 +297,7 @@ select,textarea{font:inherit;color:var(--ink);background:var(--surface);border:1
 .pz.win{animation:winp .6s ease-out infinite alternate;z-index:1}
 .ptr{position:absolute;left:50%;top:0;bottom:0;width:3px;margin-left:-1.5px;background:#fff;box-shadow:0 0 10px 2px var(--accent)}
 @keyframes winp{to{transform:scale(1.14);filter:brightness(1.25)}}
-/* ===== Toko ===== */
+/* ===== Efek ===== */
 .gold{display:inline-flex;align-items:center;gap:6px;background:linear-gradient(135deg,#FFE27A,#F2B705);color:#3a2e00;font-weight:800;padding:2px 14px;border-radius:999px}
 .shopbar{display:flex;justify-content:space-between;align-items:center;gap:12px;flex-wrap:wrap}
 .shopg{display:grid;grid-template-columns:repeat(auto-fill,minmax(220px,1fr));gap:14px}
@@ -306,7 +306,7 @@ select,textarea{font:inherit;color:var(--ink);background:var(--surface);border:1
 .si .tg{align-self:flex-start;font-size:.72rem;font-weight:800;padding:1px 10px;border-radius:999px;background:var(--tc);color:#fff}
 .si h3{margin:0}.si p{margin:0;color:var(--muted);font-size:.88rem;flex:1}
 .si .acts{display:flex;gap:8px}.si .acts .btn{flex:1;padding:10px 6px;font-size:.9rem}
-/* ===== Gaya nama (Toko) — dipakai di leaderboard, profil pemain, chip sidebar ===== */
+/* ===== Gaya nama (Efek) — dipakai di leaderboard, profil pemain, chip sidebar ===== */
 @keyframes nflow{to{background-position:200% 0}}
 @keyframes nneon{0%,100%{text-shadow:0 0 4px #7df9ff,0 0 10px #00d4ff}50%{text-shadow:0 0 8px #d6fdff,0 0 20px #00d4ff,0 0 32px #0099ff}}
 @keyframes nglitch{0%,84%,100%{transform:translate(0);text-shadow:-1px 0 #ff2d6f,1px 0 #00e5ff}88%{transform:translate(-2px,1px);text-shadow:-3px 0 #ff2d6f,3px 0 #00e5ff}92%{transform:translate(2px,-1px);text-shadow:3px 0 #ff2d6f,-3px 0 #00e5ff}96%{transform:translate(-1px,0);text-shadow:-2px 0 #ff2d6f,2px 0 #00e5ff}}
@@ -380,7 +380,7 @@ select,textarea{font:inherit;color:var(--ink);background:var(--surface);border:1
 .htabs{max-width:440px}.htabs button{flex:1 1 0;padding:10px 12px;font-size:.95rem}
 .hnote{margin:0 0 12px}.ostat{margin:0 0 12px}
 .lvl:disabled{opacity:.45;cursor:not-allowed;transform:none;box-shadow:none}
-/* Rapikan: sidebar pada layar pendek, nama rank di layar sempit, Toko, Pencapaian, Harian */
+/* Rapikan: sidebar pada layar pendek, nama rank di layar sempit, Efek, Pencapaian, Harian */
 .side{overflow-y:auto;scrollbar-width:thin}
 @media(min-width:821px) and (max-height:800px){.side{padding:14px 12px;gap:4px}.brand{padding-bottom:6px}.brand img{max-width:150px}.nav{padding:8px 14px}.side .credit{padding-top:4px}}
 @media(max-width:420px){.stp b{font-size:.66rem;letter-spacing:-.02em;overflow-wrap:normal}}
@@ -388,6 +388,8 @@ select,textarea{font:inherit;color:var(--ink);background:var(--surface);border:1
 @media(max-width:560px){.shopg{grid-template-columns:repeat(2,minmax(0,1fr));gap:10px}.si{padding:12px}.si .stage{height:72px;font-size:2.1rem}.si h3{font-size:1rem}.si p{font-size:.8rem}.si .acts{flex-direction:column;gap:6px}.si .acts .btn{padding:8px 4px}}
 .agrp>summary h2{flex:1}
 .pzg{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:12px 10px;margin-top:6px}.pzc{display:flex;flex-direction:column;align-items:flex-start;gap:3px}
+@keyframes fadein{from{opacity:0}to{opacity:1}}
+#hpane.sw .grid>.card{animation:fadein .2s}
 </style>
 </head>
 <body>
@@ -396,7 +398,7 @@ select,textarea{font:inherit;color:var(--ink);background:var(--surface);border:1
   <aside class="side">
     <div class="brand"><img src="/logo.png" alt="Al-Miftah – Mudah Belajar Membaca Kitab"></div>
     <button class="nav" data-v="home">Beranda</button>
-    <button class="nav" data-v="daily">Harian</button><button class="nav" data-v="board">Leaderboard</button><button class="nav" data-v="shop">Toko</button><button class="nav" data-v="ach">Pencapaian</button>
+    <button class="nav" data-v="daily">Harian</button><button class="nav" data-v="board">Leaderboard</button><button class="nav" data-v="shop">Efek</button><button class="nav" data-v="ach">Pencapaian</button>
     <button class="nav" data-v="admin" id="navAdmin" hidden>Panel Admin</button>
     <div class="sp"></div>
     <button class="nav" data-v="profile" id="who"></button>
@@ -407,7 +409,7 @@ select,textarea{font:inherit;color:var(--ink);background:var(--surface);border:1
     <div class="scroll"><div class="wrap" id="view"></div><div class="credit">Powered by <b>Nabil Ghufron</b> 1447-1448 H</div></div>
   </main>
   <nav class="bnav" aria-label="Menu utama">
-    <button class="bn" data-v="home"><span>🏠</span>Beranda</button><button class="bn" data-v="daily"><span>🎯</span>Harian</button><button class="bn" data-v="board"><span>🏆</span>Peringkat</button><button class="bn" data-v="shop"><span>🛒</span>Toko</button><button class="bn" data-v="ach"><span>🏅</span>Capaian</button><button class="bn" data-v="profile"><span>👤</span>Profil</button>
+    <button class="bn" data-v="home"><span>🏠</span>Beranda</button><button class="bn" data-v="daily"><span>🎯</span>Harian</button><button class="bn" data-v="board"><span>🏆</span>Peringkat</button><button class="bn" data-v="shop"><span>✨</span>Efek</button><button class="bn" data-v="ach"><span>🏅</span>Capaian</button><button class="bn" data-v="profile"><span>👤</span>Profil</button>
   </nav>
 </div>
 <script>
@@ -524,7 +526,7 @@ function burst(x, y, n = 14) {
   }
 }
 
-/* ---------- Toko: efek jawaban benar (3D) ---------- */
+/* ---------- Efek: efek jawaban benar (3D) ---------- */
 const GL = '🪙', R = (a, b) => a + Math.random() * (b - a);
 /* Kualitas efek. dpr = resolusi kanvas, ns = pengali jumlah partikel, cap = jari-jari cahaya maksimal (px), glow = bayangan tombol [blur, sebar],
    shake/flash = pengali guncangan & kilat layar (0 = mati), cull = buang sisi belakang kristal. */
@@ -823,7 +825,7 @@ const WARM = {"fire":["144,24,0","168,24,0","168,48,0","192,48,0","216,48,0","21
 function warmFx() { const k = WARM[me && me.fxa]; if (!k || RM) return; (window.requestIdleCallback || (f => setTimeout(f, 1500)))(() => E3.warm(k)); }
 function ansFx(el) { if (!RM) (FX[me.fxa] || FX.confetti)(el.getBoundingClientRect(), el); }
 
-/* ---------- Toko: tampilan ---------- */
+/* ---------- Efek: tampilan ---------- */
 const SHOP = [
   ['confetti', 'Konfeti', '🎊', 'Umum', 'Bawaan untuk semua murid. Konfeti warna-warni.'],
   ['stars', 'Bintang', '✨', 'Umum', 'Bintang emas memercik ke segala arah.'],
@@ -862,7 +864,7 @@ async function vShop() {
   const play = k => { const s = $('#sg-' + k); if (s) (FX[k] || FX.confetti)(s.getBoundingClientRect(), s); };
   const draw = () => {
     sync(); const g = st.gold, nameTab = shopTab === 'nm', list = nameTab ? NSHOP : SHOP;
-    V.innerHTML = `<div class="shopbar"><h1>Toko</h1><span class="gold" style="font-size:1.15rem">${GL} ${g}</span></div>
+    V.innerHTML = `<div class="shopbar"><h1>Efek</h1><span class="gold" style="font-size:1.15rem">${GL} ${g}</span></div>
       <div class="tabs"><button data-st="fx" class="${nameTab ? '' : 'on'}">🎆 Efek Jawaban</button><button data-st="nm" class="${nameTab ? 'on' : ''}">✒️ Gaya Nama</button></div>
       <p class="muted shopnote">${nameTab ? 'Gaya nama mengubah tampilan namamu di leaderboard, profil, dan menu. ' : 'Gold bertambah bersama XP di tiap level. Pakai untuk efek yang muncul saat jawabanmu benar. '}${!st.admin && me.pays ? `Bonus harian rank ${RANKS[rkOf(totalXp())][1]}: +${me.pays[rkOf(totalXp())]} Gold. ` : ''}Membeli tidak mengurangi XP atau rank.${st.admin ? ' Admin: semua item terbuka.' : ''}</p>
       <div class="shopg">${list.map(([k, nm_, ic, tr, ds]) => {
@@ -928,7 +930,7 @@ async function vDaily() {
     const rc = w.getBoundingClientRect();
     if (r.prize >= 1000) { FX.fireworks(rc); setTimeout(() => FX.galaxy(rc, w), 300); flash('rgba(245,197,24,.3)'); }
     else if (r.prize >= 500) FX.fireworks(rc); else if (r.prize >= d.rare) FX.stars(rc); else burst(...cen(rc), 18);
-    $('.spin .row').innerHTML = `<button class="btn ghost" id="shp">Ke Toko</button><button class="btn" id="spn">${sp.n > 1 || sp.more ? 'Lanjut' : 'Selesai'}</button>`;
+    $('.spin .row').innerHTML = `<button class="btn ghost" id="shp">Ke Efek</button><button class="btn" id="spn">${sp.n > 1 || sp.more ? 'Lanjut' : 'Selesai'}</button>`;
     $('#shp').onclick = () => go('shop'); $('#spn').onclick = () => vDaily();
   };
   $('#spin').onclick = async () => {
@@ -1040,6 +1042,7 @@ function vDailyResult(r, wrong) {
 /* Kuis Lisan: kartu jilid + tiga level. Satu sumber tampilan untuk Beranda (tab Kuis Lisan) dan halaman Kuis Lisan. Jumlah lafadz per level datang dari server (d.lv). */
 let homeTab = 'tulis'; try { homeTab = localStorage.getItem('ht') === 'lisan' ? 'lisan' : 'tulis'; } catch (e) {}
 const setHomeTab = t => { homeTab = t; try { localStorage.setItem('ht', t); } catch (e) {} };
+let oralCache = null;
 const OLV = { easy: ['Mudah', '🌱', 'e'], medium: ['Sedang', '⚡', 'm'], hard: ['Sulit', '🔥', 'h'] };
 const oralLeft = d => d.unl ? Infinity : Math.max(0, d.max - d.used);
 const oralNote = d => d.unl ? 'Akun admin: <b>tanpa batas</b> latihan.' : 'Sisa latihan hari ini: <b>' + oralLeft(d) + '</b> lafadz.';
@@ -1056,7 +1059,7 @@ function bindOral(root, d) {
   const left = oralLeft(d);
   root.querySelectorAll('[data-oj]').forEach(b => b.onclick = async () => {
     const all = root.querySelectorAll('[data-oj]'); all.forEach(x => x.disabled = true);
-    try { setHomeTab('lisan'); vOralQuiz(await api('oral/start', { jilid: +b.dataset.oj, level: b.dataset.ol }), +b.dataset.oj); }
+    try { setHomeTab('lisan'); oralCache = null; vOralQuiz(await api('oral/start', { jilid: +b.dataset.oj, level: b.dataset.ol }), +b.dataset.oj); }
     catch (e) { alert(e.message); all.forEach(x => x.disabled = !left); }
   });
 }
@@ -1168,9 +1171,13 @@ function vHome() {
         <p>${tat ? '3 nyawa. Naik tahap tiap 10 soal: Tathbiq 1 sampai 6, lalu Takhossus. XP tanpa batas!' : 'Selesaikan semua quest Jilid 1–4 (minimal ' + PASS() + '% benar di tiap level) untuk membuka mode ini.'}</p>
         <div class="ft"><small>${tat ? 'Rekor ' + (me.best['0:endless'] || 0) + ' XP · Tahap ' + (me.tstage ? STG[me.tstage - 1][0] : '-') : 'Jilid selesai: ' + [1, 2, 3, 4].filter(JD).length + '/4'}</small><button class="btn" id="endStart"${tat ? '' : ' disabled'}>${tat ? 'Mulai' : '🔒 Terkunci'}</button></div></div>
     </div>`;
-  const drawPane = async () => {
+  // swap = pindah tab (bukan render pertama): tinggi panel ditahan selama isi diganti dan animasi masuk diganti fade halus, supaya halaman tidak melompat/bergetar
+  const drawPane = async swap => {
     V.querySelectorAll('[data-ht]').forEach(b => b.classList.toggle('on', b.dataset.ht === homeTab));
     const pane = $('#hpane'), my = homeTab;
+    pane.classList.toggle('sw', !!swap);
+    pane.style.minHeight = pane.offsetHeight + 'px';
+    const settle = () => { pane.style.minHeight = ''; };
     if (my === 'tulis') {
       pane.innerHTML = paneTulis();
       $('#endStart').onclick = async () => { try { vEndless(await api('endless/start', {})); } catch (e) { alert(e.message); } };
@@ -1178,16 +1185,24 @@ function vHome() {
         try { vQuiz(await api(`quiz?jilid=${b.dataset.j}&level=${b.dataset.l}`), +b.dataset.j, b.dataset.l); }
         catch (e) { alert(e.message); }
       });
-      return;
+      settle(); return;
     }
-    pane.innerHTML = '<p class="muted">Memuat…</p>';
-    let d; try { d = await api('oral'); } catch (e) { if (homeTab === my && $('#hpane') === pane) pane.textContent = e.message; return; }
+    const paint = d => {
+      pane.innerHTML = `<p class="muted hnote">Praktek lafadz seperti di depan ustadz: jawab langkah demi langkah dengan tulisanmu sendiri, dinilai dari maksudnya. ${oralNote(d)} Makin tinggi level, makin banyak lafadz, diambil dari sebanyak mungkin bab.</p>` + oralGrid(d);
+      bindOral(pane, d);
+    };
+    const had = !!oralCache;
+    if (had) { paint(oralCache); settle(); } // tampil langsung dari data terakhir, lalu diperbarui diam-diam bila berubah
+    else pane.innerHTML = '<p class="muted">Memuat…</p>';
+    let d; try { d = await api('oral'); } catch (e) { if (!had && homeTab === my && $('#hpane') === pane) pane.textContent = e.message; settle(); return; }
     if (homeTab !== my || $('#hpane') !== pane) return; // pindah tab atau halaman saat masih memuat
-    pane.innerHTML = `<p class="muted hnote">Praktek lafadz seperti di depan ustadz: jawab langkah demi langkah dengan tulisanmu sendiri, dinilai dari maksudnya. ${oralNote(d)} Makin tinggi level, makin banyak lafadz, diambil dari sebanyak mungkin bab.</p>` + oralGrid(d);
-    bindOral(pane, d);
+    const changed = JSON.stringify(d) !== JSON.stringify(oralCache);
+    oralCache = d;
+    if (changed) { pane.classList.add('sw'); paint(d); }
+    settle();
   };
-  V.querySelectorAll('[data-ht]').forEach(b => b.onclick = () => { setHomeTab(b.dataset.ht); drawPane(); });
-  drawPane();
+  V.querySelectorAll('[data-ht]').forEach(b => b.onclick = () => { if (b.dataset.ht === homeTab) return; setHomeTab(b.dataset.ht); drawPane(true); });
+  drawPane(false);
   count($('#tx'), tot);
   $('#dailyGo').onclick = () => go('daily'); $('#fastGo').onclick = () => go('daily');
   setTimeout(() => { const g = $('#pg'); if (g) { g.style.background = rk[3]; g.style.width = frac * 100 + '%'; } }, 80);
@@ -1318,7 +1333,7 @@ const myAv = () => me.usePhoto && me.photo ? pkey(me.username, me.photo) : me.av
 /* Lencana terpasang: bd = [[ikon, nama, tingkat], ...] dari server */
 const bdg = bd => bd && bd.length ? `<span class="bdg">${bd.map(b => `<i title="${esc(b[1])}" style="--tc:${TIER[b[2]]}">${b[0]}</i>`).join('')}</span>` : '';
 const bdgChips = bd => bd && bd.length ? `<div class="bdgs">${bd.map(b => `<span class="bc" style="--tc:${TIER[b[2]]}">${b[0]} ${esc(b[1])}</span>`).join('')}</div>` : '';
-/* Toast pencapaian baru. owned = true bila Gold-nya sudah termasuk di me.bonus (dari /me atau Toko), supaya tidak dihitung dua kali. */
+/* Toast pencapaian baru. owned = true bila Gold-nya sudah termasuk di me.bonus (dari /me atau Efek), supaya tidak dihitung dua kali. */
 function noteAch(list, owned) {
   if (!list || !list.length) return;
   if (!owned) me.bonus = (me.bonus || 0) + list.reduce((s, a) => s + (a.g || 0), 0);
@@ -1374,10 +1389,10 @@ const GUIDE = {
     <li>Di <b>Profil</b> kamu bisa mengganti username, foto (emoji atau foto pribadi dari galeri yang otomatis dikompres), dan password (pilihan yang tersedia) serta melihat pencapaian. Lupa password? Minta admin mengatur ulang.</li>
     <li><b>Efek foto profil:</b> tiap pencapaian (khatam jilid dan tahap Tathbiq) menambah efek pada fotomu di sidebar, profil, dan leaderboard: dari cincin sederhana, cincin berputar bercahaya, titik cahaya mengorbit, sampai mahkota emas di tahap Takhossus. Di <b>Profil</b> kamu bebas memilih efek yang sudah terbuka (atau Otomatis, atau tanpa efek).</li>
     <li><b>Pencapaian rank:</b> Bronze, Silver, Gold, Platinum, Diamond, dan Legend diraih dari total XP. Tiga teratas di leaderboard mendapat bingkai khusus: api 🔥 (juara 1), petir ⚡ (juara 2), dan percikan aura ✨ (juara 3).</li>
-    <li><b>Gold dan Toko:</b> tiap rekor baru memberi Gold sebanyak XP-nya.@@GOLDINFO@@ Belanjakan di menu <b>Toko</b> untuk efek yang muncul saat jawabanmu benar, dari yang sederhana sampai petir dan galaksi. Efek bisa dicoba dulu, dan membeli tidak mengurangi XP atau rankmu.</li>
+    <li><b>Gold dan Efek:</b> tiap rekor baru memberi Gold sebanyak XP-nya.@@GOLDINFO@@ Belanjakan di menu <b>Efek</b> untuk efek yang muncul saat jawabanmu benar, dari yang sederhana sampai petir dan galaksi. Efek bisa dicoba dulu, dan membeli tidak mengurangi XP atau rankmu.</li>
     <li><b>Kuis Harian:</b> 10 soal acak dari semua jilid, sekali sehari dan tidak bisa diulang. Nilai minimal 80 memberi satu kali spin hadiah Gold, sampai 1000! Jangan tutup halaman sebelum selesai, karena kesempatan hari itu langsung terpakai.</li>
     <li><b>Kuis Lisan:</b> latihan praktek lafadz. Kamu diberi satu lafadz Arab lalu menjawab pertanyaan berurutan (kalimat apa, tandanya, mu'rab atau mabni, i'rab, dan alasannya) dengan tulisanmu sendiri, boleh bahasa Indonesia atau Arab. Jawaban dinilai dari maksudnya, jadi tidak harus sama persis dengan kunci. Latihan ini belum menambah XP.</li>
-    <li><b>Pencapaian dan lencana:</b> menu <b>Pencapaian</b> berisi puluhan target, dari streak harian, nilai sempurna, jawaban beruntun, sampai koleksi Toko. Tiap pencapaian memberi Gold sekali, ada juga yang tersembunyi. Di <b>Profil</b> kamu bisa memasang sampai 3 lencana yang tampil di leaderboard dan profilmu. Hari Jumat tidak memutus streak.</li></ul>`,
+    <li><b>Pencapaian dan lencana:</b> menu <b>Pencapaian</b> berisi puluhan target, dari streak harian, nilai sempurna, jawaban beruntun, sampai koleksi Efek. Tiap pencapaian memberi Gold sekali, ada juga yang tersembunyi. Di <b>Profil</b> kamu bisa memasang sampai 3 lencana yang tampil di leaderboard dan profilmu. Hari Jumat tidak memutus streak.</li></ul>`,
   tat: `<ul class="gl"><li><b>Syarat:</b> Mode Tathbiq terbuka setelah semua quest Jilid 1–4 selesai (minimal 60% benar di tiap level).</li>
     <li><b>Mode Tathbiq:</b> soal acak dari semua jilid, tanpa pengulangan, dengan <b>3 nyawa</b>. Salah 3 kali, permainan selesai.</li>
     <li>Tiap 10 soal naik tahap: Tathbiq 1 (soal 1–10), Tathbiq 2 (11–20), … Tathbiq 6 (51–60), lalu <b>Takhossus</b> (soal 61 dan seterusnya).</li>
@@ -1397,7 +1412,7 @@ function openGuide() {
 function openWelcome(thenGuide) {
   const m = document.createElement('div'); m.className = 'modal';
   m.innerHTML = `<div class="box"><h2>Selamat datang, ${esc(me.username)}! 🎉</h2><p class="muted">Akunmu sudah jadi. Ada beberapa hal penting yang perlu kamu ketahui:</p>
-    <ul class="gl">${me.starter ? `<li><b>Gold awal ${me.starter} ${GL}!</b> Murid baru mendapat Gold untuk dibelanjakan di menu <b>Toko</b>. Setiap hari kamu juga mendapat Gold bonus sesuai rank (${payText()}), otomatis saat kamu membuka aplikasi.</li>` : ''}<li><b>Akunmu tersimpan.</b> Setelah mendaftar, kamu bisa masuk lagi kapan saja dengan akun yang kamu daftarkan. Semua pencapaianmu (XP, rank, jilid yang selesai, dan efek foto) tersimpan di server, jadi tidak hilang walau kamu menutup halaman atau pindah perangkat.</li>
+    <ul class="gl">${me.starter ? `<li><b>Gold awal ${me.starter} ${GL}!</b> Murid baru mendapat Gold untuk dibelanjakan di menu <b>Efek</b>. Setiap hari kamu juga mendapat Gold bonus sesuai rank (${payText()}), otomatis saat kamu membuka aplikasi.</li>` : ''}<li><b>Akunmu tersimpan.</b> Setelah mendaftar, kamu bisa masuk lagi kapan saja dengan akun yang kamu daftarkan. Semua pencapaianmu (XP, rank, jilid yang selesai, dan efek foto) tersimpan di server, jadi tidak hilang walau kamu menutup halaman atau pindah perangkat.</li>
     <li><b>Jaga passwordmu.</b> Jangan beritahukan ke siapa pun, termasuk teman. Admin tidak bisa melihat passwordmu; kalau lupa, admin hanya bisa mengaturnya ulang.</li>
     <li><b>Password bisa diganti</b> kapan saja lewat menu <b>Profil</b>.</li>
     <li><b>Username bisa diubah nanti.</b> Buka menu <b>Profil</b>, lalu ubah username (3–20 karakter: huruf, angka, atau _). Username tampil di leaderboard, jadi pilih nama yang sopan.</li>
@@ -1469,7 +1484,7 @@ async function vProfile() {
     <div class="card"><h2>Efek foto profil</h2><p class="muted">Pilih efek bingkai yang ingin dipakai, lalu tekan Simpan. ${ADM() ? 'Sebagai admin, semua efek terbuka.' : 'Efek terbuka seiring pencapaianmu. Pilih Otomatis agar selalu memakai efek tertinggi.'}</p><div class="fxg" id="fxg">${fxGrid(dk(), pk)}</div><div class="row" style="margin-top:12px"><span></span><button class="btn" id="fxs">Simpan tampilan</button></div></div></section>
     <section class="pnl" data-p="acc"${ptab === 'acc' ? '' : ' hidden'}><div class="card"><h2>Nama pengguna</h2><input id="pu" maxlength="20" value="${esc(me.username)}" autocomplete="off">${ADM() ? `<label class="chk"><input type="checkbox" id="pbd"${me.board === false ? '' : ' checked'}> Tampilkan akunku di leaderboard</label>` : ''}<div class="err" id="err"></div><button class="btn" id="ps">Simpan</button></div>
     <div class="card"><h2>Ganti password</h2><input id="pwo" type="password" placeholder="Password lama" autocomplete="current-password"><input id="pwn" type="password" placeholder="Password baru (minimal 6 karakter)" autocomplete="new-password"><input id="pwn2" type="password" placeholder="Ulangi password baru" autocomplete="new-password"><div class="err" id="perr"></div><button class="btn" id="pws">Ganti password</button></div></section>
-    <section class="pnl" data-p="set"${ptab === 'set' ? '' : ' hidden'}><div class="card"><h2>Kualitas efek jawaban</h2><p class="muted">Kalau efek di Toko atau saat menjawab terasa patah-patah, pilih kualitas lebih rendah. Otomatis menyesuaikan sendiri dengan kemampuan perangkatmu.</p>
+    <section class="pnl" data-p="set"${ptab === 'set' ? '' : ' hidden'}><div class="card"><h2>Kualitas efek jawaban</h2><p class="muted">Kalau efek di menu Efek atau saat menjawab terasa patah-patah, pilih kualitas lebih rendah. Otomatis menyesuaikan sendiri dengan kemampuan perangkatmu.</p>
     <div class="tabs" id="fxq">${[['auto', 'Otomatis'], ['high', 'Tinggi'], ['mid', 'Sedang'], ['low', 'Rendah']].map(([k, t]) => `<button data-fq="${k}" class="${FXQ.mode === k ? 'on' : ''}">${t}</button>`).join('')}</div>
     <p class="muted" id="fxqn"></p><button class="btn ghost" id="fxt">Coba efek</button></div>
     <div class="card"><h2>Bantuan dan akun</h2><div class="slist"><button class="srow" id="pGuide"><span>📖</span><b>Panduan</b><small>Cara memakai Al-Miftah</small></button><button class="srow" id="pTheme"><span>🌓</span><b>Ganti tema</b><small>Terang atau gelap</small></button>${ADM() ? `<button class="srow adminlnk" data-v="admin"><span>🛠️</span><b>Panel Admin</b><small>${me.reports ? me.reports + ' laporan soal menunggu' : 'Kelola soal dan murid'}</small></button>` : ''}<a class="srow" href="/privasi.html" style="text-decoration:none;color:inherit"><span>🔒</span><b>Kebijakan privasi</b><small>Data apa yang kami simpan</small></a>${ADM() ? '' : `<button class="srow out" id="pDel"><span>🗑️</span><b>Hapus akun</b><small>Hapus akun dan semua datamu secara permanen</small></button>`}<button class="srow out" id="pOut"><span>🚪</span><b>Keluar</b><small>Akhiri sesi di perangkat ini</small></button></div></div></section>
