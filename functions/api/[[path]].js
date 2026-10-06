@@ -120,7 +120,7 @@ const babOf = x => String(x ?? '').trim().replace(/\s+/g, ' ');
 // Kuota gratis Groq per model (organisasi): gpt-oss-120b/20b = 30 permintaan/menit, 1.000/hari, 8.000 token/menit, 200.000 token/hari.
 // Kuota itu dipakai bersama seluruh murid, jadi ORAL_DAY_MAX dijaga kecil dan model cadangan dipakai saat kuota model utama habis.
 const ORAL_DAY_MAX = 20;                  // maksimal lafadz yang dinilai per murid per hari (WIB); melindungi kuota API gratis
-const ORAL_SESSION_N = 5, ORAL_SESSION_MAX = 10; // jumlah lafadz per sesi (bawaan, batas atas)
+const ORAL_LV = { easy: 5, medium: 10, hard: 15 };  // level Kuis Lisan = jumlah lafadz per sesi (Mudah, Sedang, Sulit), seperti 10/20/30 soal di kuis tulis. Klien membaca angka ini dari GET oral.
 const ORAL_ANS_MAX = 200;                 // panjang maksimal satu jawaban murid
 const GROQ_URL = 'https://api.groq.com/openai/v1/chat/completions';
 const GROQ_MODEL = 'openai/gpt-oss-120b', GROQ_FALLBACK = 'openai/gpt-oss-20b'; // bisa diganti lewat env GROQ_MODEL / GROQ_FALLBACK_MODEL
@@ -821,27 +821,41 @@ export async function onRequest({ request, env, params, waitUntil }) {
     }
 
     // ---------- Kuis Lisan (murid) ----------
-    const oralToday = () => sql`select count(*)::int n from oral_attempts where user_id = ${uid}::int and (created_at at time zone 'Asia/Jakarta')::date = (now() at time zone 'Asia/Jakarta')::date`;
+    // adm = pemanggil admin -> tidak dibatasi ORAL_DAY_MAX (dihitung di query yang sama, tanpa round trip tambahan)
+    const oralToday = () => sql`select count(*)::int n, coalesce((select role = 'admin' from users where id = ${uid}::int), false) adm from oral_attempts where user_id = ${uid}::int and (created_at at time zone 'Asia/Jakarta')::date = (now() at time zone 'Asia/Jakarta')::date`;
     if (route === 'GET oral') {
       const [per, [today], stats] = await sql.transaction([
         sql`select jilid, count(*)::int n from oral_items where active group by jilid`,
         oralToday(),
         sql`select jilid, sum(correct)::int c, sum(total)::int t, count(*)::int n from oral_attempts where user_id = ${uid}::int group by jilid`]);
-      return J({ counts: Object.fromEntries(per.map(r => [r.jilid, r.n])), used: today.n, max: ORAL_DAY_MAX, n: ORAL_SESSION_N,
+      return J({ counts: Object.fromEntries(per.map(r => [r.jilid, r.n])), used: today.n, max: ORAL_DAY_MAX, unl: today.adm, lv: ORAL_LV,
         stats: Object.fromEntries(stats.map(r => [r.jilid, { c: r.c, t: r.t, n: r.n }])) });
     }
     if (route === 'POST oral/start') {
-      const j = +body.jilid, n = Math.min(ORAL_SESSION_MAX, Math.max(1, Math.floor(+body.n) || ORAL_SESSION_N));
+      const j = +body.jilid, lv = ORAL_LV[body.level] ? body.level : 'easy';
       if (!(j >= 1 && j <= 4)) return bad('Pilihan tidak valid');
       const [[today], rows] = await sql.transaction([oralToday(),
-        // lafadz yang paling jarang dijawab murid ini didahulukan (lalu acak), supaya semua lafadz tercakup
-        sql`select i.id, i.bab, i.lafadz, i.steps from oral_items i
-          left join (select item_id, count(*) c from oral_attempts where user_id = ${uid}::int group by item_id) a on a.item_id = i.id
-          where i.jilid = ${j}::int and i.active order by coalesce(a.c, 0), random() limit ${n}::int`]);
+        // Syumul dua lapis. (1) Lafadz yang paling jarang dijawab murid ini didahulukan, jadi seluruh bank tercakup merata dan tidak ada yang tertinggal.
+        // (2) Di antara lafadz yang sama jarangnya, diambil bergiliran per bab (putaran 1 = satu lafadz dari tiap bab, putaran 2 = lafadz kedua, dst.),
+        // jadi satu sesi menyebar ke sebanyak mungkin bab; bab yang rata-rata paling jarang dilatih murid ini mendapat giliran lebih dulu.
+        // Lafadz tanpa bab hanya mengisi kekurangan. Urutan akhir diacak.
+        sql`select id, bab, lafadz, steps from (
+            select id, bab, lafadz, steps from (
+              select i.id, i.bab, i.lafadz, i.steps, i.bab is null as nb, coalesce(a.c, 0) ic,
+                case when i.bab is null then 0 else row_number() over (partition by coalesce(a.c, 0), lower(i.bab) order by random()) end as rk,
+                case when i.bab is null then 0 else (sum(coalesce(a.c, 0)) over (partition by lower(i.bab)))::numeric / (count(*) over (partition by lower(i.bab))) end as bc
+              from oral_items i
+              left join (select item_id, count(*) c from oral_attempts where user_id = ${uid}::int group by item_id) a on a.item_id = i.id
+              where i.jilid = ${j}::int and i.active) t
+            order by ic, nb, rk, bc, random() limit ${ORAL_LV[lv]}::int) s
+          order by random()`]);
       if (!rows.length) return bad('Belum ada soal lisan untuk jilid ini');
-      if (today.n >= ORAL_DAY_MAX) return bad('Batas latihan lisan hari ini (' + ORAL_DAY_MAX + ' lafadz) sudah tercapai. Lanjutkan besok!', 429);
-      const token = await sign({ k: 'oral', uid, j, ids: rows.map(r => r.id), nonce: crypto.randomUUID(), exp: Date.now() + 72e5 }, S);
-      return J({ items: rows.map(r => ({ id: r.id, bab: r.bab, lafadz: r.lafadz, steps: r.steps.map(s => s.q) })), token, j });
+      // Murid biasa dibatasi per hari. Bila sisa kuota lebih kecil dari level, sesi dipendekkan seperti sisa kuota (bukan ditolak); admin tanpa batas.
+      const left = today.adm ? Infinity : ORAL_DAY_MAX - today.n;
+      if (left <= 0) return bad('Batas latihan lisan hari ini (' + ORAL_DAY_MAX + ' lafadz) sudah tercapai. Lanjutkan besok!', 429);
+      const picked = rows.slice(0, left);
+      const token = await sign({ k: 'oral', uid, j, lv, ids: picked.map(r => r.id), nonce: crypto.randomUUID(), exp: Date.now() + 72e5 }, S);
+      return J({ items: picked.map(r => ({ id: r.id, bab: r.bab, lafadz: r.lafadz, steps: r.steps.map(s => s.q) })), token, j, level: lv });
     }
     if (route === 'POST oral/grade') {
       const t = await verify(String(body.token || ''), S);
@@ -855,7 +869,7 @@ export async function onRequest({ request, env, params, waitUntil }) {
         oralToday()]);
       if (!it) return bad('Lafadz ini sudah dihapus admin', 404);
       if (dup) return bad('Lafadz ini sudah dinilai', 409);
-      if (today.n >= ORAL_DAY_MAX) return bad('Batas latihan lisan hari ini sudah tercapai. Lanjutkan besok!', 429);
+      if (!today.adm && today.n >= ORAL_DAY_MAX) return bad('Batas latihan lisan hari ini sudah tercapai. Lanjutkan besok!', 429);
       const steps = it.steps, an = (Array.isArray(body.answers) ? body.answers : []).slice(0, steps.length).map(x => String(x ?? '').trim().slice(0, ORAL_ANS_MAX));
       while (an.length < steps.length) an.push('');
       // 1) cocok persis dengan bank -> benar tanpa memanggil AI; kosong -> salah; sisanya dinilai AI
