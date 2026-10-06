@@ -380,6 +380,14 @@ select,textarea{font:inherit;color:var(--ink);background:var(--surface);border:1
 .htabs{max-width:440px}.htabs button{flex:1 1 0;padding:10px 12px;font-size:.95rem}
 .hnote{margin:0 0 12px}.ostat{margin:0 0 12px}
 .lvl:disabled{opacity:.45;cursor:not-allowed;transform:none;box-shadow:none}
+/* Rapikan: sidebar pada layar pendek, nama rank di layar sempit, Toko, Pencapaian, Harian */
+.side{overflow-y:auto;scrollbar-width:thin}
+@media(min-width:821px) and (max-height:800px){.side{padding:14px 12px;gap:4px}.brand{padding-bottom:6px}.brand img{max-width:150px}.nav{padding:8px 14px}.side .credit{padding-top:4px}}
+@media(max-width:420px){.stp b{font-size:.66rem;letter-spacing:-.02em;overflow-wrap:normal}}
+.si .acts .btn{white-space:nowrap}
+@media(max-width:560px){.shopg{grid-template-columns:repeat(2,minmax(0,1fr));gap:10px}.si{padding:12px}.si .stage{height:72px;font-size:2.1rem}.si h3{font-size:1rem}.si p{font-size:.8rem}.si .acts{flex-direction:column;gap:6px}.si .acts .btn{padding:8px 4px}}
+.agrp>summary h2{flex:1}
+.pzg{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:12px 10px;margin-top:6px}.pzc{display:flex;flex-direction:column;align-items:flex-start;gap:3px}
 </style>
 </head>
 <body>
@@ -388,7 +396,7 @@ select,textarea{font:inherit;color:var(--ink);background:var(--surface);border:1
   <aside class="side">
     <div class="brand"><img src="/logo.png" alt="Al-Miftah – Mudah Belajar Membaca Kitab"></div>
     <button class="nav" data-v="home">Beranda</button>
-    <button class="nav" data-v="daily">Harian</button><button class="nav" data-v="oral">Kuis Lisan</button><button class="nav" data-v="board">Leaderboard</button><button class="nav" data-v="shop">Toko</button><button class="nav" data-v="ach">Pencapaian</button>
+    <button class="nav" data-v="daily">Harian</button><button class="nav" data-v="board">Leaderboard</button><button class="nav" data-v="shop">Toko</button><button class="nav" data-v="ach">Pencapaian</button>
     <button class="nav" data-v="admin" id="navAdmin" hidden>Panel Admin</button>
     <div class="sp"></div>
     <button class="nav" data-v="profile" id="who"></button>
@@ -456,7 +464,7 @@ const closeMenu = () => $('#app').classList.remove('open');
 function go(v, a) {
   closeMenu(); if (me) renderChip();
   document.querySelectorAll('.nav[data-v], .bn[data-v]').forEach(b => b.classList.toggle('active', b.dataset.v === v));
-  ({ auth: vAuth, home: vHome, board: vBoard, daily: vDaily, oral: vOral, shop: vShop, ach: vAch, admin: vAdmin, profile: vProfile })[v](a);
+  ({ auth: vAuth, home: vHome, board: vBoard, daily: vDaily, shop: vShop, ach: vAch, admin: vAdmin, profile: vProfile })[v](a);
   $('.scroll').scrollTop = 0;
 }
 
@@ -856,14 +864,14 @@ async function vShop() {
     sync(); const g = st.gold, nameTab = shopTab === 'nm', list = nameTab ? NSHOP : SHOP;
     V.innerHTML = `<div class="shopbar"><h1>Toko</h1><span class="gold" style="font-size:1.15rem">${GL} ${g}</span></div>
       <div class="tabs"><button data-st="fx" class="${nameTab ? '' : 'on'}">🎆 Efek Jawaban</button><button data-st="nm" class="${nameTab ? 'on' : ''}">✒️ Gaya Nama</button></div>
-      <p class="muted shopnote">${nameTab ? 'Gaya nama mengubah tampilan namamu di leaderboard, profil, dan menu. ' : 'Gold didapat dari tiap level, sama seperti XP: setiap rekor baru menambah XP dan Gold sebanyak yang sama. Belanjakan untuk efek yang muncul saat jawabanmu benar. '}${!st.admin && me.pays ? `Bonus harian rankmu (${RANKS[rkOf(totalXp())][1]}): +${me.pays[rkOf(totalXp())]} Gold, otomatis tiap hari. ` : ''}Membeli tidak mengurangi XP atau rankmu.${st.admin ? ' Sebagai admin, semua item terbuka untukmu.' : ''}</p>
+      <p class="muted shopnote">${nameTab ? 'Gaya nama mengubah tampilan namamu di leaderboard, profil, dan menu. ' : 'Gold bertambah bersama XP di tiap level. Pakai untuk efek yang muncul saat jawabanmu benar. '}${!st.admin && me.pays ? `Bonus harian rank ${RANKS[rkOf(totalXp())][1]}: +${me.pays[rkOf(totalXp())]} Gold. ` : ''}Membeli tidak mengurangi XP atau rank.${st.admin ? ' Admin: semua item terbuka.' : ''}</p>
       <div class="shopg">${list.map(([k, nm_, ic, tr, ds]) => {
         const free = k === 'confetti' || k === 'n_none', own = free || st.owned.includes(k), pr = st.prices[k] || 0;
         const eq = nameTab ? (st.equippedName || 'n_none') === k : (st.equipped || 'confetti') === k;
         const stage = nameTab ? `<div class="stage nm"><b class="${nc(k)}">${esc(me.username)}</b></div>` : `<div class="stage" id="sg-${k}"><span>${ic}</span></div>`;
         return `<div class="si${eq ? ' eq' : ''}${tr === 'Legendaris' || tr === 'Mitos' ? ' hi' : ''}" style="--tc:${TIER[tr]}"><span class="tg">${tr}</span>${stage}<h3>${nm_}</h3><p>${ds}</p>
           <div class="acts">${nameTab ? '' : `<button class="btn ghost" data-try="${k}">Coba</button>`}${own
-            ? `<button class="btn" data-eq="${k}"${eq ? ' disabled' : ''}>${eq ? 'Terpasang ✓' : 'Pasang'}</button>`
+            ? `<button class="btn" data-eq="${k}"${eq ? ' disabled' : ''}>${eq ? '✓ Terpasang' : 'Pasang'}</button>`
             : `<button class="btn" data-buy="${k}"${g < pr ? ' disabled' : ''}>${g < pr ? 'Kurang ' + (pr - g) + ' ' + GL : GL + ' ' + pr}</button>`}</div></div>`;
       }).join('')}</div>`;
     V.querySelectorAll('[data-st]').forEach(b => b.onclick = () => { shopTab = b.dataset.st; draw(); });
@@ -899,10 +907,10 @@ async function vDaily() {
     : `<p>Hasil hari ini: <b>${t.correct}/10</b> benar (nilai ${t.score}). Belum mencapai ${DAILY_PASS}, coba lagi besok.</p>`;
   V.innerHTML = '<h1>Kuis Harian</h1>' +
     (sp ? `<div class="card spin"><span class="tag">🎰 Spin hadiah · ${sp.nm}</span><h2>Kamu punya ${sp.n} spin!</h2><div class="reel"><div class="strip" id="strip"></div><i class="ptr"></i></div><div id="spmsg"></div><div class="row"><span></span><button class="btn" id="spin">Putar!</button></div></div>` : '') +
-    `<div class="card"><span class="tag">🎯 Hari ini</span>${status}<p class="muted" style="margin:8px 0 0">Kuis diperbarui dalam ${left} (pukul 00.00 WIB).</p></div>
+    `<div class="card"><span class="tag">🎯 Kuis Harian</span>${status}<p class="muted" style="margin:8px 0 0">Kuis diperbarui dalam ${left} (pukul 00.00 WIB).</p></div>
     <div class="card"><span class="tag">⚡ Cepat Tepat</span>${fstatus}</div>
-    <div class="card"><h2>Hadiah spin</h2>${d.prizes.map(([g, w]) => `<div class="urow"><span class="pz" style="--pc:${PRIZE_C[g]};flex:0 0 auto;height:34px;padding:0 14px;font-size:.95rem">${GL} ${g}</span><span class="muted" style="margin:0">peluang ${+(w / tot * 100).toFixed(1)}%</span></div>`).join('')}
-    <p class="muted" style="margin:8px 0 0">Jaminan: spin ke-${d.need} sejak hadiah langka terakhir pasti mendapat ${GL} ${d.rare} atau lebih (dihitung terpisah untuk Kuis Harian dan Cepat Tepat). Spin berikutnya di Kuis Harian adalah yang ke-${d.pity + 1}, di Cepat Tepat yang ke-${f.pity + 1}.</p></div>`;
+    <div class="card"><h2>Hadiah spin</h2><div class="pzg">${d.prizes.map(([g, w]) => `<div class="pzc"><span class="pz" style="--pc:${PRIZE_C[g]};flex:0 0 auto;height:34px;padding:0 14px;font-size:.95rem">${GL} ${g}</span><small class="muted">peluang ${+(w / tot * 100).toFixed(1)}%</small></div>`).join('')}</div>
+    <p class="muted" style="margin:12px 0 0">Jaminan: spin ke-${d.need} sejak hadiah langka terakhir (${GL} ${d.rare}+) pasti mendapat hadiah langka. Dihitung terpisah untuk Kuis Harian dan Cepat Tepat. Spin berikutnya: Kuis Harian ke-${d.pity + 1}, Cepat Tepat ke-${f.pity + 1}.</p></div>`;
   const go1 = $('#dgo'); if (go1) go1.onclick = async () => {
     if (!confirm('Kamu hanya punya satu kesempatan hari ini dan tidak bisa mengulang. Jangan tutup halaman sebelum selesai. Mulai sekarang?')) return;
     try { vDailyQuiz(await api('daily/start', {})); } catch (e) { alert(e.message); }
@@ -1052,14 +1060,6 @@ function bindOral(root, d) {
     catch (e) { alert(e.message); all.forEach(x => x.disabled = !left); }
   });
 }
-async function vOral() {
-  V.innerHTML = '<p class="muted">Memuat…</p>';
-  let d; try { d = await api('oral'); } catch (e) { V.textContent = e.message; return; }
-  V.innerHTML = `<h1>Kuis Lisan</h1>
-    <div class="card"><p style="margin:0 0 8px">Praktek lafadz seperti di depan ustadz: kamu diberi satu lafadz, lalu menjawab langkah demi langkah (kalimat apa, tandanya, mu'rab atau mabni, dan seterusnya) dengan tulisanmu sendiri.</p>
-      <p class="muted" style="margin:0">Jawaban dinilai dari maksudnya, bukan harus sama persis dengan kunci. ${oralNote(d)} Makin tinggi level, makin banyak lafadz, diambil dari sebanyak mungkin bab.</p></div>` + oralGrid(d);
-  bindOral(V, d);
-}
 function vOralQuiz(d, j) {
   const items = d.items, sum = []; let i = 0;
   const lvt = ({ easy: ' · 🌱 Mudah', medium: ' · ⚡ Sedang', hard: ' · 🔥 Sulit' })[d.level] || '';
@@ -1106,7 +1106,7 @@ function vOralQuiz(d, j) {
       <div style="text-align:left">${sum.map(x => `<div class="olr"><div class="lf" lang="ar" dir="rtl">${esc(x.it.lafadz)}</div><b>${x.r.correct}/${x.r.total}</b></div>`).join('')}</div>
       <div class="row"><button class="btn" id="oh">Kembali</button><button class="btn ghost" id="oa2">Latihan lagi</button></div></div>`;
     if (p >= 70) [0, 250].forEach(t2 => setTimeout(() => burst(innerWidth / 2, 130, 30), t2));
-    $('#oh').onclick = () => go('home'); $('#oa2').onclick = () => go('oral');
+    $('#oh').onclick = () => go('home'); $('#oa2').onclick = async e => { e.currentTarget.disabled = true; try { vOralQuiz(await api('oral/start', { jilid: j, level: d.level }), j); } catch (x) { alert(x.message); go('home'); } };
   };
   ask();
 }
