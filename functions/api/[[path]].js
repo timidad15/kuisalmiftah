@@ -5,7 +5,7 @@ const b64 = b => btoa(String.fromCharCode(...new Uint8Array(b))).replace(/\+/g, 
 const unb64 = s => Uint8Array.from(atob(s.replace(/-/g, '+').replace(/_/g, '/')), c => c.charCodeAt(0));
 const J = (o, s = 200) => new Response(JSON.stringify(o), { status: s, headers: { 'Content-Type': 'application/json', 'Cache-Control': 'no-store', 'X-Content-Type-Options': 'nosniff' } });
 const bad = (m, s = 400) => J({ error: m }, s);
-// Toko: harga efek jawaban benar (gold). 'confetti' bawaan dan gratis. Gold = XP rekor x GOLD_RATE, dikurangi total belanja.
+// Efek (toko): harga efek jawaban benar (gold). 'confetti' bawaan dan gratis. Gold = XP rekor x GOLD_RATE, dikurangi total belanja.
 const GOLD_RATE = 1;
 // Gold tambahan di luar XP rekor dan hadiah spin. Dicatat di tabel gold_grants (satu baris per pemberian) dan ikut dihitung lewat gold_total_bonus().
 const STARTER_GOLD = 500;                          // Gold awal untuk murid yang baru mendaftar
@@ -14,7 +14,7 @@ const RANK_PAY = [50, 100, 150, 200, 250, 300];    // Gold harian per rank: Bron
 const GRANTED = new Map();                         // uid -> hari (WIB) bonus rank sudah diperiksa; menghemat satu query per /me
 const wibDay = () => new Date(Date.now() + 7 * 36e5).toISOString().slice(0, 10);
 const SHOP = { stars: 100, bubbles: 200, petals: 300, coins: 450, fireworks: 600, fire: 900, ice: 1100, lightning: 1500, comet: 2000, galaxy: 2800 };
-// Toko: gaya nama di leaderboard (kunci diawali n_). Disimpan di purchases seperti efek jawaban; yang terpasang ada di users.fxn.
+// Efek (toko): gaya nama di leaderboard (kunci diawali n_). Disimpan di purchases seperti efek jawaban; yang terpasang ada di users.fxn.
 const NSHOP = { n_mint: 100, n_ocean: 150, n_grape: 300, n_sunset: 400, n_shimmer: 600, n_neon: 800, n_blaze: 1100, n_frost: 1300, n_glitch: 2000, n_rainbow: 2500 };
 const PRICES = { ...SHOP, ...NSHOP };
 // Kuis harian: 10 soal acak semua jilid; nilai >= DAILY_PASS memberi 1 spin. Hadiah = [gold, bobot]. Spin ke-PITY sejak hadiah >= RARE terakhir dijamin langka.
@@ -29,8 +29,8 @@ const PASS_PCT = 60, XPMAX = { easy: 100, medium: 200, hard: 300 }; // PASS_PCT 
 // <ach-pure>
 const STREAK_SKIP_DOW = 5; // hari yang tidak memutus streak (0 = Ahad ... 5 = Jumat, libur madrasah). Isi -1 untuk mematikan.
 const AG = { Umum: 25, Langka: 75, Epik: 150, Legendaris: 300, Mitos: 500 }; // Gold hadiah per tingkat, sekali per pencapaian
-const ACH_GROUPS = ['Konsistensi', 'Ketepatan', 'Tathbiq', 'Toko & Hoki', 'Profil & Komunitas', 'Peringkat'];
-const LEGEND_ITEMS = new Set(['lightning', 'comet', 'galaxy', 'n_blaze', 'n_frost', 'n_glitch', 'n_rainbow']); // item Legendaris + Mitos di Toko (harus sama dengan tier di index.html)
+const ACH_GROUPS = ['Konsistensi', 'Ketepatan', 'Tathbiq', 'Efek & Hoki', 'Profil & Komunitas', 'Peringkat'];
+const LEGEND_ITEMS = new Set(['lightning', 'comet', 'galaxy', 'n_blaze', 'n_frost', 'n_glitch', 'n_rainbow']); // item Legendaris + Mitos di menu Efek (harus sama dengan tier di index.html)
 // A(kunci, grup, nama, deskripsi, ikon, tingkat, metrik, target, { h: tersembunyi, ok: syarat tambahan })
 const A = (k, g, n, d, i, t, m, need, o = {}) => ({ k, g, n, d, i, t, gold: AG[t], m, need, h: o.h ? 1 : 0, np: o.np ? 1 : 0, ok: o.ok });
 const ACH = [
@@ -59,10 +59,10 @@ const ACH = [
   A('correct1000', 1, 'Seribu Benar', 'Kumpulkan 1000 jawaban benar', '📚', 'Epik', 'correct', 1000),
   A('clean', 2, 'Tanpa Cela', 'Capai soal ke-31 Tathbiq tanpa kehilangan nyawa', '🛡️', 'Legendaris', 'clean', 1),
   A('marathon', 2, 'Maraton', 'Jawab 100 soal dalam satu sesi Tathbiq', '🏃', 'Epik', 'marathon', 100),
-  A('legend3', 3, 'Kolektor Legendaris', 'Miliki 3 item Legendaris atau Mitos di Toko', '💠', 'Legendaris', 'legend', 3),
-  A('legend5', 3, 'Kolektor Agung', 'Miliki 5 item Legendaris atau Mitos di Toko', '🔱', 'Mitos', 'legend', 5),
-  A('fxall', 3, 'Koleksi Efek Penuh', 'Miliki semua efek jawaban di Toko', '🎆', 'Mitos', 'fxOwned', Object.keys(SHOP).length),
-  A('nmall', 3, 'Koleksi Nama Penuh', 'Miliki semua gaya nama di Toko', '✒️', 'Mitos', 'nmOwned', Object.keys(NSHOP).length),
+  A('legend3', 3, 'Kolektor Legendaris', 'Miliki 3 item Legendaris atau Mitos di menu Efek', '💠', 'Legendaris', 'legend', 3),
+  A('legend5', 3, 'Kolektor Agung', 'Miliki 5 item Legendaris atau Mitos di menu Efek', '🔱', 'Mitos', 'legend', 5),
+  A('fxall', 3, 'Koleksi Efek Penuh', 'Miliki semua efek jawaban di menu Efek', '🎆', 'Mitos', 'fxOwned', Object.keys(SHOP).length),
+  A('nmall', 3, 'Koleksi Nama Penuh', 'Miliki semua gaya nama di menu Efek', '✒️', 'Mitos', 'nmOwned', Object.keys(NSHOP).length),
   A('jackpot', 3, 'Jackpot', 'Dapatkan hadiah 1000 Gold dari spin kuis harian', '🎰', 'Mitos', 'jackpot', 1, { h: 1 }),
   A('photo', 4, 'Wajah Baru', 'Unggah foto pribadi', '📷', 'Umum', 'photo', 1),
   A('vet30', 4, 'Murid Lama', 'Akun berusia 30 hari dan aktif minimal 10 hari', '🕌', 'Langka', 'age', 30, { ok: m => m.active >= 10 }),
@@ -612,7 +612,7 @@ export async function onRequest({ request, env, params, waitUntil }) {
       return J({ ok: true });
     }
 
-    // ---------- Toko ----------
+    // ---------- Efek ----------
     const shopState = async () => {
       const [best, own, [u], [bn], [ag]] = await sql.transaction([bestOf(uid), sql`select item, price from purchases where user_id = ${uid}`, sql`select fxa, fxn, role from users where id = ${uid}`, sql`select gold_total_bonus(${uid}::int) s`, sql`select coalesce(sum(gold), 0)::int s from user_achievements where user_id = ${uid}`]);
       const earned = best.reduce((a, r) => a + r.xp, 0) * GOLD_RATE, spent = own.reduce((a, r) => a + r.price, 0), admin = !!u && u.role === 'admin';
