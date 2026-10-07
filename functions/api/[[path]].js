@@ -124,6 +124,14 @@ const ORAL_LV = { easy: 5, medium: 10, hard: 15 };  // level Kuis Lisan = jumlah
 const ORAL_ANS_MAX = 200;                 // panjang maksimal satu jawaban murid
 const GROQ_URL = 'https://api.groq.com/openai/v1/chat/completions';
 const GROQ_MODEL = 'openai/gpt-oss-120b', GROQ_FALLBACK = 'openai/gpt-oss-20b'; // bisa diganti lewat env GROQ_MODEL / GROQ_FALLBACK_MODEL
+// Pemakaian Groq dicatat per panggilan ke tabel ai_usage (token, status, lama, sisa kuota dari header) dan dibaca tab "Groq" di panel admin.
+// Batas di bawah hanya untuk tampilan bilah di panel admin; angka resmi ada di console.groq.com/settings/limits. Ubah bila paket Groq berubah.
+const GROQ_LIMITS = { rpm: 30, rpd: 1000, tpm: 8000, tpd: 200000 };
+let aiuReady;
+const aiuEnsure = sql => aiuReady ||= sql.transaction([
+  sql`create table if not exists ai_usage (id bigserial primary key, created_at timestamptz not null default now(), model text not null, status int not null, ok boolean not null,
+    prompt_tokens int, completion_tokens int, total_tokens int, ms int, rem_req int, lim_req int, rem_tok int, lim_tok int, reset_req text)`,
+  sql`create index if not exists ai_usage_t on ai_usage (created_at desc)`]).catch(e => { aiuReady = null; throw e; });
 const GROQ_EFFORT = 'low';               // reasoning_effort gpt-oss (low/medium/high); low cukup untuk mencocokkan makna dengan bank dan hemat token
 // <oral-pure>
 // Normalisasi untuk pencocokan lokal: buang harakat/tatwil, samakan bentuk alif dan ya, buang tanda baca, rapikan spasi.
@@ -166,29 +174,35 @@ function parseOral(text, nums) {
 // Menilai langkah-langkah yang belum cocok lokal lewat Groq (API kompatibel OpenAI). Urutan: model utama, lalu model cadangan.
 // 429 (kuota model habis) -> langsung pindah ke model cadangan, karena kuota dihitung per model. 5xx atau balasan salah format -> coba ulang sekali.
 // 401/403 (key salah) -> berhenti dengan error. Semua gagal -> lempar error, dan pemanggil tidak menyimpan jawaban murid.
-async function aiGrade(env, lafadz, todo) {
+async function aiGrade(env, lafadz, todo, rec) {
   if (!env.GROQ_API_KEY) throw new Error('GROQ_API_KEY belum diatur');
   const models = [env.GROQ_MODEL || GROQ_MODEL, env.GROQ_FALLBACK_MODEL || GROQ_FALLBACK].filter((m, i, a) => m && a.indexOf(m) === i);
   let last;
   for (const model of models) {
     for (let t = 0; t < 2; t++) {
       const ac = new AbortController(), to = setTimeout(() => ac.abort(), 15000);
+      let got = false; const t0 = Date.now();
       try {
         const body = { model, temperature: 0, max_completion_tokens: 1200, response_format: { type: 'json_object' },
           messages: [{ role: 'system', content: ORAL_SYS }, { role: 'user', content: oralPrompt(lafadz, todo) }] };
         if (/gpt-oss/.test(model)) { body.reasoning_effort = env.GROQ_EFFORT || GROQ_EFFORT; body.include_reasoning = false; } // parameter ini hanya untuk model gpt-oss
         const r = await fetch(GROQ_URL, { method: 'POST', signal: ac.signal, headers: { 'Content-Type': 'application/json', Authorization: 'Bearer ' + env.GROQ_API_KEY }, body: JSON.stringify(body) });
-        if (r.status === 401 || r.status === 403) throw Object.assign(new Error('groq ' + r.status + ' key ditolak'), { fatal: true });
-        if (r.status === 429) { last = new Error('groq 429 ' + model); break; }              // kuota model ini habis: ke model cadangan
-        if (r.status >= 500) last = new Error('groq ' + r.status);
-        else if (!r.ok) { last = new Error('groq ' + r.status + ' ' + model + ' ' + (await r.text()).slice(0, 200)); break; } // mis. nama model salah: ke model cadangan
+        got = true;
+        const hn = k => { const v = parseInt(r.headers.get(k), 10); return Number.isFinite(v) ? v : null; };
+        const log = x => rec && rec({ model, status: r.status, ms: Date.now() - t0, rem_req: hn('x-ratelimit-remaining-requests'), lim_req: hn('x-ratelimit-limit-requests'),
+          rem_tok: hn('x-ratelimit-remaining-tokens'), lim_tok: hn('x-ratelimit-limit-tokens'), reset_req: (r.headers.get('x-ratelimit-reset-requests') || '').slice(0, 20) || null, ...x });
+        if (r.status === 401 || r.status === 403) { log(); throw Object.assign(new Error('groq ' + r.status + ' key ditolak'), { fatal: true }); }
+        if (r.status === 429) { log(); last = new Error('groq 429 ' + model); break; }              // kuota model ini habis: ke model cadangan
+        if (r.status >= 500) { log(); last = new Error('groq ' + r.status); }
+        else if (!r.ok) { log(); last = new Error('groq ' + r.status + ' ' + model + ' ' + (await r.text()).slice(0, 200)); break; } // mis. nama model salah: ke model cadangan
         else {
           const d = await r.json(), res = parseOral(d.choices && d.choices[0] && d.choices[0].message && d.choices[0].message.content, todo.map(x => x.n));
+          const us = d.usage || {}; log({ pt: us.prompt_tokens ?? null, ct: us.completion_tokens ?? null, tt: us.total_tokens ?? null });
           console.log('groq', model, 'token', d.usage && d.usage.total_tokens); // pantau pemakaian token harian di log Cloudflare
           if (res) return res;
           last = new Error('balasan groq tidak sesuai format (' + model + ')');
         }
-      } catch (e) { if (e && e.fatal) throw e; last = e; }
+      } catch (e) { if (!got && rec) rec({ model, status: 0, ms: Date.now() - t0 }); if (e && e.fatal) throw e; last = e; }
       finally { clearTimeout(to); }
       if (t === 0) await new Promise(ok => setTimeout(ok, 800));
     }
@@ -234,6 +248,17 @@ export async function onRequest({ request, env, params, waitUntil }) {
   const sql = neon(env.DATABASE_URL), S = env.JWT_SECRET, url = new URL(request.url);
   const route = request.method + ' ' + [].concat(params.path || []).join('/');
   const body = request.method === 'POST' ? await request.json().catch(() => ({})) : {};
+  const aiRec = e => { // catat satu panggilan Groq tanpa menahan respons ke murid; kegagalan mencatat tidak boleh mengganggu penilaian
+    const p = (async () => {
+      try {
+        await aiuEnsure(sql);
+        await sql`insert into ai_usage (model, status, ok, prompt_tokens, completion_tokens, total_tokens, ms, rem_req, lim_req, rem_tok, lim_tok, reset_req)
+          values (${e.model}::text, ${e.status}::int, ${e.status >= 200 && e.status < 300}::boolean, ${e.pt ?? null}::int, ${e.ct ?? null}::int, ${e.tt ?? null}::int, ${e.ms ?? null}::int,
+            ${e.rem_req ?? null}::int, ${e.lim_req ?? null}::int, ${e.rem_tok ?? null}::int, ${e.lim_tok ?? null}::int, ${e.reset_req ?? null}::text)`;
+      } catch (x) { console.error('ai_usage', x); }
+    })();
+    if (waitUntil) waitUntil(p);
+  };
   const authToken = id => sign({ k: 'auth', uid: id, exp: Date.now() + 6048e5 }, S);
   // Pembatas percobaan login. locked() mengembalikan query (bisa dimasukkan ke sql.transaction).
   const locked = k => sql`select 1 from login_attempts where key = ${k} and reset_at > now() and n >= ${LOGIN_MAX}`;
@@ -855,7 +880,7 @@ export async function onRequest({ request, env, params, waitUntil }) {
       if (left <= 0) return bad('Batas latihan lisan hari ini (' + ORAL_DAY_MAX + ' lafadz) sudah tercapai. Lanjutkan besok!', 429);
       const picked = rows.slice(0, left);
       const token = await sign({ k: 'oral', uid, j, lv, ids: picked.map(r => r.id), nonce: crypto.randomUUID(), exp: Date.now() + 72e5 }, S);
-      return J({ items: picked.map(r => ({ id: r.id, bab: r.bab, lafadz: r.lafadz, steps: r.steps.map(s => s.q) })), token, j, level: lv });
+      return J({ items: picked.map(r => ({ id: r.id, lafadz: r.lafadz, steps: r.steps.map(s => s.q) })), token, j, level: lv });
     }
     if (route === 'POST oral/grade') {
       const t = await verify(String(body.token || ''), S);
@@ -876,7 +901,7 @@ export async function onRequest({ request, env, params, waitUntil }) {
       const res = steps.map((st, i) => !an[i] ? { ok: false, fb: 'Belum dijawab.' } : localOk(an[i], st.a) ? { ok: true, fb: '' } : null);
       const todo = steps.map((st, i) => res[i] ? null : { n: i + 1, q: st.q, bank: st.a, note: st.n || '', s: an[i] }).filter(Boolean);
       if (todo.length) {
-        try { const g = await aiGrade(env, it.lafadz, todo); for (const x of todo) res[x.n - 1] = g.get(x.n); }
+        try { const g = await aiGrade(env, it.lafadz, todo, aiRec); for (const x of todo) res[x.n - 1] = g.get(x.n); }
         catch (e) { console.error(e); return bad('Penilai otomatis sedang sibuk. Jawabanmu belum tersimpan, coba kirim lagi sebentar lagi.', 503); }
       }
       const correct = res.filter(r => r.ok).length;
@@ -1084,6 +1109,38 @@ export async function onRequest({ request, env, params, waitUntil }) {
         sql`select count(*)::int n from oral_items where (${j}::int = 0 or jilid = ${j}::int) and (${q}::text = '' or lafadz ilike ${like} or bab ilike ${like} or steps::text ilike ${like})`,
         sql`select jilid, count(*)::int n from oral_items group by jilid`]);
       return J({ rows, total: n, counts: Object.fromEntries(per.map(r => [r.jilid, r.n])) });
+    }
+    if (route === 'GET admin/groq') {
+      await aiuEnsure(sql);
+
+      const [[w], bm, dy, last, od] = await sql.transaction([
+        sql`select count(*) filter (where (created_at at time zone 'Asia/Jakarta')::date = (now() at time zone 'Asia/Jakarta')::date)::int c_today,
+            coalesce(sum(total_tokens) filter (where (created_at at time zone 'Asia/Jakarta')::date = (now() at time zone 'Asia/Jakarta')::date), 0)::int t_today,
+            count(*) filter (where created_at > now() - interval '24 hours')::int c_24, coalesce(sum(total_tokens) filter (where created_at > now() - interval '24 hours'), 0)::int t_24,
+            count(*) filter (where created_at > now() - interval '1 minute')::int c_1m, coalesce(sum(total_tokens) filter (where created_at > now() - interval '1 minute'), 0)::int t_1m,
+            count(*) filter (where status = 429 and created_at > now() - interval '24 hours')::int e429, count(*) filter (where not ok and status <> 429 and created_at > now() - interval '24 hours')::int eoth
+          from ai_usage where created_at > now() - interval '2 days'`,
+        sql`select model, count(*)::int calls, coalesce(sum(total_tokens), 0)::int tokens, coalesce(round(avg(ms)), 0)::int avg_ms, count(*) filter (where status = 429)::int e429, count(*) filter (where not ok and status <> 429)::int eoth
+          from ai_usage where created_at > now() - interval '24 hours' group by model order by calls desc`,
+        sql`select to_char((created_at at time zone 'Asia/Jakarta')::date, 'YYYY-MM-DD') d, count(*)::int calls, coalesce(sum(prompt_tokens), 0)::int pt, coalesce(sum(completion_tokens), 0)::int ct, coalesce(sum(total_tokens), 0)::int tokens, count(*) filter (where status = 429)::int e429
+          from ai_usage where created_at > now() - interval '8 days' group by 1 order by 1 desc limit 7`,
+        sql`select distinct on (model) model, rem_req, lim_req, rem_tok, lim_tok, reset_req, extract(epoch from now() - created_at)::int age
+          from ai_usage where rem_req is not null or rem_tok is not null order by model, created_at desc`,
+        sql`select to_char((created_at at time zone 'Asia/Jakarta')::date, 'YYYY-MM-DD') d, count(*)::int lafadz, count(*) filter (where ai)::int ai
+          from oral_attempts where created_at > now() - interval '8 days' group by 1 order by 1 desc limit 7`]);
+      return J({ configured: !!env.GROQ_API_KEY, models: [env.GROQ_MODEL || GROQ_MODEL, env.GROQ_FALLBACK_MODEL || GROQ_FALLBACK].filter((m, i, a) => m && a.indexOf(m) === i),
+        limits: GROQ_LIMITS, win: w, byModel: bm, days: dy, last, oral: od });
+    }
+    if (route === 'POST admin/groq-test') { // cek key tanpa memakai token: hanya meminta daftar model
+      if (!env.GROQ_API_KEY) return J({ ok: false, msg: 'GROQ_API_KEY belum diatur di Cloudflare Pages.' });
+      const want = [env.GROQ_MODEL || GROQ_MODEL, env.GROQ_FALLBACK_MODEL || GROQ_FALLBACK].filter((m, i, a) => m && a.indexOf(m) === i);
+      try {
+        const r = await fetch('https://api.groq.com/openai/v1/models', { headers: { Authorization: 'Bearer ' + env.GROQ_API_KEY }, signal: AbortSignal.timeout(8000) });
+        if (r.status === 401 || r.status === 403) return J({ ok: false, msg: 'Key ditolak oleh Groq (' + r.status + '). Periksa GROQ_API_KEY.' });
+        if (!r.ok) return J({ ok: false, msg: 'Groq membalas status ' + r.status + '.' });
+        const d = await r.json(), ids = new Set((d.data || []).map(m => m.id));
+        return J({ ok: true, n: ids.size, models: want.map(m => [m, ids.has(m)]) });
+      } catch (e) { return J({ ok: false, msg: e && e.name === 'TimeoutError' ? 'Groq tidak menjawab (waktu habis).' : 'Tidak bisa menghubungi Groq.' }); }
     }
     if (route === 'GET admin/oral-export') return J({ rows: await sql`select jilid, bab, lafadz, steps from oral_items order by jilid, id` });
 
