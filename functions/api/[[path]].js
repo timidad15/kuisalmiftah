@@ -171,6 +171,123 @@ function parseOral(text, nums) {
   return nums.every(n => m.has(n)) ? m : null;
 }
 // </oral-pure>
+
+// ---------- Kuis Sorof: 6 level mengikuti file bank (Pra Tathbiq, Tathbiq 1–5), pilihan ganda ----------
+// Soal dibuat otomatis dari tabel sorof_words (satu baris = satu fiil; level 4–5 berisi tashrif 14 dhamir). Nilai disimpan di tabel attempts
+// dengan kode jilid SOROF_LV[x].j (6–11) dan tingkat XP SOROF_LV[x].xl, jadi XP, rank, Gold harian, dan leaderboard otomatis ikut menghitungnya
+// (bestOf tidak menyaring jilid). Rumus XP yang sudah ada tidak diubah.
+const SOROF_MIN = 5;                        // jumlah baris aktif minimal agar sebuah level bisa dimainkan
+const sorofLv = x => (Object.prototype.hasOwnProperty.call(SOROF_LV, x) ? x : '');
+// <sorof-pure>
+// Sighot untuk level berjenis "kata" (Pra Tathbiq – Tathbiq 3). Kunci sama dengan kolom bank kata (forms di tabel sorof_words).
+const SG = { madhi: "Fi'il Madhi", mudhari: "Fi'il Mudhari'", masdar: 'Masdar Ghairu Mim', masdar_mim: 'Masdar Mim', fail: "Isim Fa'il", maful: "Isim Maf'ul", amar: "Fi'il Amar", nahi: "Fi'il Nahi", zaman: 'Isim Zaman/Makan', alat: 'Isim Alat' };
+const SG_KEYS = Object.keys(SG);
+// Empat belas dhamir untuk level berjenis "tashrif" (Tathbiq 4 dan 5), urut seperti di file bank.
+const SH = ['Mufrad Mudzakkar Ghaib', 'Tatsniyah Mudzakkar Ghaib', 'Jamak Mudzakkar Ghaib', "Mufrad Mu'annats Ghaibah", "Tatsniyah Mu'annats Ghaibah", "Jamak Mu'annats Ghaibah",
+  'Mufrad Mudzakkar Mukhathab', 'Tatsniyah Mudzakkar Mukhathab', 'Jamak Mudzakkar Mukhathab', "Mufrad Mu'annats Mukhathabah", "Tatsniyah Mu'annats Mukhathabah", "Jamak Mu'annats Mukhathabah",
+  'Mutakallim Wahdah', "Mutakallim Ma'al Ghair"];
+// Level mengikuti file bank. j = kode jilid di tabel attempts; xl = tingkat XP yang dipakai rumus XP yang sudah ada (easy 100, medium 200, hard 300); n = jumlah soal.
+// Kode 5 tidak boleh dipakai (filter Tathbiq di leaderboard); kode 6 juga menjadi filter gabungan Sorof di leaderboard.
+const SOROF_LV = {
+  pra: { j: 6,  n: 10, xl: 'easy',   t: 'kata',    title: 'Pra Tathbiq' },
+  t1:  { j: 7,  n: 10, xl: 'easy',   t: 'kata',    title: 'Tathbiq 1' },
+  t2:  { j: 8,  n: 20, xl: 'medium', t: 'kata',    title: 'Tathbiq 2' },
+  t3:  { j: 9,  n: 20, xl: 'medium', t: 'kata',    title: 'Tathbiq 3' },
+  t4:  { j: 10, n: 30, xl: 'hard',   t: 'tashrif', title: 'Tathbiq 4' },
+  t5:  { j: 11, n: 30, xl: 'hard',   t: 'tashrif', title: 'Tathbiq 5' },
+};
+const shuffle = (a, rnd) => { a = a.slice(); for (let i = a.length - 1; i > 0; i--) { const j = Math.floor(rnd() * (i + 1)); [a[i], a[j]] = [a[j], a[i]]; } return a; };
+const pickOf = (a, rnd) => a[Math.floor(rnd() * a.length)];
+const uniqs = a => [...new Set(a)];
+const sorofBuild = (q, right, wrong, rnd) => { const o = shuffle([right, ...wrong], rnd); return { q, a: o[0], b: o[1], c: o[2], d: o[3], ans: 'ABCD'[o.indexOf(right)] }; };
+// Ambil sampai `max` pengecoh dari tiga kelompok berurutan (prioritas), tanpa kembar.
+function sorofPick(groups, max, rnd) {
+  const got = [];
+  for (const [arr, upto] of groups) for (const x of shuffle(uniqs(arr), rnd)) { if (got.length >= Math.min(upto, max)) break; if (!got.includes(x)) got.push(x); }
+  return got.length === max ? got : null;
+}
+// ---- Level "kata": satu kata = satu fiil dengan semua bentuk turunannya ----
+// Dua jenis soal: "sighot" (lafadz -> nama sighot) dan "bentuk" (nama sighot + fiil -> lafadz). Null bila kata ini tak bisa dibuat soal.
+function sorofQ(w, pool, keys, rnd) {
+  const f = w.forms, have = keys.filter(k => f[k] && f[k].length);
+  for (const kind of rnd() < 0.5 ? ['sighot', 'bentuk'] : ['bentuk', 'sighot']) {
+    for (const k of shuffle(kind === 'bentuk' ? have.filter(x => x !== 'madhi') : have, rnd)) {
+      const x = pickOf(f[k], rnd);
+      if (kind === 'sighot') {
+        // sighot lain yang bentuknya sama persis pada kata ini tidak boleh jadi pilihan (jawabannya jadi ganda)
+        const cand = keys.filter(o => o !== k && !(f[o] || []).includes(x));
+        if (cand.length < 3) continue;
+        return sorofBuild(`Lafadz «${x}» termasuk sighot apa?`, SG[k], shuffle(cand, rnd).slice(0, 3).map(o => SG[o]), rnd);
+      }
+      // Pengecoh: utamakan bentuk lain dari fiil yang sama, lalu sighot yang sama milik kata lain di pola yang sama.
+      const right = new Set(f[k]), base = f.madhi[0], ok = y => y && !right.has(y) && y !== base;
+      const wrong = sorofPick([
+        [keys.filter(o => o !== k && o !== 'madhi').flatMap(o => f[o] || []).filter(ok), 2],
+        [pool.filter(p => p !== w && p.grup === w.grup).flatMap(p => p.forms[k] || []).filter(ok), 3],
+        [pool.filter(p => p !== w && p.grup !== w.grup).flatMap(p => p.forms[k] || []).filter(ok), 3]], 3, rnd);
+      if (wrong) return sorofBuild(`Manakah ${SG[k]} dari fi'il «${f.madhi[0]}»?`, x, wrong, rnd);
+    }
+  }
+  return null;
+}
+// ---- Level "tashrif": satu item = satu fiil dengan bentuknya untuk 14 dhamir (forms.s, '' = tidak ada) ----
+// Dua jenis soal: "dhamir" (lafadz -> dhamir) dan "bentuk" (fiil + dhamir -> lafadz).
+function sorofQT(w, pool, rnd) {
+  const s = (w.forms && w.forms.s) || [], base = s[0], have = s.map((x, i) => (x ? i : -1)).filter(i => i >= 0);
+  if (!base || have.length < 6) return null;
+  for (const kind of rnd() < 0.5 ? ['dhamir', 'bentuk'] : ['bentuk', 'dhamir']) {
+    for (const i of shuffle(kind === 'bentuk' ? have.filter(x => x > 0) : have, rnd)) {
+      const x = s[i];
+      if (kind === 'dhamir') {
+        if (s.some((y, j) => j !== i && y === x)) continue; // bentuk yang sama dipakai dhamir lain: jawabannya ganda, lewati
+        const others = shuffle(SH.map((_, j) => j).filter(j => j !== i), rnd).slice(0, 3).map(j => SH[j]);
+        return sorofBuild(i ? `Lafadz «${x}» (dari «${base}») termasuk dhamir apa?` : `Lafadz «${x}» termasuk dhamir apa?`, SH[i], others, rnd);
+      }
+      const ok = y => y && y !== x && y !== base, at = p => (p.forms && p.forms.s || [])[i];
+      const wrong = sorofPick([
+        [s.filter(ok), 2],
+        [pool.filter(p => p !== w && p.grup === w.grup).map(at).filter(ok), 3],
+        [pool.filter(p => p !== w && p.grup !== w.grup).map(at).filter(ok), 3]], 3, rnd);
+      if (wrong) return sorofBuild(`Manakah bentuk «${base}» untuk dhamir ${SH[i]}?`, x, wrong, rnd);
+    }
+  }
+  return null;
+}
+// items: baris sorof_words ({ grup, forms }) milik satu level. Mengembalikan paling banyak n soal { q, a, b, c, d, ans } tanpa soal kembar.
+function genSorof(items, lv, rnd = Math.random) {
+  const L = SOROF_LV[lv], n = L.n, order = shuffle(items, rnd), out = [], seen = new Set();
+  const keys = SG_KEYS.filter(k => items.some(w => w.forms[k] && w.forms[k].length)); // hanya sighot yang ada di level ini
+  for (let i = 0; out.length < n && i < n * 6 && order.length; i++) {
+    const w = order[i % order.length], q = L.t === 'kata' ? sorofQ(w, items, keys, rnd) : sorofQT(w, items, rnd);
+    if (q && !seen.has(q.q)) { seen.add(q.q); out.push(q); }
+  }
+  return out;
+}
+// Validasi dan rapikan bentuk-bentuk satu kata dari admin -> objek bersih, atau null bila tidak valid. Boleh berupa larik atau teks "a / b".
+function cleanForms(raw) {
+  if (!raw || typeof raw !== 'object' || Array.isArray(raw)) return null;
+  const out = {};
+  for (const k of SG_KEYS) {
+    if (raw[k] == null) continue;
+    const a = uniqs([].concat(raw[k]).flatMap(x => String(x).split('/')).map(x => x.trim()).filter(Boolean));
+    if (!a.length) continue;
+    if (a.length > 6 || a.some(x => x.length > 60)) return null;
+    out[k] = a;
+  }
+  return out.madhi && Object.keys(out).length >= 4 ? out : null; // wajib fiil madhi + minimal 3 bentuk lain
+}
+// Satu baris bank dari admin -> { grup, forms } bersih, atau null. Level "kata": forms = bentuk per sighot; level "tashrif": forms = { s: [14 bentuk] }.
+function cleanItem(lv, grup, forms) {
+  const L = SOROF_LV[lv]; grup = String(grup == null ? '' : grup).trim().replace(/\s+/g, ' ');
+  if (!L || !grup || grup.length > 80) return null;
+  if (L.t === 'kata') { const f = cleanForms(forms); return f ? { grup, forms: f } : null; }
+  const s = forms && Array.isArray(forms.s) ? forms.s.slice(0, 14).map(x => String(x == null ? '' : x).trim()) : null;
+  if (!s || s.some(x => x.length > 60)) return null;
+  while (s.length < 14) s.push('');
+  return s[0] && s.filter(Boolean).length >= 6 ? { grup, forms: { s } } : null; // wajib bentuk dasar + minimal 5 dhamir lain
+}
+// </sorof-pure>
+
 // Menilai langkah-langkah yang belum cocok lokal lewat Groq (API kompatibel OpenAI). Urutan: model utama, lalu model cadangan.
 // 429 (kuota model habis) -> langsung pindah ke model cadangan, karena kuota dihitung per model. 5xx atau balasan salah format -> coba ulang sekali.
 // 401/403 (key salah) -> berhenti dengan error. Semua gagal -> lempar error, dan pemanggil tidak menyimpan jawaban murid.
@@ -765,11 +882,11 @@ export async function onRequest({ request, env, params, waitUntil }) {
         with best as (
           select user_id, jilid, level,
                  max(case when level = 'endless' then score::numeric else round((case level when 'easy' then 100 when 'medium' then 200 else 300 end) * correct::numeric / total) end)::int xp
-          from attempts where case when ${j}::int = 0 then true when ${j}::int = 5 then level = 'endless' else jilid = ${j}::int end group by 1, 2, 3),
+          from attempts where case when ${j}::int = 0 then true when ${j}::int = 5 then level = 'endless' when ${j}::int = 6 then jilid between 6 and 11 else jilid = ${j}::int end group by 1, 2, 3),
         ranked as (
           select rank() over (order by sum(xp) desc)::int as rank, u.id, u.username, u.avatar, u.role, u.fx as pick, u.fxn as nm,
                  case when u.use_photo then u.photo_v end as ph, u.badges,
-                 sum(xp)::int as total, (count(distinct jilid) filter (where jilid > 0))::int as jilids
+                 sum(xp)::int as total, (count(distinct jilid) filter (where jilid between 1 and 4))::int as jilids
           from best join users u on u.id = best.user_id where u.role <> 'admin' or u.on_board group by u.id, u.username, u.avatar, u.role, u.fx, u.fxn, u.photo_v, u.use_photo, u.badges)
         select * from ranked
         where ${q}::text = '' or strpos(lower(username), lower(${q}::text)) > 0
@@ -914,6 +1031,48 @@ export async function onRequest({ request, env, params, waitUntil }) {
         steps: steps.map((st, i) => ({ q: st.q, s: an[i], ok: res[i].ok, fb: res[i].fb, model: st.a[0] })) });
     }
 
+    // ---------- Kuis Sorof (murid) ----------
+    // Soal + kunci dikirim sekaligus seperti GET quiz; nilai dihitung ulang di server dari kunci yang ditandatangani di token.
+    if (route === 'GET sorof') {
+      const per = await sql`select lv, count(*)::int n from sorof_words where active group by lv`;
+      const c = Object.fromEntries(per.map(r => [r.lv, r.n]));
+      return J({ lv: Object.entries(SOROF_LV).map(([k, v]) => ({ k, title: v.title, j: v.j, xl: v.xl, n: v.n, tipe: v.t, words: c[k] || 0, ready: (c[k] || 0) >= SOROF_MIN })) });
+    }
+    if (route === 'GET sorof/quiz') {
+      const l = sorofLv(url.searchParams.get('level')), L = SOROF_LV[l];
+      if (!L) return bad('Pilihan tidak valid');
+      const items = await sql`select grup, forms from sorof_words where active and lv = ${l}::text order by random() limit ${L.n * 3}`;
+      if (items.length < SOROF_MIN) return bad('Bank soal level ini belum tersedia');
+      const raw = genSorof(items, l);
+      if (raw.length < L.n) return bad('Soal level ini belum cukup');
+      const token = await sign({ k: 'sorof', uid, l, keys: raw.map(x => x.ans).join(''), nonce: crypto.randomUUID(), t0: Date.now(), exp: Date.now() + 72e5 }, S);
+      return J({ questions: raw.map((x, i) => ({ id: i + 1, q: x.q, a: x.a, b: x.b, c: x.c, d: x.d, answer: x.ans })), token });
+    }
+    if (route === 'POST sorof/submit') {
+      const t = await verify(String(body.token || ''), S), L = t && SOROF_LV[sorofLv(t.l)];
+      if (!t || t.k !== 'sorof' || t.uid !== uid || !L || typeof t.keys !== 'string') return bad('Sesi kuis tidak valid atau kedaluwarsa');
+      const total = t.keys.length;
+      if (!total || Date.now() - (t.t0 || 0) < total * 1000) return bad('Terlalu cepat. Baca soal dengan teliti, lalu kirim lagi.', 429); // batas wajar anti-curang
+      const an = body.answers && typeof body.answers === 'object' ? body.answers : {};
+      const key = Object.fromEntries([...t.keys].map((x, i) => [i + 1, x])), order = Object.keys(key).map(Number);
+      const correct = order.filter(id => an[id] === key[id]).length;
+      let row;
+      try {
+        [row] = await sql`insert into attempts (user_id, jilid, level, total, correct, score, nonce)
+          values (${uid}::int, ${L.j}::int, ${L.xl}::text, ${total}::int, ${correct}::int, ${Math.round(correct * 100 / total)}::int, ${t.nonce}::text)
+          returning correct, score`;
+      } catch (e) {
+        if (e.code === '23505') return bad('Kuis ini sudah pernah dikirim', 409);
+        throw e;
+      }
+      LB.clear();
+      try { // rekor jawaban benar beruntun; pencatatan ini tidak boleh menggagalkan hasil kuis
+        const run = maxRun(order, an, key);
+        if (run > 0) await sql`insert into user_stats (user_id, best_run) values (${uid}::int, ${run}::int) on conflict (user_id) do update set best_run = greatest(user_stats.best_run, excluded.best_run)`;
+      } catch (e) { console.error(e); }
+      return J({ correct: row.correct, total, score: row.score, xp: Math.round(XPMAX[L.xl] * row.correct / total), ach: await evalAch(uid) });
+    }
+
     // ---------- Khusus admin ----------
     const u = await getUser();
     if (!u) return bad('Silakan masuk dulu', 401);
@@ -928,7 +1087,7 @@ export async function onRequest({ request, env, params, waitUntil }) {
           (select count(*) from attempts a join users u on u.id = a.user_id and u.role = 'student')::int attempts,
           (select count(distinct a.user_id) from attempts a join users u on u.id = a.user_id and u.role = 'student' where a.created_at > now() - interval '7 days')::int active7`,
         sql`select a.jilid, count(*)::int attempts, count(distinct a.user_id)::int students, coalesce(round(avg(a.score)), 0)::int avg
-          from attempts a join users u on u.id = a.user_id and u.role = 'student' where a.jilid between 1 and 4 group by a.jilid`,
+          from attempts a join users u on u.id = a.user_id and u.role = 'student' where (a.jilid between 1 and 4 or a.jilid between 6 and 11) group by a.jilid`,
         sql`with best as (select user_id, max(case when level = 'endless' then score::numeric else round((case level when 'easy' then 100 when 'medium' then 200 else 300 end) * correct::numeric / total) end) xp from attempts group by user_id, jilid, level),
           tot as (select u.id, coalesce(sum(b.xp), 0)::int t from users u left join best b on b.user_id = u.id where u.role = 'student' group by u.id)
           select count(*) filter (where t < 300)::int r0, count(*) filter (where t >= 300 and t < 700)::int r1, count(*) filter (where t >= 700 and t < 1200)::int r2,
@@ -1175,6 +1334,54 @@ export async function onRequest({ request, env, params, waitUntil }) {
       const ins = sql`insert into oral_items (jilid, bab, lafadz, steps)
         select (x->>'jilid')::int, nullif(x->>'bab', ''), x->>'lafadz', x->'steps' from jsonb_array_elements(${JSON.stringify(clean)}::jsonb) x`;
       if (body.replace) await sql.transaction([sql`delete from oral_items where jilid = any(${[...new Set(clean.map(r => r.jilid))]}::int[])`, ins]);
+      else await ins;
+      return J({ added: clean.length });
+    }
+
+    // ---------- Admin: bank Sorof (kata dan tashrif) ----------
+    if (route === 'GET admin/sorof') {
+      const lv = sorofLv(url.searchParams.get('lv')), q = (url.searchParams.get('q') || '').trim().slice(0, 60);
+      const off = Math.max(0, +url.searchParams.get('offset') || 0), like = '%' + q.replace(/[\\%_]/g, '\\$&') + '%';
+      const [rows, [{ n }], per] = await sql.transaction([
+        sql`select id, lv, grup, forms, active from sorof_words
+          where (${lv}::text = '' or lv = ${lv}::text) and (${q}::text = '' or grup ilike ${like} or forms::text ilike ${like})
+          order by lv, id limit 30 offset ${off}`,
+        sql`select count(*)::int n from sorof_words where (${lv}::text = '' or lv = ${lv}::text) and (${q}::text = '' or grup ilike ${like} or forms::text ilike ${like})`,
+        sql`select lv, count(*)::int n from sorof_words group by lv`]);
+      return J({ rows, total: n, counts: Object.fromEntries(per.map(r => [r.lv, r.n])) });
+    }
+    if (route === 'GET admin/sorof-export') return J({ rows: await sql`select lv, grup, forms from sorof_words order by lv, id` });
+
+    if (route === 'POST admin/sorof-save') {
+      const id = +body.id || 0, lv = sorofLv(body.lv), c = cleanItem(lv, body.grup, body.forms), act = body.active !== false;
+      if (!lv) return bad('Level tidak dikenal (pra, t1, t2, t3, t4, t5)');
+      if (!c) return bad('Data tidak valid: pola/bagian wajib diisi (maks 80 karakter); level kata butuh fiil madhi + minimal 3 bentuk lain, level tashrif butuh bentuk dasar + minimal 5 dhamir lain (tiap bentuk maks 60 karakter)');
+      if (id) {
+        const r = await sql`update sorof_words set lv = ${lv}, grup = ${c.grup}, forms = ${JSON.stringify(c.forms)}::jsonb, active = ${act} where id = ${id} returning id`;
+        if (!r.length) return bad('Data tidak ditemukan', 404);
+      } else await sql`insert into sorof_words (lv, grup, forms, active) values (${lv}, ${c.grup}, ${JSON.stringify(c.forms)}::jsonb, ${act})`;
+      return J({ ok: true });
+    }
+
+    if (route === 'POST admin/sorof-delete') {
+      const ids = [].concat(body.ids ?? body.id ?? []).map(Number).filter(n => Number.isInteger(n) && n > 0).slice(0, 500);
+      if (!ids.length) return bad('Tidak ada data dipilih');
+      await sql`delete from sorof_words where id = any(${ids}::int[])`;
+      return J({ deleted: ids.length });
+    }
+
+    if (route === 'POST admin/sorof-import') {
+      const rows = body.rows;
+      if (!Array.isArray(rows) || !rows.length || rows.length > 1000) return bad('Data kosong atau lebih dari 1000 baris');
+      const clean = [];
+      for (const [i, r] of rows.entries()) {
+        const lv = sorofLv(r && r.lv), c = cleanItem(lv, r && r.grup, r && r.forms);
+        if (!c) return bad(`Baris ${i + 2} tidak valid (level pra/t1–t5, pola terisi, dan bentuk-bentuknya lengkap)`);
+        clean.push({ lv, grup: c.grup, forms: c.forms });
+      }
+      const ins = sql`insert into sorof_words (lv, grup, forms)
+        select x->>'lv', x->>'grup', x->'forms' from jsonb_array_elements(${JSON.stringify(clean)}::jsonb) x`;
+      if (body.replace) await sql.transaction([sql`delete from sorof_words where lv = any(${[...new Set(clean.map(r => r.lv))]}::text[])`, ins]);
       else await ins;
       return J({ added: clean.length });
     }
