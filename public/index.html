@@ -1044,6 +1044,8 @@ let homeTab = 'tulis'; try { homeTab = localStorage.getItem('ht') === 'lisan' ? 
 const setHomeTab = t => { homeTab = t; try { localStorage.setItem('ht', t); } catch (e) {} };
 let oralCache = null;
 const OLV = { easy: ['Mudah', '🌱', 'e'], medium: ['Sedang', '⚡', 'm'], hard: ['Sulit', '🔥', 'h'] };
+const AR_RUN = /[\u0600-\u06FF\u0750-\u077F]+(?:\s+[\u0600-\u06FF\u0750-\u077F]+)*/g;
+const qtx = s => esc(s).replace(AR_RUN, m => `<bdi lang="ar" dir="rtl">${m}</bdi>`), qdir = s => /[A-Za-z]/.test(s) ? 'ltr' : 'auto';
 const oralLeft = d => d.unl ? Infinity : Math.max(0, d.max - d.used);
 const oralNote = d => d.unl ? 'Akun admin: <b>tanpa batas</b> latihan.' : 'Sisa latihan hari ini: <b>' + oralLeft(d) + '</b> lafadz.';
 const oralGrid = d => {
@@ -1067,15 +1069,15 @@ function vOralQuiz(d, j) {
   const items = d.items, sum = []; let i = 0;
   const lvt = ({ easy: ' · 🌱 Mudah', medium: ' · ⚡ Sedang', hard: ' · 🔥 Sulit' })[d.level] || '';
   const head = (it, frac) => `<div class="bar"><i style="width:${frac * 100}%"></i></div>
-    <div class="meta"><span class="muted">🗣️ Jilid ${j}${lvt} · Lafadz ${i + 1}/${items.length}${it.bab ? ' · ' + esc(it.bab) : ''}</span></div>
+    <div class="meta"><span class="muted">🗣️ Jilid ${j}${lvt} · Lafadz ${i + 1}/${items.length}</span></div>
     <div class="lf" lang="ar" dir="rtl">${esc(it.lafadz)}</div>`;
   const ask = () => {
     const it = items[i], ans = []; let s = 0, busy = false;
     const draw = () => {
       const last = s === it.steps.length - 1;
       V.innerHTML = `<div class="card jc" style="${jst(j)}">${head(it, (i + s / it.steps.length) / items.length)}
-        ${s ? `<div>${ans.map((a, n) => `<div class="oqa"><p class="muted">${n + 1}. ${esc(it.steps[n])}</p><p class="a" dir="auto">${a ? esc(a) : '<i class="muted">(dikosongkan)</i>'}</p></div>`).join('')}</div>` : ''}
-        <h2 dir="auto" style="margin-top:14px">${s + 1}. ${esc(it.steps[s])}</h2>
+        ${s ? `<div>${ans.map((a, n) => `<div class="oqa"><p class="muted">${n + 1}. ${qtx(it.steps[n])}</p><p class="a" dir="auto">${a ? esc(a) : '<i class="muted">(dikosongkan)</i>'}</p></div>`).join('')}</div>` : ''}
+        <h2 dir="${qdir(it.steps[s])}" style="margin-top:14px">${s + 1}. ${qtx(it.steps[s])}</h2>
         <input id="oa" dir="auto" maxlength="200" placeholder="Tulis jawabanmu…" autocomplete="off" autocapitalize="off" spellcheck="false">
         <div class="err" id="oe"></div>
         <div class="row"><span class="muted" style="margin:0;font-size:.85rem">Bebas: bahasa Indonesia atau Arab</span><button class="btn" id="onx">${last ? 'Periksa jawaban' : 'Lanjut →'}</button></div></div>`;
@@ -1095,7 +1097,7 @@ function vOralQuiz(d, j) {
       const perfect = r.correct === r.total;
       V.innerHTML = `<div class="card jc" style="${jst(j)}">${head(it, (i + 1) / items.length)}
         <span class="chip pop">${perfect ? '✅ Semua benar, masya Allah!' : r.correct + ' dari ' + r.total + ' langkah benar'}</span>
-        ${r.steps.map((x, n) => `<div class="ost ${x.ok ? 'ok' : 'no'}"><p class="muted">${n + 1}. ${esc(x.q)}</p><p dir="auto"><b>${x.s ? esc(x.s) : '(dikosongkan)'}</b> ${x.ok ? '✅' : '❌'}</p>${x.ok ? '' : `<p class="muted" dir="auto">${x.fb ? esc(x.fb) + ' ' : ''}Jawaban contoh: <b>${esc(x.model)}</b></p>`}</div>`).join('')}
+        ${r.steps.map((x, n) => `<div class="ost ${x.ok ? 'ok' : 'no'}"><p class="muted">${n + 1}. ${qtx(x.q)}</p><p dir="auto"><b>${x.s ? esc(x.s) : '(dikosongkan)'}</b> ${x.ok ? '✅' : '❌'}</p>${x.ok ? '' : `<p class="muted" dir="auto">${x.fb ? esc(x.fb) + ' ' : ''}Jawaban contoh: <b>${esc(x.model)}</b></p>`}</div>`).join('')}
         <div class="row"><span></span><button class="btn" id="onn">${i < items.length - 1 ? 'Lafadz berikutnya →' : 'Lihat hasil'}</button></div></div>`;
       if (perfect) burst(innerWidth / 2, 130, 24);
       $('#onn').onclick = () => { if (i < items.length - 1) { i++; ask(); } else result(); };
@@ -1701,8 +1703,8 @@ const loadX = () => window.XLSX ? Promise.resolve() : xlsxP ||= new Promise((ok,
 let admTab = 'stat';
 const ago = t => { if (!t) return 'belum pernah'; const m = (Date.now() - new Date(t)) / 6e4; return m < 1 ? 'baru saja' : m < 60 ? Math.floor(m) + ' menit lalu' : m < 1440 ? Math.floor(m / 60) + ' jam lalu' : Math.floor(m / 1440) + ' hari lalu'; };
 function vAdmin() {
-  V.innerHTML = `<h1>Panel Admin</h1><div class="tabs">${[['stat', '📊 Statistik'], ['soal', '📝 Kelola soal'], ['oral', '🗣️ Soal lisan'], ['user', '👥 Kelola murid'], ['lap', '🚩 Laporan' + (me.reports ? ' (' + me.reports + ')' : '')]].map(([k, n]) => `<button data-t="${k}" class="${k === admTab ? 'on' : ''}">${n}</button>`).join('')}</div><div id="ab"></div>`;
-  const show = t => { admTab = t; V.querySelectorAll('[data-t]').forEach(x => x.classList.toggle('on', x.dataset.t === t)); const ab = $('#ab'); ab.innerHTML = ''; ({ stat: adminStats, soal: adminSoal, oral: adminOral, user: adminUsers, lap: adminReports })[t](ab); };
+  V.innerHTML = `<h1>Panel Admin</h1><div class="tabs">${[['stat', '📊 Statistik'], ['soal', '📝 Kelola soal'], ['oral', '🗣️ Soal lisan'], ['user', '👥 Kelola murid'], ['groq', '🤖 Groq'], ['lap', '🚩 Laporan' + (me.reports ? ' (' + me.reports + ')' : '')]].map(([k, n]) => `<button data-t="${k}" class="${k === admTab ? 'on' : ''}">${n}</button>`).join('')}</div><div id="ab"></div>`;
+  const show = t => { admTab = t; V.querySelectorAll('[data-t]').forEach(x => x.classList.toggle('on', x.dataset.t === t)); const ab = $('#ab'); ab.innerHTML = ''; ({ stat: adminStats, soal: adminSoal, oral: adminOral, user: adminUsers, lap: adminReports, groq: adminGroq })[t](ab); };
   V.querySelectorAll('[data-t]').forEach(b => b.onclick = () => show(b.dataset.t));
   show(admTab);
 }
@@ -1848,6 +1850,7 @@ async function adminOral(box) {
     } catch (x) { $('#oer').textContent = /^Gagal memuat/.test(x.message) ? x.message : 'File tidak bisa dibaca.'; }
   };
   $('#oup').onclick = async () => {
+    if ($('#orp').checked && !confirm('Lafadz lama pada jilid yang ada di file akan DIHAPUS dan diganti. Catatan penilai (yang diisi lewat tombol Edit) juga ikut hilang karena tidak ada di Excel. Lanjutkan?')) return;
     try { const r = await api('admin/oral-import', { rows: imp, replace: $('#orp').checked }); alert(r.added + ' lafadz ditambahkan.'); refresh(); }
     catch (e) { $('#oer').textContent = e.message; }
   };
@@ -1896,6 +1899,41 @@ async function adminOral(box) {
     finally { b.disabled = false; b.textContent = t0; }
   };
   load();
+}
+
+/* ---------- Admin: pemakaian Groq (token, kuota, kesehatan penilai AI) ---------- */
+const nf = n => Number(n || 0).toLocaleString('id-ID');
+const agoS = s => s < 90 ? s + ' dtk lalu' : s < 5400 ? Math.round(s / 60) + ' mnt lalu' : Math.round(s / 3600) + ' jam lalu';
+async function adminGroq(box) {
+  box.innerHTML = '<p class="muted">Memuat…</p>';
+  let g; try { g = await api('admin/groq'); } catch (e) { box.textContent = e.message; return; }
+  if (!$('#ab')) return;
+  const L = g.limits, w = g.win, od = Object.fromEntries(g.oral.map(r => [r.d, r]));
+  const tile = (n, t) => `<div class="card" style="text-align:center"><h1 style="margin:0">${n}</h1><span class="muted" style="margin:0">${t}</span></div>`;
+  const bar = (lb, v, max) => { const p = max ? Math.min(100, v / max * 100) : 0; return `<div class="urow"><span style="min-width:170px">${lb}</span><div class="prog" style="flex:1"><i style="width:${p}%${p >= 80 ? ';background:#E24B3B' : ''}"></i></div><b style="min-width:120px;text-align:right">${nf(v)} / ${nf(max)}</b></div>`; };
+  const row = (a, b) => `<div class="urow"><span dir="auto">${a}</span><span class="muted" style="margin:0;text-align:right;font-size:.88rem">${b}</span></div>`;
+  const none = '<p class="muted">Belum ada data. Pencatatan dimulai sejak panggilan Groq pertama setelah pembaruan ini.</p>';
+  box.innerHTML = `<div class="card"><h2>Koneksi</h2>
+      <p class="muted">Kunci API: <b>${g.configured ? 'terpasang' : 'BELUM diatur'}</b> · Model utama: <b>${esc(g.models[0])}</b>${g.models[1] ? ' · cadangan: <b>' + esc(g.models[1]) + '</b>' : ''}</p>
+      <div class="row" style="margin:0"><button class="btn ghost" id="gtest">Tes kunci Groq</button><button class="btn ghost" id="grf">Muat ulang</button></div>
+      <p class="muted" id="gres" style="margin:10px 0 0">Tes kunci hanya meminta daftar model, tidak memakai token.</p></div>
+    <div class="grid">${tile(nf(w.c_today), 'Panggilan hari ini (WIB)')}${tile(nf(w.t_today), 'Token hari ini (WIB)')}${tile(nf(w.c_24), 'Panggilan 24 jam')}${tile(nf(w.t_24), 'Token 24 jam')}</div>
+    <div class="card"><h2>Kuota (perkiraan dari catatan aplikasi)</h2>
+      ${bar('Permintaan 24 jam', w.c_24, L.rpd)}${bar('Token 24 jam', w.t_24, L.tpd)}${bar('Permintaan 1 menit', w.c_1m, L.rpm)}${bar('Token 1 menit', w.t_1m, L.tpm)}
+      <p class="muted" style="margin:10px 0 0">Gagal 24 jam terakhir: <b>${w.e429}</b> kuota habis (429), <b>${w.eoth}</b> galat lain. Batas di atas adalah angka pengaturan di server; yang resmi ada di console.groq.com/settings/limits.</p></div>
+    <div class="card"><h2>Sisa kuota menurut Groq</h2>${g.last.length ? g.last.map(x => row('<b>' + esc(x.model) + '</b>',
+      `${x.rem_req != null ? 'sisa permintaan harian ' + nf(x.rem_req) + (x.lim_req ? ' / ' + nf(x.lim_req) : '') : ''}${x.rem_tok != null ? ' · sisa token menit ini ' + nf(x.rem_tok) + (x.lim_tok ? ' / ' + nf(x.lim_tok) : '') : ''}${x.reset_req ? ' · reset harian ' + esc(x.reset_req) : ''} · ${agoS(x.age)}`)).join('') : none}</div>
+    <div class="card"><h2>Per model (24 jam)</h2>${g.byModel.length ? g.byModel.map(x => row('<b>' + esc(x.model) + '</b>',
+      `${nf(x.calls)} panggilan · ${nf(x.tokens)} token · rata-rata ${nf(x.avg_ms)} ms${x.e429 ? ' · 429: ' + x.e429 : ''}${x.eoth ? ' · galat: ' + x.eoth : ''}`)).join('') : none}</div>
+    <div class="card"><h2>7 hari terakhir (WIB)</h2>${g.days.length ? g.days.map(x => { const o = od[x.d]; return row('<b>' + esc(x.d) + '</b>',
+      `${nf(x.calls)} panggilan · ${nf(x.tokens)} token (masuk ${nf(x.pt)}, keluar ${nf(x.ct)})${x.e429 ? ' · 429: ' + x.e429 : ''}${o ? ' · ' + nf(o.lafadz) + ' lafadz dinilai, ' + nf(o.ai) + ' lewat AI' : ''}`); }).join('') : none}</div>`;
+  $('#grf').onclick = () => adminGroq(box);
+  $('#gtest').onclick = async e => {
+    const b = e.currentTarget, o = $('#gres'); b.disabled = true; o.textContent = 'Memeriksa…';
+    try { const r = await api('admin/groq-test', {}); o.innerHTML = r.ok ? '✅ Kunci diterima Groq. ' + r.models.map(([m, ok]) => esc(m) + (ok ? ' ✅ tersedia' : ' ⚠️ tidak ditemukan di daftar')).join(' · ') : '❌ ' + esc(r.msg); }
+    catch (x) { o.textContent = x.message; }
+    b.disabled = false;
+  };
 }
 
 /* ---------- Admin: detail statistik satu murid ---------- */
