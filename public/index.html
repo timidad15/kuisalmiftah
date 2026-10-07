@@ -390,6 +390,9 @@ select,textarea{font:inherit;color:var(--ink);background:var(--surface);border:1
 .pzg{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:12px 10px;margin-top:6px}.pzc{display:flex;flex-direction:column;align-items:flex-start;gap:3px}
 @keyframes fadein{from{opacity:0}to{opacity:1}}
 #hpane.sw .grid>.card{animation:fadein .2s}
+.htabs{max-width:560px}.sorof .lvls{grid-template-columns:repeat(3,1fr)}
+@media(max-width:560px){.sorof .lvls{grid-template-columns:repeat(2,1fr)}}
+@media(max-width:480px){.htabs button{padding:10px 6px;font-size:.84rem}}
 </style>
 </head>
 <body>
@@ -1040,9 +1043,9 @@ function vDailyResult(r, wrong) {
 
 /* ---------- Kuis Lisan (murid) ---------- */
 /* Kuis Lisan: kartu jilid + tiga level. Satu sumber tampilan untuk Beranda (tab Kuis Lisan) dan halaman Kuis Lisan. Jumlah lafadz per level datang dari server (d.lv). */
-let homeTab = 'tulis'; try { homeTab = localStorage.getItem('ht') === 'lisan' ? 'lisan' : 'tulis'; } catch (e) {}
+let homeTab = 'tulis'; try { homeTab = ['lisan', 'sorof'].includes(localStorage.getItem('ht')) ? localStorage.getItem('ht') : 'tulis'; } catch (e) {}
 const setHomeTab = t => { homeTab = t; try { localStorage.setItem('ht', t); } catch (e) {} };
-let oralCache = null;
+let oralCache = null, sorofCache = null;
 const OLV = { easy: ['Mudah', '🌱', 'e'], medium: ['Sedang', '⚡', 'm'], hard: ['Sulit', '🔥', 'h'] };
 const AR_RUN = /[\u0600-\u06FF\u0750-\u077F]+(?:\s+[\u0600-\u06FF\u0750-\u077F]+)*/g;
 const qtx = s => esc(s).replace(AR_RUN, m => `<bdi lang="ar" dir="rtl">${m}</bdi>`), qdir = s => /[A-Za-z]/.test(s) ? 'ltr' : 'auto';
@@ -1117,7 +1120,7 @@ function vOralQuiz(d, j) {
 }
 
 /* ---------- Beranda ---------- */
-const JC = { 1: ['#C5DA2B', '#6F8A0A', '#1b2400'], 2: ['#2BA3E6', '#0E5C9C', '#04263f'], 3: ['#A94BC0', '#6A2A94', '#2a0a36'], 4: ['#F5A31A', '#B85C00', '#2b1500'] };
+const JC = { 1: ['#C5DA2B', '#6F8A0A', '#1b2400'], 2: ['#2BA3E6', '#0E5C9C', '#04263f'], 3: ['#A94BC0', '#6A2A94', '#2a0a36'], 4: ['#F5A31A', '#B85C00', '#2b1500'], 6: ['#14B8A6', '#0F766E', '#021f1c'] };
 const jst = j => `--c:${JC[j][0]};--d:${JC[j][1]};--fg:${JC[j][2]}`;
 /* Quest selesai = level yang mencapai batas lulus (aturan persennya ada di server: PASS_PCT). Jilid selesai = 3 level selesai. Tathbiq terbuka = 4 jilid selesai. */
 const PASS = () => me.pass || 60;
@@ -1159,7 +1162,7 @@ function vHome() {
         <div class="ft"><small id="fst">Satu kesempatan per hari</small><button class="btn" id="fastGo">Buka</button></div></div>
     </div>
     <div class="sec"><h2>Latihan</h2><span>Pilih jenis kuis, lalu jilid dan levelnya</span></div>
-    <div class="tabs htabs"><button data-ht="tulis">✍️ Kuis Tulis</button><button data-ht="lisan">🗣️ Kuis Lisan</button></div>
+    <div class="tabs htabs"><button data-ht="tulis">✍️ Kuis Tulis</button><button data-ht="lisan">🗣️ Kuis Lisan</button><button data-ht="sorof">🧩 Kuis Sorof</button></div>
     <div id="hpane"></div>`;
   // Tab Kuis Tulis: quest per jilid (XP) + Mode Tathbiq sebagai puncaknya
   const paneTulis = () => `<p class="muted hnote">Soal pilihan ganda. Minimal ${PASS()}% benar di tiap level agar quest selesai; selesaikan semua jilid untuk membuka Mode Tathbiq.</p>
@@ -1187,6 +1190,23 @@ function vHome() {
         try { vQuiz(await api(`quiz?jilid=${b.dataset.j}&level=${b.dataset.l}`), +b.dataset.j, b.dataset.l); }
         catch (e) { alert(e.message); }
       });
+      settle(); return;
+    }
+    if (my === 'sorof') { // tab Kuis Sorof: daftar level dari server, nilai terbaik dari me.best
+      const paintS = d => {
+        pane.innerHTML = sorofPane(d);
+        pane.querySelectorAll('[data-sl]').forEach(b => b.onclick = async () => {
+          const L = d.lv.find(x => x.k === b.dataset.sl);
+          try { vSorofQuiz(await api('sorof/quiz?level=' + L.k), L); } catch (e) { alert(e.message); }
+        });
+      };
+      const hadS = !!sorofCache;
+      if (hadS) { paintS(sorofCache); settle(); } else pane.innerHTML = '<p class="muted">Memuat…</p>';
+      let d; try { d = await api('sorof'); } catch (e) { if (!hadS && homeTab === my && $('#hpane') === pane) pane.textContent = e.message; settle(); return; }
+      if (homeTab !== my || $('#hpane') !== pane) return;
+      const changed = JSON.stringify(d) !== JSON.stringify(sorofCache);
+      sorofCache = d;
+      if (changed) { pane.classList.add('sw'); paintS(d); }
       settle(); return;
     }
     const paint = d => {
@@ -1263,6 +1283,69 @@ function vResult(r, j, l, wrong) {
   bindRpts(); count($('#rx'), r.xp);
   if (r.score >= 70) [0, 250, 500].forEach(t => setTimeout(() => burst(innerWidth / 2, 130, 36), t));
   $('#hm').onclick = () => go('home'); $('#lb').onclick = () => go('board');
+}
+
+/* ---------- Kuis Sorof: 6 level mengikuti file Tathbiq (Pra Tathbiq, Tathbiq 1–5) ---------- */
+/* Daftar level dan jumlah soal datang dari server (GET sorof). Nilai disimpan sebagai jilid 6–11 dengan tingkat XP easy/medium/hard, jadi me.best['<j>:<xl>'] dan XP total otomatis ikut. */
+const SIC = { pra: '🌱', t1: '📘', t2: '📗', t3: '📙', t4: '📕', t5: '📒' };
+const sBest = L => me.best[L.j + ':' + L.xl] || 0;
+const sDone = L => sBest(L) >= LV[L.xl][2] * PASS() / 100;
+function sorofPane(d) {
+  const n = d.lv.filter(sDone).length;
+  return `<p class="muted hnote">Soal pilihan ganda mengikuti kitab Tathbiq. Pra Tathbiq sampai Tathbiq 3 menebak sighot dan bentuk fi'il (isim fa'il, isim maf'ul, fi'il amar, fi'il nahi, masdar, dan lainnya); Tathbiq 4 dan 5 menebak bentuk fi'il untuk tiap dhamir. Minimal ${PASS()}% benar di tiap level agar quest selesai.</p>
+    <div class="card jc sorof" style="${jst(6)}"><div class="jh"><span class="tag">Kuis Sorof</span><span class="jst">${n === d.lv.length ? '🏅 Selesai' : n + '/' + d.lv.length + ' level selesai'}</span></div><div class="lvls">` +
+    d.lv.map(L => {
+      const b = sBest(L), x = LV[L.xl][2], g = sDone(L) ? GR(Math.max(Math.round(b / x * 100), PASS())) : null;
+      return `<button class="lvl ${LV[L.xl][4]}" data-sl="${L.k}"${L.ready ? '' : ' disabled'}><span class="ic">${SIC[L.k] || '📖'}</span><b>${esc(L.title)}</b><small>${L.n} soal${g ? ' · <span class="gr">' + g[0] + '</span>' : ''}${L.ready ? '' : ' · belum tersedia'}</small><span class="xp">${b}/${x} XP</span><i class="pb"><u style="width:${b / x * 100}%"></u></i>${g ? '<span class="done" title="' + g[0] + '">' + g[1] + '</span>' : ''}</button>`;
+    }).join('') + `</div></div>`;
+}
+function vSorofQuiz(d, L) {
+  const qs = d.questions, wrong = [], ans = {}; let i = 0, streak = 0;
+  const draw = () => {
+    const q = qs[i];
+    V.innerHTML = `<div class="card jc" style="${jst(6)}"><div class="bar"><i style="width:${i / qs.length * 100}%"></i></div>
+      <div class="meta"><span class="muted">Sorof · ${esc(L.title)} · Soal ${i + 1}/${qs.length}</span><span class="chip" id="cb">🔥 ${streak}</span></div>
+      <h2 dir="auto" id="qt"></h2><div>` +
+      ['a', 'b', 'c', 'd'].map((k, n) => `<button class="opt" style="--i:${n}" data-k="${k.toUpperCase()}" dir="auto"><b>${k.toUpperCase()}</b><span>${esc(q[k])}</span></button>`).join('') +
+      `</div><div id="fb"></div><div class="row"><span></span><button class="btn" id="nx" hidden>${i < qs.length - 1 ? 'Berikutnya →' : 'Lihat hasil'}</button></div></div>`;
+    const h = $('#qt'), all = V.querySelectorAll('.opt');
+    typeIt(h, q.q);
+    h.onclick = () => { clearInterval(tt); h.textContent = q.q; h.classList.remove('cur'); };
+    all.forEach(b => b.onclick = () => { // jawaban diperiksa di perangkat: tanpa menunggu server
+      all.forEach(x => x.disabled = true);
+      const k = b.dataset.k, ok = k === q.answer; ans[q.id] = k;
+      clearInterval(tt); h.textContent = q.q; h.classList.remove('cur');
+      [...all].find(x => x.dataset.k === q.answer).classList.add('ok');
+      if (ok) { streak++; ansFx(b); }
+      else { b.classList.add('no'); streak = 0; wrong.push({ q: q.q, a: q[q.answer.toLowerCase()], k: q.answer }); }
+      const cb = $('#cb'); cb.textContent = '🔥 ' + streak; cb.classList.add('pop');
+      $('#fb').innerHTML = ok
+        ? `<div class="fb ok">${pick(['Benar!', 'Masya Allah, tepat!', 'Barakallahu fiik!'])}${streak > 2 ? ' ' + streak + ' beruntun!' : ''}</div>`
+        : `<div class="fb no">Belum tepat. Jawaban yang benar: ${q.answer}</div>`;
+      $('#nx').hidden = false; $('#nx').focus();
+    });
+    $('#nx').onclick = async () => {
+      if (i < qs.length - 1) { i++; draw(); return; }
+      try { vSorofResult(await api('sorof/submit', { token: d.token, answers: ans }), L, wrong); } catch (e) { alert(e.message); }
+    };
+  };
+  draw();
+}
+function vSorofResult(r, L, wrong) {
+  const k = L.j + ':' + L.xl, prev = me.best[k] || 0, gain = Math.max(0, r.xp - prev), mx = LV[L.xl][2], need = mx * PASS() / 100, t0 = totalXp();
+  me.best[k] = Math.max(prev, r.xp); noteRank(t0); noteAch(r.ach);
+  if (prev < need && r.xp >= need) setTimeout(() => toast(`Pencapaian baru: <b>${esc(L.title)}</b> selesai!`, '🏅'), 400);
+  const em = r.score >= 90 ? '🏆' : r.score >= 70 ? '🎉' : r.score >= 40 ? '👍' : '💪';
+  V.innerHTML = `<div class="card res jc" style="${jst(6)}"><div class="big">${em}</div><span class="tag">Hasil · Sorof · ${esc(L.title)}</span>
+    <h1><span id="rx">0</span> / ${mx} XP</h1><p class="muted">${r.correct} dari ${r.total} soal benar · nilai ${r.score}</p>
+    ${GR(r.score) ? `<span class="gtag" style="background:${GR(r.score)[2]}">${GR(r.score)[1]} ${GR(r.score)[0]} · quest selesai</span>` : `<p class="muted">Belum lulus. Butuh minimal ${PASS()}% benar agar quest ini selesai.</p>`}
+    <span class="chip pop">${gain ? '+' + gain + ' XP dan +' + gain + ' ' + GL + ' masuk ke totalmu' : 'Rekor di level ini: ' + prev + ' XP. Lampaui untuk menambah total.'}</span>
+    <div class="row"><button class="btn" id="hm">Kembali</button><button class="btn ghost" id="sag">Ulangi level ini</button><button class="btn ghost" id="lb">Lihat leaderboard</button></div></div>` +
+    (wrong.length ? `<h2>Pembahasan (${wrong.length} salah)</h2>` + wrong.map((w, n) => `<div class="card" style="--i:${n}"><p dir="auto"><b>${esc(w.q)}</b></p><p class="muted" dir="auto">Jawaban benar: ${w.k}. ${esc(w.a)}</p></div>`).join('') : '');
+  count($('#rx'), r.xp);
+  if (r.score >= 70) [0, 250, 500].forEach(t => setTimeout(() => burst(innerWidth / 2, 130, 36), t));
+  $('#hm').onclick = () => go('home'); $('#lb').onclick = () => go('board');
+  $('#sag').onclick = async () => { try { vSorofQuiz(await api('sorof/quiz?level=' + L.k), L); } catch (e) { alert(e.message); } };
 }
 
 /* ---------- Endless ---------- */
@@ -1603,7 +1686,7 @@ let bq = '';
 let lio;
 async function vBoard(j = 0) {
   V.innerHTML = `<h1>Leaderboard</h1><div class="tabs">` +
-    ['Semua', 1, 2, 3, 4, 'Tathbiq'].map((x, n) => `<button data-j="${n}" class="${n === j ? 'on' : ''}">${n === 5 ? '📚 Tathbiq' : n ? 'Jilid ' + x : x}</button>`).join('') +
+    ['Semua', 1, 2, 3, 4, 'Tathbiq', 'Sorof'].map((x, n) => `<button data-j="${n}" class="${n === j ? 'on' : ''}">${n === 5 ? '📚 Tathbiq' : n === 6 ? '🧩 Sorof' : n ? 'Jilid ' + x : x}</button>`).join('') +
     `</div><input type="search" id="sq" placeholder="Cari nama murid…" value="${esc(bq)}" autocomplete="off"><div class="card" id="lbr"><p class="muted">Memuat…</p></div>`;
   V.querySelectorAll('[data-j]').forEach(b => b.onclick = () => vBoard(+b.dataset.j));
   let t, seq = 0, first = true;
@@ -1614,7 +1697,7 @@ async function vBoard(j = 0) {
       if (my !== seq) return;
       const box = $('#lbr');
       box.classList.toggle('nofx', !first);
-      box.innerHTML = d.rows.length ? d.rows.map((r, n) => `<div class="lrow${r.username === me.username ? ' me' : ''}${r.total > 0 && r.rank <= 3 ? ' top' + r.rank : ''}${nc(r.nm) ? ' hasnm' : ''}" data-u="${esc(r.username)}" data-rk="${r.rank}" tabindex="0" role="button" title="Lihat profil" style="--i:${Math.min(n, 12)}"><span class="rk r${r.rank}">${r.rank < 4 ? ['🥇', '🥈', '🥉'][r.rank - 1] : r.rank}</span><b class="un">${av(r.ph ? pkey(r.username, r.ph) : r.avatar, '', r.fx, r.total > 0 && r.rank <= 3 ? r.rank : 0)}<span class="uname${nc(r.nm) ? ' ' + nc(r.nm) : ''}">${esc(r.username)}</span>${bdg(r.bd)}</b><span class="muted" style="margin:0">${j === 5 ? '📚' : r.jilids + ' jilid'}</span><b>${r.total} XP</b></div>`).join('')
+      box.innerHTML = d.rows.length ? d.rows.map((r, n) => `<div class="lrow${r.username === me.username ? ' me' : ''}${r.total > 0 && r.rank <= 3 ? ' top' + r.rank : ''}${nc(r.nm) ? ' hasnm' : ''}" data-u="${esc(r.username)}" data-rk="${r.rank}" tabindex="0" role="button" title="Lihat profil" style="--i:${Math.min(n, 12)}"><span class="rk r${r.rank}">${r.rank < 4 ? ['🥇', '🥈', '🥉'][r.rank - 1] : r.rank}</span><b class="un">${av(r.ph ? pkey(r.username, r.ph) : r.avatar, '', r.fx, r.total > 0 && r.rank <= 3 ? r.rank : 0)}<span class="uname${nc(r.nm) ? ' ' + nc(r.nm) : ''}">${esc(r.username)}</span>${bdg(r.bd)}</b><span class="muted" style="margin:0">${j === 5 ? '📚' : j === 6 ? '🧩' : r.jilids + ' jilid'}</span><b>${r.total} XP</b></div>`).join('')
         : `<p class="muted">${bq ? 'Tidak ada murid bernama "' + esc(bq) + '".' : 'Belum ada nilai.'}</p>`;
       box.onclick = e => { const r = e.target.closest('.lrow'); if (r) openPlayer(r.dataset.u, j === 0 ? +r.dataset.rk : 0); };
       box.onkeydown = e => { if (e.key === 'Enter' && e.target.classList.contains('lrow')) e.target.click(); };
@@ -1703,8 +1786,8 @@ const loadX = () => window.XLSX ? Promise.resolve() : xlsxP ||= new Promise((ok,
 let admTab = 'stat';
 const ago = t => { if (!t) return 'belum pernah'; const m = (Date.now() - new Date(t)) / 6e4; return m < 1 ? 'baru saja' : m < 60 ? Math.floor(m) + ' menit lalu' : m < 1440 ? Math.floor(m / 60) + ' jam lalu' : Math.floor(m / 1440) + ' hari lalu'; };
 function vAdmin() {
-  V.innerHTML = `<h1>Panel Admin</h1><div class="tabs">${[['stat', '📊 Statistik'], ['soal', '📝 Kelola soal'], ['oral', '🗣️ Soal lisan'], ['user', '👥 Kelola murid'], ['groq', '🤖 Groq'], ['lap', '🚩 Laporan' + (me.reports ? ' (' + me.reports + ')' : '')]].map(([k, n]) => `<button data-t="${k}" class="${k === admTab ? 'on' : ''}">${n}</button>`).join('')}</div><div id="ab"></div>`;
-  const show = t => { admTab = t; V.querySelectorAll('[data-t]').forEach(x => x.classList.toggle('on', x.dataset.t === t)); const ab = $('#ab'); ab.innerHTML = ''; ({ stat: adminStats, soal: adminSoal, oral: adminOral, user: adminUsers, lap: adminReports, groq: adminGroq })[t](ab); };
+  V.innerHTML = `<h1>Panel Admin</h1><div class="tabs">${[['stat', '📊 Statistik'], ['soal', '📝 Kelola soal'], ['oral', '🗣️ Soal lisan'], ['sorof', '🧩 Bank Sorof'], ['user', '👥 Kelola murid'], ['groq', '🤖 Groq'], ['lap', '🚩 Laporan' + (me.reports ? ' (' + me.reports + ')' : '')]].map(([k, n]) => `<button data-t="${k}" class="${k === admTab ? 'on' : ''}">${n}</button>`).join('')}</div><div id="ab"></div>`;
+  const show = t => { admTab = t; V.querySelectorAll('[data-t]').forEach(x => x.classList.toggle('on', x.dataset.t === t)); const ab = $('#ab'); ab.innerHTML = ''; ({ stat: adminStats, soal: adminSoal, oral: adminOral, sorof: adminSorof, user: adminUsers, lap: adminReports, groq: adminGroq })[t](ab); };
   V.querySelectorAll('[data-t]').forEach(b => b.onclick = () => show(b.dataset.t));
   show(admTab);
 }
@@ -1895,6 +1978,153 @@ async function adminOral(box) {
       const wb = XLSX.utils.book_new(); XLSX.utils.book_append_sheet(wb, ws, 'Lafadz');
       XLSX.writeFile(wb, 'bank-soal-lisan-' + new Date().toISOString().slice(0, 10) + '.xlsx');
       toast(d.rows.length + ' lafadz diunduh', '⬇️');
+    } catch (x) { alert(x.message); }
+    finally { b.disabled = false; b.textContent = t0; }
+  };
+  load();
+}
+
+/* ---------- Admin: bank Sorof (kata untuk Pra–Tathbiq 3, tashrif 14 dhamir untuk Tathbiq 4–5) ---------- */
+const SOROF_LVS = [['pra', 'Pra Tathbiq', 'k'], ['t1', 'Tathbiq 1', 'k'], ['t2', 'Tathbiq 2', 'k'], ['t3', 'Tathbiq 3', 'k'], ['t4', 'Tathbiq 4', 't'], ['t5', 'Tathbiq 5', 't']];
+const SOROF_SG = [['madhi', "Fi'il Madhi"], ['mudhari', "Fi'il Mudhari'"], ['masdar', 'Masdar Ghairu Mim'], ['masdar_mim', 'Masdar Mim'], ['fail', "Isim Fa'il"], ['maful', "Isim Maf'ul"], ['amar', "Fi'il Amar"], ['nahi', "Fi'il Nahi"], ['zaman', 'Isim Zaman/Makan'], ['alat', 'Isim Alat']];
+const SOROF_SH = ['Mufrad Mudzakkar Ghaib', 'Tatsniyah Mudzakkar Ghaib', 'Jamak Mudzakkar Ghaib', "Mufrad Mu'annats Ghaibah", "Tatsniyah Mu'annats Ghaibah", "Jamak Mu'annats Ghaibah", 'Mufrad Mudzakkar Mukhathab', 'Tatsniyah Mudzakkar Mukhathab', 'Jamak Mudzakkar Mukhathab', "Mufrad Mu'annats Mukhathabah", "Tatsniyah Mu'annats Mukhathabah", "Jamak Mu'annats Mukhathabah", 'Mutakallim Wahdah', "Mutakallim Ma'al Ghair"];
+const sLvName = k => (SOROF_LVS.find(x => x[0] === k) || [k, k])[1], sIsT = k => (SOROF_LVS.find(x => x[0] === k) || [])[2] === 't';
+let sJ = '', sQ = '', sOff = 0;
+const SPAGE = 30;
+function sEditor(r, done) {
+  r = r || { lv: sJ || 'pra', grup: '', forms: {}, active: true };
+  const fs = Array.from({ length: 14 }, (_, i) => (r.forms.s && r.forms.s[i]) || ''), fk = {};
+  if (!r.forms.s) for (const [k] of SOROF_SG) fk[k] = Array.isArray(r.forms[k]) ? r.forms[k].join(' / ') : (r.forms[k] || '');
+  const m = document.createElement('div'); m.className = 'modal';
+  m.innerHTML = `<div class="box"><h2>${r.id ? 'Edit data sorof' : 'Tambah data sorof'}</h2>
+    <select id="sel">${SOROF_LVS.map(([k, n]) => `<option value="${k}"${k === r.lv ? ' selected' : ''}>${n}</option>`).join('')}</select>
+    <input id="seg" dir="auto" maxlength="80" placeholder="Pola / bagian" value="${esc(r.grup || '')}" autocomplete="off">
+    <label class="chk"><input type="checkbox" id="seact"${r.active === false ? '' : ' checked'}> Aktif (muncul di kuis murid)</label>
+    <p class="muted" id="sehelp" style="font-size:.85rem"></p><div id="sef"></div>
+    <div class="err" id="see"></div><div class="row"><button class="btn ghost" id="sex">Batal</button><button class="btn" id="ses">Simpan</button></div></div>`;
+  document.body.appendChild(m);
+  const g = id => m.querySelector('#' + id), lab = t => `<label class="muted" style="margin:8px 0 2px;display:block;font-size:.82rem">${t}</label>`;
+  const pull = () => { m.querySelectorAll('[data-s]').forEach(x => { fs[+x.dataset.s] = x.value; }); m.querySelectorAll('[data-k]').forEach(x => { fk[x.dataset.k] = x.value; }); };
+  const draw = () => {
+    const t = sIsT(g('sel').value);
+    g('sehelp').textContent = t ? "Isi bentuk fi'il untuk tiap dhamir. Bentuk pertama (dasar) wajib dan minimal 6 kolom terisi; kosongkan bila bentuknya tidak ada." : "Fi'il madhi wajib dan minimal 3 bentuk lain terisi. Pisahkan alternatif dengan tanda /.";
+    g('sef').innerHTML = t
+      ? SOROF_SH.map((n, i) => lab(`${i + 1}. ${n}`) + `<input data-s="${i}" class="lfin" dir="rtl" lang="ar" maxlength="60" value="${esc(fs[i])}" autocomplete="off">`).join('')
+      : SOROF_SG.map(([k, n]) => lab(n + (k === 'madhi' ? ' (wajib)' : '')) + `<input data-k="${k}" class="lfin" dir="rtl" lang="ar" maxlength="200" value="${esc(fk[k] || '')}" autocomplete="off">`).join('');
+  };
+  draw();
+  g('sel').onchange = () => { pull(); draw(); };
+  const close = () => m.remove(); g('sex').onclick = close; m.onclick = e => { if (e.target === m) close(); };
+  g('ses').onclick = async () => {
+    pull();
+    const lv = g('sel').value, forms = sIsT(lv) ? { s: fs } : Object.fromEntries(Object.entries(fk).filter(([, v]) => v.trim()));
+    try {
+      await api('admin/sorof-save', { id: r.id || 0, lv, grup: g('seg').value, active: g('seact').checked, forms });
+      close(); toast(r.id ? 'Data diperbarui' : 'Data ditambahkan', '✅'); done();
+    } catch (e) { g('see').textContent = e.message; }
+  };
+}
+async function adminSorof(box) {
+  loadX().catch(() => {});
+  box.innerHTML = '<p class="muted">Memuat…</p>';
+  let d0; try { d0 = await api('admin/sorof?offset=0'); } catch (e) { box.textContent = e.message; return; }
+  if (!$('#ab')) return;
+  const refresh = () => adminSorof(box), SK = SOROF_SG.map(x => x[0]);
+  let imp = [];
+  box.innerHTML = `<div class="grid">` + SOROF_LVS.map(([k, n, t]) => `<div class="card jc" style="${jst(6)}"><span class="tag">${n}</span><h2>${d0.counts[k] || 0} ${t === 't' ? 'fiil (14 dhamir)' : 'kata'}</h2></div>`).join('') + `</div>
+    <div class="card"><h2>Unggah dari Excel</h2><p class="muted">Dua lembar. <code>Kata</code> (level pra, t1, t2, t3): kolom <code>level, pola, madhi, mudhari, masdar, masdar_mim, fail, maful, amar, nahi, zaman, alat</code>; alternatif dipisah <code>/</code>. <code>Tashrif</code> (level t4, t5): kolom <code>level, bagian, s1 … s14</code>, satu kolom per dhamir. Salah satu lembar boleh tidak ada. Baris kosong dilewati.</p>
+      <div class="row" style="margin:0 0 12px"><button class="btn ghost" id="stp">Unduh template Excel</button></div>
+      <input type="file" id="sfl" accept=".xlsx,.xls,.csv">
+      <label class="chk"><input type="checkbox" id="srp"> Ganti data lama pada level yang ada di file</label>
+      <div class="muted" id="spv"></div><div class="err" id="ser"></div><button class="btn" id="sup" disabled>Unggah data</button></div>
+    <div class="card" id="sm"><h2>Kelola data sorof</h2>
+      <div class="tabs">${[['', 'Semua']].concat(SOROF_LVS.map(x => [x[0], x[1]])).map(([k, n]) => `<button data-sj="${k}" class="${k === sJ ? 'on' : ''}">${n}</button>`).join('')}</div>
+      <input type="search" id="sq" placeholder="Cari bentuk atau pola…" value="${esc(sQ)}" autocomplete="off">
+      <div class="row" style="margin:0 0 12px"><button class="btn" id="sadd">+ Tambah data</button><button class="btn ghost del" id="sdel" disabled>Hapus terpilih</button></div>
+      <div class="row" style="margin:0 0 12px"><button class="btn ghost" id="sexp">⬇️ Unduh semua data</button></div>
+      <div id="sl" class="muted">Memuat…</div></div>`;
+  const hdrK = ['level', 'pola'].concat(SK), hdrT = ['level', 'bagian'].concat(Array.from({ length: 14 }, (_, i) => 's' + (i + 1)));
+  const book = (kata, tash, petunjuk) => {
+    const b = XLSX.utils.book_new(), a = XLSX.utils.aoa_to_sheet(kata), t = XLSX.utils.aoa_to_sheet(tash);
+    a['!cols'] = [{ wch: 8 }, { wch: 26 }, ...SK.map(() => ({ wch: 18 }))]; t['!cols'] = [{ wch: 8 }, { wch: 26 }, ...Array.from({ length: 14 }, () => ({ wch: 15 }))];
+    XLSX.utils.book_append_sheet(b, a, 'Kata'); XLSX.utils.book_append_sheet(b, t, 'Tashrif');
+    if (petunjuk) { const p = XLSX.utils.aoa_to_sheet(petunjuk); p['!cols'] = [{ wch: 30 }, { wch: 100 }]; XLSX.utils.book_append_sheet(b, p, 'Petunjuk'); }
+    return b;
+  };
+  $('#stp').onclick = async () => {
+    try { await loadX(); } catch (e) { alert(e.message); return; }
+    const pet = [['Kolom', 'Keterangan'], ['level', 'Wajib. pra, t1, t2, t3 (lembar Kata) atau t4, t5 (lembar Tashrif).'],
+      ['LEMBAR KATA', "Satu baris = satu fiil dengan bentuk turunannya. 'pola' wajib (mis. فَعَلَ يَفْعُلُ), 'madhi' wajib, dan total bentuk yang terisi minimal 4. Alternatif dipisah tanda /. masdar = masdar ghairu mim; zaman = isim zaman/makan."],
+      ['LEMBAR TASHRIF', "Satu baris = satu fiil dengan bentuknya untuk 14 dhamir. 'bagian' wajib (nama kelompok). s1 wajib (bentuk dasar), minimal 6 sel terisi, kosongkan bila tidak ada."]]
+      .concat(SOROF_SH.map((n, i) => ['s' + (i + 1), n])).concat([['Catatan', 'Baris contoh hanya menunjukkan format. Hapus atau ganti sebelum diunggah.']]);
+    XLSX.writeFile(book([hdrK, ['pra', 'فَعَلَ يَفْعُلُ', 'نَصَرَ', 'يَنْصُرُ', 'نَصْرًا', 'مَنْصَرًا', 'نَاصِرٌ', 'مَنْصُوْرٌ', 'اُنْصُرْ', 'لَا تَنْصُرْ', 'مَنْصَرٌ', 'مِنْصَرٌ']], [hdrT, ['t4', 'Madhi', 'نَصَرَ', 'نَصَرَا', 'نَصَرُوْا', 'نَصَرَتْ', 'نَصَرَتَا', 'نَصَرْنَ', 'نَصَرْتَ', 'نَصَرْتُمَا', 'نَصَرْتُمْ', 'نَصَرْتِ', 'نَصَرْتُمَا', 'نَصَرْتُنَّ', 'نَصَرْتُ', 'نَصَرْنَا']], pet), 'template-bank-sorof.xlsx');
+  };
+  const rowsOf = (wb, name, fallback) => {
+    const nm = wb.SheetNames.find(x => x.trim().toLowerCase() === name) || (fallback ? wb.SheetNames[0] : null);
+    return nm ? XLSX.utils.sheet_to_json(wb.Sheets[nm], { defval: '' }).map(o => { const n = {}; for (const k in o) n[k.trim().toLowerCase()] = String(o[k]).trim(); return n; }) : [];
+  };
+  $('#sfl').onchange = async e => {
+    const f = e.target.files[0]; if (!f) return;
+    try {
+      await loadX();
+      const wb = XLSX.read(await f.arrayBuffer()), low = wb.SheetNames.map(x => x.trim().toLowerCase());
+      const kata = rowsOf(wb, 'kata', !low.includes('tashrif')).filter(n => n.level || n.pola || n.madhi);
+      const tash = rowsOf(wb, 'tashrif', false).filter(n => n.level || n.bagian || n.s1);
+      imp = kata.map(n => ({ lv: n.level.toLowerCase(), grup: n.pola, forms: Object.fromEntries(SK.filter(k => n[k]).map(k => [k, n[k]])) }))
+        .concat(tash.map(n => ({ lv: n.level.toLowerCase(), grup: n.bagian, forms: { s: Array.from({ length: 14 }, (_, i) => n['s' + (i + 1)] || '') } })));
+      const per = {}; imp.forEach(r => { per[r.lv] = (per[r.lv] || 0) + 1; });
+      $('#spv').innerHTML = imp.length + ' baris terbaca' + Object.keys(per).sort().map(k => '<br>' + esc(sLvName(k)) + ': ' + per[k]).join('');
+      $('#sup').disabled = !imp.length; $('#ser').textContent = '';
+    } catch (x) { $('#ser').textContent = /^Gagal memuat/.test(x.message) ? x.message : 'File tidak bisa dibaca.'; }
+  };
+  $('#sup').onclick = async () => {
+    if ($('#srp').checked && !confirm('Data lama pada level yang ada di file akan DIHAPUS dan diganti. Lanjutkan?')) return;
+    try { const r = await api('admin/sorof-import', { rows: imp, replace: $('#srp').checked }); alert(r.added + ' baris ditambahkan.'); refresh(); }
+    catch (e) { $('#ser').textContent = e.message; }
+  };
+  let t, seq = 0, rows = [];
+  const sel = () => [...$('#sl').querySelectorAll('input[type=checkbox]:checked')].map(x => +x.dataset.id);
+  const sync = () => { const n = sel().length; $('#sdel').disabled = !n; $('#sdel').textContent = n ? `Hapus terpilih (${n})` : 'Hapus terpilih'; };
+  const brief = r => {
+    const ar = v => `<div class="lfin" dir="rtl" lang="ar" style="margin:6px 0">${esc(v || '')}</div>`;
+    return r.forms.s ? ar(r.forms.s[0]) + `<div class="qopt">${r.forms.s.filter(Boolean).length}/14 dhamir</div>`
+      : ar((r.forms.madhi || [])[0]) + `<div class="qopt" dir="auto">${SOROF_SG.slice(1).filter(([k]) => r.forms[k]).map(([k, n]) => esc(n) + ' <b>' + esc(r.forms[k][0]) + '</b>').join(' · ')}</div>`;
+  };
+  const load = async () => {
+    const my = ++seq;
+    try {
+      const d = await api(`admin/sorof?lv=${sJ}&q=${encodeURIComponent(sQ)}&offset=${sOff}`);
+      if (my !== seq || !$('#sl')) return;
+      if (!d.rows.length && sOff > 0) { sOff = Math.max(0, sOff - SPAGE); return load(); }
+      rows = d.rows;
+      $('#sl').innerHTML = (d.rows.length ? d.rows.map((r, n) => `<div class="urow qrow"><label class="chk"><input type="checkbox" data-id="${r.id}" aria-label="Pilih data"></label>
+        <div style="flex:1;min-width:0"><span class="chip">${esc(sLvName(r.lv))}</span> <span class="chip" dir="auto">${esc(r.grup)}</span>${r.active ? '' : ' <span class="chip">nonaktif</span>'}${brief(r)}</div>
+        <button class="btn ghost" data-e="${n}">Edit</button></div>`).join('') : 'Belum ada data.') +
+        `<div class="pager"><button class="btn ghost" id="sprev"${sOff ? '' : ' disabled'}>← Sebelumnya</button><span class="muted" style="margin:0">${d.total ? sOff + 1 + '–' + (sOff + d.rows.length) + ' dari ' + d.total : ''}</span><button class="btn ghost" id="snext"${sOff + SPAGE < d.total ? '' : ' disabled'}>Berikutnya →</button></div>`;
+      sync();
+      $('#sl').querySelectorAll('input[type=checkbox]').forEach(x => x.onchange = sync);
+      $('#sl').querySelectorAll('[data-e]').forEach(b => b.onclick = () => sEditor(rows[+b.dataset.e], refresh));
+      $('#sprev').onclick = () => { sOff = Math.max(0, sOff - SPAGE); load(); };
+      $('#snext').onclick = () => { sOff += SPAGE; load(); };
+    } catch (e) { $('#sl').textContent = e.message; }
+  };
+  $('#sm').querySelectorAll('[data-sj]').forEach(b => b.onclick = () => { sJ = b.dataset.sj; sOff = 0; $('#sm').querySelectorAll('[data-sj]').forEach(x => x.classList.toggle('on', x === b)); load(); });
+  $('#sq').oninput = e => { sQ = e.target.value.trim(); sOff = 0; clearTimeout(t); t = setTimeout(load, 250); };
+  $('#sadd').onclick = () => sEditor(null, refresh);
+  $('#sdel').onclick = async () => {
+    const ids = sel(); if (!ids.length) return;
+    if (!confirm(`Hapus ${ids.length} data terpilih? Tindakan ini tidak bisa dibatalkan.`)) return;
+    try { await api('admin/sorof-delete', { ids }); toast(ids.length + ' data dihapus', '🗑️'); refresh(); } catch (e) { alert(e.message); }
+  };
+  $('#sexp').onclick = async e => {
+    const b = e.currentTarget, t0 = b.textContent; b.disabled = true; b.textContent = 'Menyiapkan…';
+    try {
+      const [d] = await Promise.all([api('admin/sorof-export'), loadX()]);
+      if (!d.rows.length) { alert('Bank sorof masih kosong.'); return; }
+      const kata = [hdrK].concat(d.rows.filter(r => !r.forms.s).map(r => [r.lv, r.grup].concat(SK.map(k => (r.forms[k] || []).join(' / '))))),
+        tash = [hdrT].concat(d.rows.filter(r => r.forms.s).map(r => [r.lv, r.grup].concat(Array.from({ length: 14 }, (_, i) => r.forms.s[i] || ''))));
+      XLSX.writeFile(book(kata, tash), 'bank-sorof-' + new Date().toISOString().slice(0, 10) + '.xlsx');
+      toast(d.rows.length + ' baris diunduh', '⬇️');
     } catch (x) { alert(x.message); }
     finally { b.disabled = false; b.textContent = t0; }
   };
