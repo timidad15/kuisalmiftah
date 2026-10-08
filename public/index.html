@@ -272,6 +272,8 @@ select,textarea{font:inherit;color:var(--ink);background:var(--surface);border:1
 .mode.dly{background:linear-gradient(135deg,#B45309,#F59E0B)}
 .mode.tth{background:linear-gradient(135deg,#3b1d8f,#c2317a);grid-column:1/-1}
 .mode.fst{background:linear-gradient(135deg,#0f766e,#22d3ee)}
+.mode.srf{background:linear-gradient(135deg,#166534,#65a30d)}
+.mode.lsn{background:linear-gradient(135deg,#1e3a8a,#3b82f6)}
 .mode.off{grid-column:1/-1}
 .tmr{height:10px;border-radius:99px;background:var(--line);overflow:hidden;margin:8px 0 2px}.tmr i{display:block;height:100%;width:100%;background:#22c55e;transform-origin:left;border-radius:99px}.tmr.low i{background:#ef4444}
 .tcount{font-weight:800;font-variant-numeric:tabular-nums}.tcount.low{color:#ef4444}
@@ -564,7 +566,7 @@ const dbg = (mean, p75, worst, peak, shed, down) => {
   if (!d) { d = document.createElement('div'); d.id = 'fxdbg'; d.style.cssText = 'position:fixed;left:6px;bottom:6px;z-index:200;max-width:92vw;font:11px/1.35 monospace;background:rgba(0,0,0,.78);color:#9f9;padding:5px 9px;border-radius:8px;pointer-events:none'; document.body.appendChild(d); }
   d.textContent = `kualitas ${QN[FXQ.level]}${FXQ.mode === 'auto' ? ' (otomatis)' : ''} · rata-rata ${mean.toFixed(1)} ms (${Math.round(1000 / mean)} fps) · p75 ${p75.toFixed(1)} · terburuk ${worst.toFixed(0)} ms · partikel maks ${peak}${shed ? ' · pengaman ' + shed : ''}${down ? ' · KUALITAS TURUN' : ''}`;
 };
-const gold = () => Math.max(0, totalXp() * (me.rate || 1) + (me.bonus || 0) - (me.spent || 0));
+const gold = () => Math.max(0, Math.floor(totalXp() * (me.rate || 1)) + (me.bonus || 0) - (me.spent || 0));
 const FXL = () => { let z = $('#fxl'); if (!z) { z = document.createElement('div'); z.id = 'fxl'; z.style.cssText = 'position:fixed;inset:0;pointer-events:none;z-index:98;overflow:hidden'; document.body.appendChild(z); } return z; };
 function part(x, y, o) { // satu partikel DOM (dipakai kilat layar)
   const p = document.createElement('i');
@@ -894,36 +896,41 @@ async function vShop() {
 }
 
 /* ---------- Kuis harian + spin hadiah ---------- */
-const DAILY_PASS = 80, PRIZE_C = { 100: '#8A97A6', 150: '#4CAF73', 200: '#2BA3E6', 300: '#A94BC0', 500: '#E8960F', 750: '#EF3E7B', 1000: '#F5C518' };
+let DAILY_PASS = 80; const EVP = { daily: 80, fast: 80, sorof: 80, oral: 80 }, setEvp = d => { if (d.dly) { DAILY_PASS = EVP.daily = d.dly.pass; } EVP.fast = d.fast.pass; EVP.sorof = d.sorof.pass; EVP.oral = d.oral.pass; }, PRIZE_C = { 100: '#8A97A6', 150: '#4CAF73', 200: '#2BA3E6', 300: '#A94BC0', 500: '#E8960F', 750: '#EF3E7B', 1000: '#F5C518' };
 async function vDaily() {
   V.innerHTML = '<p class="muted">Memuat…</p>';
   let d; try { d = await api('daily'); } catch (e) { V.textContent = e.message; return; }
-  const t = d.today, f = d.fast, FT = f.today, tot = d.prizes.reduce((a, p) => a + p[1], 0), WIN = 36;
-  const sp = d.pending ? { n: d.pending, pity: d.pity, mode: '', nm: 'Kuis Harian', more: d.fast.pending } : f.pending ? { n: f.pending, pity: f.pity, mode: 'fast', nm: 'Cepat Tepat', more: 0 } : null;
+  setEvp(d);
+  const f = d.fast, so = d.sorof, ol = d.oral, tot = d.prizes.reduce((a, p) => a + p[1], 0), WIN = 36;
+  const order = [['', 'Kuis Harian', d.pending, d.pity], ['fast', 'Cepat Tepat', f.pending, f.pity], ['sorof', 'Sorof Harian', so.pending, so.pity], ['oral', 'Lisan Harian', ol.pending, ol.pity]];
+  const first = order.find(x => x[2]), sp = first ? { n: first[2], mode: first[0], nm: first[1], more: order.filter(x => x !== first).reduce((a, x) => a + x[2], 0) } : null;
   const ms = 864e5 - ((Date.now() + 252e5) % 864e5), left = Math.floor(ms / 36e5) + ' jam ' + Math.floor(ms % 36e5 / 6e4) + ' menit'; // hari baru = pukul 00.00 WIB
-  const fstatus = !FT ? `<p>10 soal dengan <b>batas waktu</b> tiap soal: mulai <b>${f.lim[0]} detik</b> dan makin cepat sampai <b>${f.lim[f.lim.length - 1]} detik</b> di soal terakhir. Nilai minimal <b>${f.pass}</b> untuk mendapat <b>1× spin hadiah</b>. Satu kesempatan per hari.</p><button class="btn" id="fgo">Mulai Cepat Tepat</button>`
-    : !FT.done ? '<p>Cepat Tepat hari ini sudah dimulai tapi tidak diselesaikan, jadi kesempatan hari ini hangus. Coba lagi besok.</p>'
-    : FT.score >= f.pass ? `<p>Hasil hari ini: <b>${FT.correct}/10</b> benar (nilai ${FT.score}). ${FT.spun ? 'Hadiah spinmu: ' + GL + ' ' + FT.prize + ' 🎉' : 'Spin hadiahmu menunggu di atas!'}</p>`
-    : `<p>Hasil hari ini: <b>${FT.correct}/10</b> benar (nilai ${FT.score}). Belum mencapai ${f.pass}, coba lagi besok.</p>`;
   const tile = g => `<div class="pz" style="--pc:${PRIZE_C[g]}">${GL} ${g}</div>`;
-  const status = !t ? `<p>10 soal acak dari semua jilid. Nilai minimal <b>${DAILY_PASS}</b> untuk mendapat <b>1× spin hadiah</b>, hadiah tertinggi <b>${GL} 1000</b>! Hanya satu kesempatan per hari dan tidak bisa diulang.</p><button class="btn" id="dgo">Mulai kuis harian</button>`
-    : !t.done ? '<p>Kuis hari ini sudah dimulai tapi tidak diselesaikan, jadi kesempatan hari ini hangus. Coba lagi besok.</p>'
-    : t.score >= DAILY_PASS ? `<p>Hasil hari ini: <b>${t.correct}/10</b> benar (nilai ${t.score}). ${t.spun ? 'Hadiah spinmu: ' + GL + ' ' + t.prize + ' 🎉' : 'Spin hadiahmu menunggu di atas!'}</p>`
-    : `<p>Hasil hari ini: <b>${t.correct}/10</b> benar (nilai ${t.score}). Belum mencapai ${DAILY_PASS}, coba lagi besok.</p>`;
-  V.innerHTML = '<h1>Kuis Harian</h1>' +
+  // satu kartu per event: belum mulai (tombol), tidak diselesaikan (hangus), lulus, atau belum lulus
+  const evCard = (tag, intro, X, pass, on, id, label, tot2) => {
+    const got = X ? `<b>${X.correct}${tot2 ? '/' + tot2 : ' langkah'}</b> benar (nilai ${X.score})` : '';
+    const body = !X ? (on ? `<p>${intro}</p><button class="btn" id="${id}">${label}</button>` : '<p>Event ini sedang dinonaktifkan admin.</p>')
+      : !X.done ? '<p>Event hari ini sudah dimulai tapi tidak diselesaikan, jadi kesempatan hari ini hangus. Coba lagi besok.</p>'
+      : X.score >= pass ? `<p>Hasil hari ini: ${got}. ${X.spun ? 'Hadiah spinmu: ' + GL + ' ' + X.prize + ' 🎉' : 'Spin hadiahmu menunggu di atas!'}</p>`
+      : `<p>Hasil hari ini: ${got}. Belum mencapai ${pass}, coba lagi besok.</p>`;
+    return `<div class="card"><span class="tag">${tag}</span>${body}</div>`;
+  };
+  const sub = (pass) => `Nilai minimal <b>${pass}</b> untuk mendapat <b>1× spin hadiah</b>. Satu kesempatan per hari dan tidak bisa diulang.`;
+  V.innerHTML = '<h1>Tantangan Harian</h1>' +
     (sp ? `<div class="card spin"><span class="tag">🎰 Spin hadiah · ${sp.nm}</span><h2>Kamu punya ${sp.n} spin!</h2><div class="reel"><div class="strip" id="strip"></div><i class="ptr"></i></div><div id="spmsg"></div><div class="row"><span></span><button class="btn" id="spin">Putar!</button></div></div>` : '') +
-    `<div class="card"><span class="tag">🎯 Kuis Harian</span>${status}<p class="muted" style="margin:8px 0 0">Kuis diperbarui dalam ${left} (pukul 00.00 WIB).</p></div>
-    <div class="card"><span class="tag">⚡ Cepat Tepat</span>${fstatus}</div>
+    evCard('🎯 Kuis Harian', `${d.dly.n} soal acak dari semua jilid. ${sub(d.dly.pass)} Hadiah tertinggi <b>${GL} 1000</b>!`, d.today, d.dly.pass, d.dly.on, 'dgo', 'Mulai kuis harian', d.dly.n) +
+    evCard('⚡ Cepat Tepat', `10 soal dengan <b>batas waktu</b> tiap soal: mulai <b>${f.lim[0]} detik</b> dan makin cepat sampai <b>${f.lim[f.lim.length - 1]} detik</b> di soal terakhir. ${sub(f.pass)}`, f.today, f.pass, f.on, 'fgo', 'Mulai Cepat Tepat', 10) +
+    evCard('🧩 Sorof Harian', `${so.n} soal Sorof acak dari semua level yang tersedia (sighot dan bentuk fi'il). ${sub(so.pass)}`, so.today, so.pass, so.on, 'sgo', 'Mulai Sorof Harian', so.n) +
+    evCard('🗣️ Lisan Harian', `${ol.n} lafadz acak dari semua jilid, dijawab dengan tulisanmu sendiri dan dinilai dari maksudnya. ${sub(ol.pass)}`, ol.today, ol.pass, ol.on, 'ogo', 'Mulai Lisan Harian', 0) +
+    `<p class="muted" style="margin:0 0 12px">Semua tantangan diperbarui dalam ${left} (pukul 00.00 WIB).</p>
     <div class="card"><h2>Hadiah spin</h2><div class="pzg">${d.prizes.map(([g, w]) => `<div class="pzc"><span class="pz" style="--pc:${PRIZE_C[g]};flex:0 0 auto;height:34px;padding:0 14px;font-size:.95rem">${GL} ${g}</span><small class="muted">peluang ${+(w / tot * 100).toFixed(1)}%</small></div>`).join('')}</div>
-    <p class="muted" style="margin:12px 0 0">Jaminan: spin ke-${d.need} sejak hadiah langka terakhir (${GL} ${d.rare}+) pasti mendapat hadiah langka. Dihitung terpisah untuk Kuis Harian dan Cepat Tepat. Spin berikutnya: Kuis Harian ke-${d.pity + 1}, Cepat Tepat ke-${f.pity + 1}.</p></div>`;
-  const go1 = $('#dgo'); if (go1) go1.onclick = async () => {
-    if (!confirm('Kamu hanya punya satu kesempatan hari ini dan tidak bisa mengulang. Jangan tutup halaman sebelum selesai. Mulai sekarang?')) return;
-    try { vDailyQuiz(await api('daily/start', {})); } catch (e) { alert(e.message); }
-  };
-  const fg = $('#fgo'); if (fg) fg.onclick = async () => {
-    if (!confirm('Cepat Tepat hanya satu kesempatan hari ini. Setiap soal ada batas waktunya, dan soal yang lewat waktu dianggap salah. Jangan tutup halaman sebelum selesai. Mulai sekarang?')) return;
-    try { vFastQuiz(await api('daily/fast/start', {})); } catch (e) { alert(e.message); }
-  };
+    <p class="muted" style="margin:12px 0 0">Jaminan: spin ke-${d.need} sejak hadiah langka terakhir (${GL} ${d.rare}+) pasti mendapat hadiah langka. Dihitung terpisah untuk tiap tantangan. Spin berikutnya: Kuis Harian ke-${d.pity + 1}, Cepat Tepat ke-${f.pity + 1}, Sorof Harian ke-${so.pity + 1}, Lisan Harian ke-${ol.pity + 1}.</p></div>`;
+  const start = (id, msg, url, run) => { const b = $('#' + id); if (b) b.onclick = async () => { if (!confirm(msg)) return; try { run(await api(url, {})); } catch (e) { alert(e.message); } }; };
+  const once = 'Kamu hanya punya satu kesempatan hari ini dan tidak bisa mengulang. Jangan tutup halaman sebelum selesai. Mulai sekarang?';
+  start('dgo', once, 'daily/start', vDailyQuiz);
+  start('fgo', 'Cepat Tepat hanya satu kesempatan hari ini. Setiap soal ada batas waktunya, dan soal yang lewat waktu dianggap salah. Jangan tutup halaman sebelum selesai. Mulai sekarang?', 'daily/fast/start', vFastQuiz);
+  start('sgo', once, 'daily/sorof/start', q => vSorofQuiz(q, { title: 'Sorof Harian' }, true));
+  start('ogo', once + ' Penilaian jawaban dilakukan di akhir tiap lafadz.', 'daily/oral/start', q => vOralQuiz(q, 0, true));
   const strip = $('#strip'); if (!strip) return;
   const mk = () => { const x = Math.random() * tot; let a = 0; for (const [g, w] of d.prizes) { a += w; if (x < a) return g; } return d.prizes[0][0]; };
   strip.innerHTML = Array.from({ length: 44 }, () => tile(mk())).join('');
@@ -1024,16 +1031,16 @@ function vFastQuiz(d) {
 }
 function vFastResult(r, wrong) {
   V.innerHTML = `<div class="card res"><div class="big">${r.pass ? '⚡' : '💪'}</div><span class="tag">Hasil Cepat Tepat</span><h1>${r.correct} / ${r.total}</h1>
-    <p class="muted">Nilai ${r.score}. ${r.pass ? 'Kamu berhak 1× spin hadiah!' : 'Butuh minimal ' + 80 + ' untuk spin. Coba lagi besok.'}</p>
+    <p class="muted">Nilai ${r.score}. ${r.pass ? 'Kamu berhak 1× spin hadiah!' : 'Butuh minimal ' + EVP.fast + ' untuk spin. Coba lagi besok.'}</p>
     <div class="row"><span></span><button class="btn" id="dn">${r.pass ? '🎰 Spin hadiah' : 'Kembali'}</button></div></div>` +
     (wrong.length ? `<h2>Pembahasan (${wrong.length} salah atau lewat waktu)</h2>` + wrong.map((w, n) => `<div class="card" style="--i:${n}"><p dir="auto"><b>${esc(w.q)}</b></p><p class="muted" dir="auto">Jawaban benar: ${w.k}. ${esc(w.a)}</p>${w.id ? rptRow(w.id) : ''}</div>`).join('') : '');
   bindRpts();
   if (r.pass) [0, 250, 500].forEach(t => setTimeout(() => burst(innerWidth / 2, 130, 36), t));
   $('#dn').onclick = () => go(r.pass ? 'daily' : 'home');
 }
-function vDailyResult(r, wrong) {
-  V.innerHTML = `<div class="card res"><div class="big">${r.pass ? '🎉' : '💪'}</div><span class="tag">Hasil Kuis Harian</span><h1>${r.correct} / ${r.total}</h1>
-    <p class="muted">Nilai ${r.score}. ${r.pass ? 'Kamu berhak 1× spin hadiah!' : 'Butuh minimal ' + DAILY_PASS + ' untuk spin. Coba lagi besok.'}</p>
+function vDailyResult(r, wrong, nm = 'Kuis Harian', need = DAILY_PASS) {
+  V.innerHTML = `<div class="card res"><div class="big">${r.pass ? '🎉' : '💪'}</div><span class="tag">Hasil ${nm}</span><h1>${r.correct} / ${r.total}</h1>
+    <p class="muted">Nilai ${r.score}. ${r.pass ? 'Kamu berhak 1× spin hadiah!' : 'Butuh minimal ' + need + ' untuk spin. Coba lagi besok.'}</p>
     <div class="row"><span></span><button class="btn" id="dn">${r.pass ? '🎰 Spin hadiah' : 'Kembali'}</button></div></div>` +
     (wrong.length ? `<h2>Pembahasan (${wrong.length} salah)</h2>` + wrong.map((w, n) => `<div class="card" style="--i:${n}"><p dir="auto"><b>${esc(w.q)}</b></p><p class="muted" dir="auto">Jawaban benar: ${w.k}. ${esc(w.a)}</p>${w.id ? rptRow(w.id) : ''}</div>`).join('') : '');
   bindRpts();
@@ -1050,6 +1057,7 @@ const OLV = { easy: ['Mudah', '🌱', 'e'], medium: ['Sedang', '⚡', 'm'], hard
 const AR_RUN = /[\u0600-\u06FF\u0750-\u077F]+(?:\s+[\u0600-\u06FF\u0750-\u077F]+)*/g;
 const qtx = s => esc(s).replace(AR_RUN, m => `<bdi lang="ar" dir="rtl">${m}</bdi>`), qdir = s => /[A-Za-z]/.test(s) ? 'ltr' : 'auto';
 const oralLeft = d => d.unl ? Infinity : Math.max(0, d.max - d.used);
+const oralXp = (j, k) => { const b = me.best[(11 + j) + ':' + k] || 0, x = LV[k][2]; return `<span class="xp">${b}/${x} XP</span><i class="pb"><u style="width:${b / x * 100}%"></u></i>`; };
 const oralNote = d => d.unl ? 'Akun admin: <b>tanpa batas</b> latihan.' : 'Sisa latihan hari ini: <b>' + oralLeft(d) + '</b> lafadz.';
 const oralGrid = d => {
   const left = oralLeft(d);
@@ -1057,7 +1065,7 @@ const oralGrid = d => {
     const c = d.counts[j] || 0, s = d.stats[j];
     return `<div class="card jc" style="--i:${n};${jst(j)}"><div class="jh"><span class="tag">Jilid ${j}</span><span class="jst">${c} lafadz</span></div>
       <p class="muted ostat">${s ? s.n + ' lafadz dijawab · ' + Math.round(s.c / s.t * 100) + '% langkah benar' : c ? 'Belum pernah dicoba' : 'Soal belum tersedia'}</p>
-      ${c ? `<div class="lvls">${Object.entries(d.lv).map(([k, n2]) => `<button class="lvl ${OLV[k][2]}" data-oj="${j}" data-ol="${k}"${left ? '' : ' disabled'}><span class="ic">${OLV[k][1]}</span><b>${OLV[k][0]}</b><small>${Math.min(n2, c)} lafadz</small><span class="xp">Mulai ▶</span></button>`).join('')}</div>${left ? '' : '<p class="muted ostat" style="margin:10px 0 0">Batas latihan hari ini tercapai. Lanjutkan besok!</p>'}` : ''}</div>`;
+      ${c ? `<div class="lvls">${Object.entries(d.lv).map(([k, n2]) => `<button class="lvl ${OLV[k][2]}" data-oj="${j}" data-ol="${k}"${left ? '' : ' disabled'}><span class="ic">${OLV[k][1]}</span><b>${OLV[k][0]}</b><small>${Math.min(n2, c)} lafadz</small>${oralXp(j, k)}</button>`).join('')}</div>${left ? '' : '<p class="muted ostat" style="margin:10px 0 0">Batas latihan hari ini tercapai. Lanjutkan besok!</p>'}` : ''}</div>`;
   }).join('') + '</div>';
 };
 function bindOral(root, d) {
@@ -1068,17 +1076,17 @@ function bindOral(root, d) {
     catch (e) { alert(e.message); all.forEach(x => x.disabled = !left); }
   });
 }
-function vOralQuiz(d, j) {
-  const items = d.items, sum = []; let i = 0;
+function vOralQuiz(d, j, daily) {
+  const items = d.items, sum = [], jj = daily ? 6 : j; let i = 0;
   const lvt = ({ easy: ' · 🌱 Mudah', medium: ' · ⚡ Sedang', hard: ' · 🔥 Sulit' })[d.level] || '';
   const head = (it, frac) => `<div class="bar"><i style="width:${frac * 100}%"></i></div>
-    <div class="meta"><span class="muted">🗣️ Jilid ${j}${lvt} · Lafadz ${i + 1}/${items.length}</span></div>
+    <div class="meta"><span class="muted">🗣️ ${daily ? 'Lisan Harian' : 'Jilid ' + j + lvt} · Lafadz ${i + 1}/${items.length}</span></div>
     <div class="lf" lang="ar" dir="rtl">${esc(it.lafadz)}</div>`;
   const ask = () => {
     const it = items[i], ans = []; let s = 0, busy = false;
     const draw = () => {
       const last = s === it.steps.length - 1;
-      V.innerHTML = `<div class="card jc" style="${jst(j)}">${head(it, (i + s / it.steps.length) / items.length)}
+      V.innerHTML = `<div class="card jc" style="${jst(jj)}">${head(it, (i + s / it.steps.length) / items.length)}
         ${s ? `<div>${ans.map((a, n) => `<div class="oqa"><p class="muted">${n + 1}. ${qtx(it.steps[n])}</p><p class="a" dir="auto">${a ? esc(a) : '<i class="muted">(dikosongkan)</i>'}</p></div>`).join('')}</div>` : ''}
         <h2 dir="${qdir(it.steps[s])}" style="margin-top:14px">${s + 1}. ${qtx(it.steps[s])}</h2>
         <input id="oa" dir="auto" maxlength="200" placeholder="Tulis jawabanmu…" autocomplete="off" autocapitalize="off" spellcheck="false">
@@ -1090,7 +1098,7 @@ function vOralQuiz(d, j) {
         ans[s] = inp.value.trim();
         if (!last) { s++; draw(); return; }
         busy = true; btn.disabled = true; inp.disabled = true; btn.textContent = 'Sedang diperiksa…'; $('#oe').textContent = '';
-        try { show(await api('oral/grade', { token: d.token, item: it.id, answers: ans })); }
+        try { show(await api(daily ? 'daily/oral/grade' : 'oral/grade', { token: d.token, item: it.id, answers: ans })); }
         catch (e) { busy = false; btn.disabled = false; inp.disabled = false; btn.textContent = 'Kirim ulang'; $('#oe').textContent = e.message; }
       };
       btn.onclick = next; inp.onkeydown = e => { if (e.key === 'Enter') next(); };
@@ -1098,7 +1106,7 @@ function vOralQuiz(d, j) {
     const show = r => {
       sum.push({ it, r });
       const perfect = r.correct === r.total;
-      V.innerHTML = `<div class="card jc" style="${jst(j)}">${head(it, (i + 1) / items.length)}
+      V.innerHTML = `<div class="card jc" style="${jst(jj)}">${head(it, (i + 1) / items.length)}
         <span class="chip pop">${perfect ? '✅ Semua benar, masya Allah!' : r.correct + ' dari ' + r.total + ' langkah benar'}</span>
         ${r.steps.map((x, n) => `<div class="ost ${x.ok ? 'ok' : 'no'}"><p class="muted">${n + 1}. ${qtx(x.q)}</p><p dir="auto"><b>${x.s ? esc(x.s) : '(dikosongkan)'}</b> ${x.ok ? '✅' : '❌'}</p>${x.ok ? '' : `<p class="muted" dir="auto">${x.fb ? esc(x.fb) + ' ' : ''}Jawaban contoh: <b>${esc(x.model)}</b></p>`}</div>`).join('')}
         <div class="row"><span></span><button class="btn" id="onn">${i < items.length - 1 ? 'Lafadz berikutnya →' : 'Lihat hasil'}</button></div></div>`;
@@ -1109,11 +1117,30 @@ function vOralQuiz(d, j) {
   };
   const result = () => {
     const c = sum.reduce((a, x) => a + x.r.correct, 0), t = sum.reduce((a, x) => a + x.r.total, 0), p = t ? Math.round(c / t * 100) : 0;
-    V.innerHTML = `<div class="card res jc" style="${jst(j)}"><div class="big">${p >= 90 ? '🏆' : p >= 70 ? '🎉' : p >= 40 ? '👍' : '💪'}</div><span class="tag">Hasil Kuis Lisan · Jilid ${j}${lvt}</span>
+    if (daily) {
+      V.innerHTML = `<div class="card res jc" style="${jst(jj)}"><div class="big">${p >= 90 ? '🏆' : p >= 70 ? '🎉' : p >= 40 ? '👍' : '💪'}</div><span class="tag">Hasil Lisan Harian</span>
+        <h1>${c} / ${t}</h1><p class="muted">langkah benar (${p}%) dari ${sum.length} lafadz</p><p class="muted" id="oxp">Menghitung nilai…</p>
+        <div style="text-align:left">${sum.map(x => `<div class="olr"><div class="lf" lang="ar" dir="rtl">${esc(x.it.lafadz)}</div><b>${x.r.correct}/${x.r.total}</b></div>`).join('')}</div>
+        <div class="row"><span></span><button class="btn" id="dn" disabled>Kembali</button></div></div>`;
+      api('daily/oral/finish', { token: d.token }).then(r => {
+        noteAch(r.ach); const e = $('#oxp'), b = $('#dn');
+        if (e) e.textContent = 'Nilai ' + r.score + '. ' + (r.pass ? 'Kamu berhak 1× spin hadiah!' : 'Butuh minimal ' + EVP.oral + ' untuk spin. Coba lagi besok.');
+        if (b) { b.disabled = false; b.textContent = r.pass ? '🎰 Spin hadiah' : 'Kembali'; b.onclick = () => go(r.pass ? 'daily' : 'home'); }
+        if (r.pass) [0, 250, 500].forEach(t2 => setTimeout(() => burst(innerWidth / 2, 130, 36), t2));
+      }).catch(x => { const e = $('#oxp'), b = $('#dn'); if (e) e.textContent = x.message; if (b) { b.disabled = false; b.onclick = () => go('daily'); } });
+      return;
+    }
+    V.innerHTML = `<div class="card res jc" style="${jst(jj)}"><div class="big">${p >= 90 ? '🏆' : p >= 70 ? '🎉' : p >= 40 ? '👍' : '💪'}</div><span class="tag">Hasil Kuis Lisan · Jilid ${j}${lvt}</span>
       <h1>${c} / ${t}</h1><p class="muted">langkah benar (${p}%) dari ${sum.length} lafadz</p>
+      <span class="chip pop" id="oxp">Menghitung XP…</span>
       <div style="text-align:left">${sum.map(x => `<div class="olr"><div class="lf" lang="ar" dir="rtl">${esc(x.it.lafadz)}</div><b>${x.r.correct}/${x.r.total}</b></div>`).join('')}</div>
       <div class="row"><button class="btn" id="oh">Kembali</button><button class="btn ghost" id="oa2">Latihan lagi</button></div></div>`;
     if (p >= 70) [0, 250].forEach(t2 => setTimeout(() => burst(innerWidth / 2, 130, 30), t2));
+    api('oral/finish', { token: d.token }).then(r => {
+      const k = (11 + j) + ':' + d.level, prev = me.best[k] || 0, gain = Math.max(0, r.xp - prev), t0 = totalXp();
+      me.best[k] = Math.max(prev, r.xp); noteRank(t0); noteAch(r.ach); oralCache = null;
+      const e = $('#oxp'); if (e) e.textContent = gain ? '+' + gain + ' XP dan +' + Math.floor(gain * (me.rate || 1)) + ' ' + GL + ' masuk ke totalmu' : 'XP sesi ini ' + r.xp + '. Rekor level ini: ' + prev + ' XP. Lampaui untuk menambah total.';
+    }).catch(x => { const e = $('#oxp'); if (e) e.textContent = x.message; });
     $('#oh').onclick = () => go('home'); $('#oa2').onclick = async e => { e.currentTarget.disabled = true; try { vOralQuiz(await api('oral/start', { jilid: j, level: d.level }), j); } catch (x) { alert(x.message); go('home'); } };
   };
   ask();
@@ -1135,7 +1162,7 @@ const ADM = () => !!me && me.role === 'admin';
 const AJD = j => ADM() || JD(j), TS = () => ADM() ? 7 : (me.tstage || 0);
 const JN = j => Object.keys(LV).filter(k => qd(j, k)).length, JD = j => JN(j) === 3, TAT = () => ADM() || [1, 2, 3, 4].every(JD);
 /* [batas XP, nama, warna teks di atas warna rank, warna rank]. Batas XP harus sama dengan query admin/stats di backend. Ikon: gambar /rank/<nama>.webp (bronze, silver, gold, platinum, diamond, legend). */
-const RANKS = [[0, 'Bronze', '#1a1a1a', '#CD7F32'], [300, 'Silver', '#1a1a1a', '#B8C2CC'], [700, 'Gold', '#1a1a1a', '#F2B705'], [1200, 'Platinum', '#1a1a1a', '#46C2B5'], [1800, 'Diamond', '#1a1a1a', '#3AA9F0'], [3000, 'Legend', '#ffffff', '#B13CFF']];
+const RANKS = [[0, 'Bronze', '#1a1a1a', '#CD7F32'], [400, 'Silver', '#1a1a1a', '#B8C2CC'], [900, 'Gold', '#1a1a1a', '#F2B705'], [1600, 'Platinum', '#1a1a1a', '#46C2B5'], [2500, 'Diamond', '#1a1a1a', '#3AA9F0'], [3500, 'Legend', '#ffffff', '#B13CFF']];
 const RI = (n, sz = 40) => `<img class="ri" src="/rank/${RANKS[n][1].toLowerCase()}.webp" width="${sz}" height="${sz}" alt="" draggable="false">`;
 const payText = () => { const p = me && me.pays; return p ? RANKS.map((r, i) => r[1] + ' ' + p[i]).join(', ') : ''; };
 const rkOf = t => RANKS.reduce((a, r, n) => t >= r[0] ? n : a, 0), totalXp = () => Object.values(me.best).reduce((a, b) => a + b, 0);
@@ -1154,12 +1181,18 @@ function vHome() {
     </div>
     <div class="sec"><h2>Tantangan Harian</h2><span>Sekali sehari, menangkan hadiah ${GL}</span></div>
     <div class="modes">
-      <div class="mode dly"><span class="ico">🎯</span><span class="tag">🎯 Kuis Harian</span><h2>10 soal acak, spin hadiah</h2>
-        <p>Nilai minimal ${DAILY_PASS} untuk memutar hadiah sampai ${GL} 1000. Satu kesempatan per hari.</p>
+      <div class="mode dly"><span class="ico">🎯</span><span class="tag">🎯 Kuis Harian</span><h2>Soal acak, spin hadiah</h2>
+        <p id="dpt">Nilai minimal ${DAILY_PASS} untuk memutar hadiah sampai ${GL} 1000. Satu kesempatan per hari.</p>
         <div class="ft"><small id="dst">Satu kesempatan per hari</small><button class="btn" id="dailyGo">Buka</button></div></div>
       <div class="mode fst"><span class="ico">⚡</span><span class="tag">⚡ Cepat Tepat</span><h2>Tiap soal berpacu dengan waktu</h2>
-        <p>Mulai 10 detik per soal, makin cepat sampai 5 detik. Nilai minimal 80 untuk memutar hadiah. Satu kesempatan per hari.</p>
+        <p id="fpt">Mulai 10 detik per soal, makin cepat sampai 5 detik. Nilai minimal ${EVP.fast} untuk memutar hadiah. Satu kesempatan per hari.</p>
         <div class="ft"><small id="fst">Satu kesempatan per hari</small><button class="btn" id="fastGo">Buka</button></div></div>
+      <div class="mode srf"><span class="ico">🧩</span><span class="tag">🧩 Sorof Harian</span><h2>Sighot dan bentuk fi'il</h2>
+        <p id="spt">Soal Sorof acak dari semua level. Nilai minimal ${EVP.sorof} untuk memutar hadiah. Satu kesempatan per hari.</p>
+        <div class="ft"><small id="sst">Satu kesempatan per hari</small><button class="btn" id="sorofGo">Buka</button></div></div>
+      <div class="mode lsn"><span class="ico">🗣️</span><span class="tag">🗣️ Lisan Harian</span><h2>Praktek lafadz</h2>
+        <p id="opt">Beberapa lafadz acak, dijawab dengan tulisanmu. Nilai minimal ${EVP.oral} untuk memutar hadiah. Satu kesempatan per hari.</p>
+        <div class="ft"><small id="ost2">Satu kesempatan per hari</small><button class="btn" id="oralGo">Buka</button></div></div>
     </div>
     <div class="sec"><h2>Latihan</h2><span>Pilih jenis kuis, lalu jilid dan levelnya</span></div>
     <div class="tabs htabs"><button data-ht="tulis">✍️ Kuis Tulis</button><button data-ht="lisan">🗣️ Kuis Lisan</button><button data-ht="sorof">🧩 Kuis Sorof</button></div>
@@ -1173,8 +1206,8 @@ function vHome() {
       }).join('') + `</div></div>`).join('') + `</div>
     <div class="modes">
       <div class="mode ${tat ? 'tth' : 'off'}"><span class="ico">${tat ? '📚' : '🔒'}</span><span class="tag">${tat ? '📚' : '🔒'} Mode Tathbiq</span><h2>Soal acak dari semua jilid</h2>
-        <p>${tat ? '3 nyawa. Naik tahap tiap 10 soal: Tathbiq 1 sampai 6, lalu Takhossus. XP tanpa batas!' : 'Selesaikan semua quest Jilid 1–4 (minimal ' + PASS() + '% benar di tiap level) untuk membuka mode ini.'}</p>
-        <div class="ft"><small>${tat ? 'Rekor ' + (me.best['0:endless'] || 0) + ' XP · Tahap ' + (me.tstage ? STG[me.tstage - 1][0] : '-') : 'Jilid selesai: ' + [1, 2, 3, 4].filter(JD).length + '/4'}</small><button class="btn" id="endStart"${tat ? '' : ' disabled'}>${tat ? 'Mulai' : '🔒 Terkunci'}</button></div></div>
+        <p>${tat ? '3 nyawa. Naik tahap tiap 10 soal: Tathbiq 1 sampai 6, lalu Takhossus. Skor tanpa batas (maks 2.000 XP dihitung ke total).' : 'Selesaikan semua quest Jilid 1–4 (minimal ' + PASS() + '% benar di tiap level) untuk membuka mode ini.'}</p>
+        <div class="ft"><small>${tat ? 'Rekor ' + (me.tathRaw || 0) + ' XP · Tahap ' + (me.tstage ? STG[me.tstage - 1][0] : '-') : 'Jilid selesai: ' + [1, 2, 3, 4].filter(JD).length + '/4'}</small><button class="btn" id="endStart"${tat ? '' : ' disabled'}>${tat ? 'Mulai' : '🔒 Terkunci'}</button></div></div>
     </div>`;
   // swap = pindah tab (bukan render pertama): tinggi panel ditahan selama isi diganti dan animasi masuk diganti fade halus, supaya halaman tidak melompat/bergetar
   const drawPane = async swap => {
@@ -1210,7 +1243,7 @@ function vHome() {
       settle(); return;
     }
     const paint = d => {
-      pane.innerHTML = `<p class="muted hnote">Praktek lafadz seperti di depan ustadz: jawab langkah demi langkah dengan tulisanmu sendiri, dinilai dari maksudnya. ${oralNote(d)} Makin tinggi level, makin banyak lafadz, diambil dari sebanyak mungkin bab.</p>` + oralGrid(d);
+      pane.innerHTML = `<p class="muted hnote">Praktek lafadz seperti di depan ustadz: jawab langkah demi langkah dengan tulisanmu sendiri, dinilai dari maksudnya. ${oralNote(d)} Makin tinggi level, makin banyak lafadz, diambil dari sebanyak mungkin bab. Tiap sesi memberi XP sesuai persen langkah benar (maks 100/200/300 per level).</p>` + oralGrid(d);
       bindOral(pane, d);
     };
     const had = !!oralCache;
@@ -1226,11 +1259,19 @@ function vHome() {
   V.querySelectorAll('[data-ht]').forEach(b => b.onclick = () => { if (b.dataset.ht === homeTab) return; setHomeTab(b.dataset.ht); drawPane(true); });
   drawPane(false);
   count($('#tx'), tot);
-  $('#dailyGo').onclick = () => go('daily'); $('#fastGo').onclick = () => go('daily');
+  $('#dailyGo').onclick = () => go('daily'); $('#fastGo').onclick = () => go('daily'); $('#sorofGo').onclick = () => go('daily'); $('#oralGo').onclick = () => go('daily');
   setTimeout(() => { const g = $('#pg'); if (g) { g.style.background = rk[3]; g.style.width = frac * 100 + '%'; } }, 80);
   // status kuis harian dimuat belakangan agar beranda tampil langsung
-  api('daily').then(d => { const e = $('#dst'); if (!e) return; const t = d.today; e.textContent = d.pending ? '🎰 Spin hadiah siap!' : !t ? 'Belum dikerjakan hari ini' : !t.done ? 'Hari ini hangus' : '✅ Selesai · nilai ' + t.score; if (d.pending) e.classList.add('badge');
-    const g = $('#fst'), f = d.fast; if (g) { const x = f.today; g.textContent = f.pending ? '🎰 Spin hadiah siap!' : !x ? 'Belum dikerjakan hari ini' : !x.done ? 'Hari ini hangus' : '✅ Selesai · nilai ' + x.score; if (f.pending) g.classList.add('badge'); } }).catch(() => {});
+  api('daily').then(d => {
+    setEvp(d);
+    const put = (id, X, pend, on) => { const e = $(id); if (!e) return; e.textContent = !X && !on ? 'Dinonaktifkan admin' : pend ? '🎰 Spin hadiah siap!' : !X ? 'Belum dikerjakan hari ini' : !X.done ? 'Hari ini hangus' : '✅ Selesai · nilai ' + X.score; if (pend) e.classList.add('badge'); };
+    put('#dst', d.today, d.pending, d.dly.on); put('#fst', d.fast.today, d.fast.pending, d.fast.on); put('#sst', d.sorof.today, d.sorof.pending, d.sorof.on); put('#ost2', d.oral.today, d.oral.pending, d.oral.on);
+    const tx = (id, t) => { const e = $(id); if (e) e.textContent = t; };
+    tx('#dpt', `${d.dly.n} soal acak. Nilai minimal ${d.dly.pass} untuk memutar hadiah sampai ${GL} 1000. Satu kesempatan per hari.`);
+    tx('#fpt', `Mulai 10 detik per soal, makin cepat sampai 5 detik. Nilai minimal ${d.fast.pass} untuk memutar hadiah. Satu kesempatan per hari.`);
+    tx('#spt', `${d.sorof.n} soal Sorof acak dari semua level. Nilai minimal ${d.sorof.pass} untuk memutar hadiah. Satu kesempatan per hari.`);
+    tx('#opt', `${d.oral.n} lafadz acak, dijawab dengan tulisanmu. Nilai minimal ${d.oral.pass} untuk memutar hadiah. Satu kesempatan per hari.`);
+  }).catch(() => {});
 }
 
 /* ---------- Kuis ---------- */
@@ -1277,7 +1318,7 @@ function vResult(r, j, l, wrong) {
   V.innerHTML = `<div class="card res jc" style="${jst(j)}"><div class="big">${em}</div><span class="tag">Hasil · Jilid ${j} · ${LV[l][0]}</span>
     <h1><span id="rx">0</span> / ${LV[l][2]} XP</h1><p class="muted">${r.correct} dari ${r.total} soal benar · nilai ${r.score}</p>
     ${GR(r.score) ? `<span class="gtag" style="background:${GR(r.score)[2]}">${GR(r.score)[1]} ${GR(r.score)[0]} · quest selesai</span>` : `<p class="muted">Belum lulus. Butuh minimal ${PASS()}% benar agar quest ini selesai.</p>`}
-    <span class="chip pop">${gain ? '+' + gain + ' XP dan +' + gain + ' ' + GL + ' masuk ke totalmu' : 'Rekor di level ini: ' + prev + ' XP. Lampaui untuk menambah total.'}</span>
+    <span class="chip pop">${gain ? '+' + gain + ' XP dan +' + Math.floor(gain * (me.rate || 1)) + ' ' + GL + ' masuk ke totalmu' : 'Rekor di level ini: ' + prev + ' XP. Lampaui untuk menambah total.'}</span>
     <div class="row"><button class="btn" id="hm">Kembali</button><button class="btn ghost" id="lb">Lihat leaderboard</button></div></div>` +
     (wrong.length ? `<h2>Pembahasan (${wrong.length} salah)</h2>` + wrong.map((w, n) => `<div class="card" style="--i:${n}"><p dir="auto"><b>${esc(w.q)}</b></p><p class="muted" dir="auto">Jawaban benar: ${w.k}. ${esc(w.a)}</p>${w.id ? rptRow(w.id) : ''}</div>`).join('') : '');
   bindRpts(); count($('#rx'), r.xp);
@@ -1299,12 +1340,12 @@ function sorofPane(d) {
       return `<button class="lvl ${LV[L.xl][4]}" data-sl="${L.k}"${L.ready ? '' : ' disabled'}><span class="ic">${SIC[L.k] || '📖'}</span><b>${esc(L.title)}</b><small>${L.n} soal${g ? ' · <span class="gr">' + g[0] + '</span>' : ''}${L.ready ? '' : ' · belum tersedia'}</small><span class="xp">${b}/${x} XP</span><i class="pb"><u style="width:${b / x * 100}%"></u></i>${g ? '<span class="done" title="' + g[0] + '">' + g[1] + '</span>' : ''}</button>`;
     }).join('') + `</div></div>`;
 }
-function vSorofQuiz(d, L) {
+function vSorofQuiz(d, L, daily) {
   const qs = d.questions, wrong = [], ans = {}; let i = 0, streak = 0;
   const draw = () => {
     const q = qs[i];
     V.innerHTML = `<div class="card jc" style="${jst(6)}"><div class="bar"><i style="width:${i / qs.length * 100}%"></i></div>
-      <div class="meta"><span class="muted">Sorof · ${esc(L.title)} · Soal ${i + 1}/${qs.length}</span><span class="chip" id="cb">🔥 ${streak}</span></div>
+      <div class="meta"><span class="muted">${daily ? '' : 'Sorof · '}${esc(L.title)} · Soal ${i + 1}/${qs.length}</span><span class="chip" id="cb">🔥 ${streak}</span></div>
       <h2 dir="auto" id="qt"></h2><div>` +
       ['a', 'b', 'c', 'd'].map((k, n) => `<button class="opt" style="--i:${n}" data-k="${k.toUpperCase()}" dir="auto"><b>${k.toUpperCase()}</b><span>${esc(q[k])}</span></button>`).join('') +
       `</div><div id="fb"></div><div class="row"><span></span><button class="btn" id="nx" hidden>${i < qs.length - 1 ? 'Berikutnya →' : 'Lihat hasil'}</button></div></div>`;
@@ -1326,7 +1367,10 @@ function vSorofQuiz(d, L) {
     });
     $('#nx').onclick = async () => {
       if (i < qs.length - 1) { i++; draw(); return; }
-      try { vSorofResult(await api('sorof/submit', { token: d.token, answers: ans }), L, wrong); } catch (e) { alert(e.message); }
+      try {
+        if (daily) { const r = await api('daily/sorof/submit', { token: d.token, answers: ans }); noteAch(r.ach); vDailyResult(r, wrong, 'Sorof Harian', EVP.sorof); }
+        else vSorofResult(await api('sorof/submit', { token: d.token, answers: ans }), L, wrong);
+      } catch (e) { alert(e.message); }
     };
   };
   draw();
@@ -1339,7 +1383,7 @@ function vSorofResult(r, L, wrong) {
   V.innerHTML = `<div class="card res jc" style="${jst(6)}"><div class="big">${em}</div><span class="tag">Hasil · Sorof · ${esc(L.title)}</span>
     <h1><span id="rx">0</span> / ${mx} XP</h1><p class="muted">${r.correct} dari ${r.total} soal benar · nilai ${r.score}</p>
     ${GR(r.score) ? `<span class="gtag" style="background:${GR(r.score)[2]}">${GR(r.score)[1]} ${GR(r.score)[0]} · quest selesai</span>` : `<p class="muted">Belum lulus. Butuh minimal ${PASS()}% benar agar quest ini selesai.</p>`}
-    <span class="chip pop">${gain ? '+' + gain + ' XP dan +' + gain + ' ' + GL + ' masuk ke totalmu' : 'Rekor di level ini: ' + prev + ' XP. Lampaui untuk menambah total.'}</span>
+    <span class="chip pop">${gain ? '+' + gain + ' XP dan +' + Math.floor(gain * (me.rate || 1)) + ' ' + GL + ' masuk ke totalmu' : 'Rekor di level ini: ' + prev + ' XP. Lampaui untuk menambah total.'}</span>
     <div class="row"><button class="btn" id="hm">Kembali</button><button class="btn ghost" id="sag">Ulangi level ini</button><button class="btn ghost" id="lb">Lihat leaderboard</button></div></div>` +
     (wrong.length ? `<h2>Pembahasan (${wrong.length} salah)</h2>` + wrong.map((w, n) => `<div class="card" style="--i:${n}"><p dir="auto"><b>${esc(w.q)}</b></p><p class="muted" dir="auto">Jawaban benar: ${w.k}. ${esc(w.a)}</p></div>`).join('') : '');
   count($('#rx'), r.xp);
@@ -1395,12 +1439,12 @@ function vEndless(d) {
   draw();
 }
 function vEndResult(r) {
-  const prev = me.best['0:endless'] || 0, gain = Math.max(0, r.score - prev);
+  const cap = me.tcap || 2000, sc = Math.min(r.score, cap), prev = me.best['0:endless'] || 0, gain = Math.max(0, sc - prev);
   const t0 = totalXp();
-  me.best['0:endless'] = Math.max(prev, r.score); noteRank(t0);
+  me.best['0:endless'] = Math.max(prev, sc); me.tathRaw = Math.max(me.tathRaw || 0, r.score); noteRank(t0);
   V.innerHTML = `<div class="card res"><div class="big">${gain ? '🏆' : '🏁'}</div><span class="tag">Hasil Tathbiq</span>
     <h1><span id="rx">0</span> XP</h1><p class="muted">${r.correct} benar dari ${r.answered} soal${r.cleared ? ' · semua soal berhasil dijawab!' : ''}</p>
-    <span class="chip pop">${gain ? '+' + gain + ' XP dan +' + gain + ' ' + GL + ' masuk ke totalmu (rekor baru!)' : 'Rekor Tathbiq-mu: ' + prev + ' XP. Lampaui untuk menambah total.'}</span>
+    <span class="chip pop">${gain ? '+' + gain + ' XP dan +' + Math.floor(gain * (me.rate || 1)) + ' ' + GL + ' masuk ke totalmu (rekor baru!)' : 'Rekor Tathbiq-mu: ' + me.tathRaw + ' XP' + (me.tathRaw > cap ? ' (yang dihitung ke total maksimal ' + cap + ' XP)' : '') + '. Lampaui untuk menambah total.'}</span>
     <div class="row"><button class="btn" id="hm">Kembali</button><button class="btn ghost" id="lb">Lihat leaderboard</button></div></div>`;
   count($('#rx'), r.score);
   if (gain) [0, 250, 500].forEach(t => setTimeout(() => burst(innerWidth / 2, 130, 36), t));
@@ -1475,14 +1519,14 @@ const GUIDE = {
     <li><b>Efek foto profil:</b> tiap pencapaian (khatam jilid dan tahap Tathbiq) menambah efek pada fotomu di sidebar, profil, dan leaderboard: dari cincin sederhana, cincin berputar bercahaya, titik cahaya mengorbit, sampai mahkota emas di tahap Takhossus. Di <b>Profil</b> kamu bebas memilih efek yang sudah terbuka (atau Otomatis, atau tanpa efek).</li>
     <li><b>Pencapaian rank:</b> Bronze, Silver, Gold, Platinum, Diamond, dan Legend diraih dari total XP. Tiga teratas di leaderboard mendapat bingkai khusus: api 🔥 (juara 1), petir ⚡ (juara 2), dan percikan aura ✨ (juara 3).</li>
     <li><b>Gold dan Efek:</b> tiap rekor baru memberi Gold sebanyak XP-nya.@@GOLDINFO@@ Belanjakan di menu <b>Efek</b> untuk efek yang muncul saat jawabanmu benar, dari yang sederhana sampai petir dan galaksi. Efek bisa dicoba dulu, dan membeli tidak mengurangi XP atau rankmu.</li>
-    <li><b>Kuis Harian:</b> 10 soal acak dari semua jilid, sekali sehari dan tidak bisa diulang. Nilai minimal 80 memberi satu kali spin hadiah Gold, sampai 1000! Jangan tutup halaman sebelum selesai, karena kesempatan hari itu langsung terpakai.</li>
-    <li><b>Kuis Lisan:</b> latihan praktek lafadz. Kamu diberi satu lafadz Arab lalu menjawab pertanyaan berurutan (kalimat apa, tandanya, mu'rab atau mabni, i'rab, dan alasannya) dengan tulisanmu sendiri, boleh bahasa Indonesia atau Arab. Jawaban dinilai dari maksudnya, jadi tidak harus sama persis dengan kunci. Latihan ini belum menambah XP.</li>
+    <li><b>Tantangan Harian:</b> ada empat event, masing-masing sekali sehari dan tidak bisa diulang: <b>Kuis Harian</b> (soal acak semua jilid), <b>Cepat Tepat</b> (tiap soal berbatas waktu), <b>Sorof Harian</b> (soal Sorof acak), dan <b>Lisan Harian</b> (beberapa lafadz acak). Nilai di atas batas lulus tiap event (diatur admin, awalnya 80) memberi satu kali spin hadiah Gold, sampai 1000! Jangan tutup halaman sebelum selesai, karena kesempatan hari itu langsung terpakai.</li>
+    <li><b>Kuis Lisan:</b> latihan praktek lafadz. Kamu diberi satu lafadz Arab lalu menjawab pertanyaan berurutan (kalimat apa, tandanya, mu'rab atau mabni, i'rab, dan alasannya) dengan tulisanmu sendiri, boleh bahasa Indonesia atau Arab. Jawaban dinilai dari maksudnya, jadi tidak harus sama persis dengan kunci. XP dihitung seperti kuis tulis: 100/200/300 XP (Mudah/Sedang/Sulit) dikali persen langkah yang benar dalam satu sesi, dan hanya rekor terbaik tiap jilid dan level yang dihitung. Selesaikan sampai halaman hasil agar XP tercatat.</li>
     <li><b>Pencapaian dan lencana:</b> menu <b>Pencapaian</b> berisi puluhan target, dari streak harian, nilai sempurna, jawaban beruntun, sampai koleksi Efek. Tiap pencapaian memberi Gold sekali, ada juga yang tersembunyi. Di <b>Profil</b> kamu bisa memasang sampai 3 lencana yang tampil di leaderboard dan profilmu. Hari Jumat tidak memutus streak.</li></ul>`,
   tat: `<ul class="gl"><li><b>Syarat:</b> Mode Tathbiq terbuka setelah semua quest Jilid 1–4 selesai (minimal 60% benar di tiap level).</li>
     <li><b>Mode Tathbiq:</b> soal acak dari semua jilid, tanpa pengulangan, dengan <b>3 nyawa</b>. Salah 3 kali, permainan selesai.</li>
     <li>Tiap 10 soal naik tahap: Tathbiq 1 (soal 1–10), Tathbiq 2 (11–20), … Tathbiq 6 (51–60), lalu <b>Takhossus</b> (soal 61 dan seterusnya).</li>
     <li>Poin tiap jawaban benar = 10 × nomor tahap: Tathbiq 1 = +10, Tathbiq 2 = +20, … Takhossus mulai +70 dan terus naik tiap 10 soal.</li>
-    <li>XP Tathbiq <b>tanpa batas</b>. Rekor terbaikmu masuk ke total XP, dan ada tab khusus Tathbiq di leaderboard.</li>
+    <li>Skor Tathbiq <b>tanpa batas</b>, tetapi yang dihitung ke total XP dan rank maksimal <b>2.000 XP</b>. Skor mentahmu tetap tampil di tab Tathbiq leaderboard.</li>
     <li>Mencapai tahap baru memberi <b>pencapaian</b> yang tampil di profilmu. Skor tersimpan tiap soal, jadi keluar di tengah jalan tetap tercatat.</li></ul>`
 };
 const guideTxt = k => GUIDE[k].replace('@@GOLDINFO@@', me && me.starter ? ` Murid baru mendapat Gold awal ${me.starter}, dan setiap hari kamu mendapat bonus Gold sesuai rank (${payText()}) yang masuk otomatis saat kamu membuka aplikasi. Bonus tidak menumpuk kalau sehari tidak dibuka.` : '');
@@ -1557,7 +1601,7 @@ async function vProfile() {
   let cur = me.avatar || 'a1', pk = me.fxp == null ? null : me.fxp, ph = me.photo || null, usePh = !!(ph && me.usePhoto);
   const dk = () => usePh && ph ? pkey(me.username, ph) : cur; // kunci avatar yang sedang dipilih (foto atau emoji)
   V.innerHTML = `<div class="card prof"><div id="pav">${av(dk(), 'lg', fxOf(pk))}</div><div><h1>${nm(me.username, me.fxn)}</h1><div id="mybdg">${bdgChips(me.bd)}</div><span class="tag" style="background:${RANKS[ri][3]};color:${RANKS[ri][2]}">${RI(ri, 20)}${RANKS[ri][1]}</span>
-    <p class="muted">${xp} XP · Rekor Tathbiq ${me.best['0:endless'] || 0} XP</p></div></div>
+    <p class="muted">${xp} XP · Rekor Tathbiq ${me.tathRaw || 0} XP</p></div></div>
     <div class="tabs ptabs" id="ptabs">${[['look', '🎨 Tampilan'], ['acc', '👤 Akun'], ['set', '⚙️ Setelan'], ['win', '🏅 Prestasi']].map(([k, t]) => `<button data-pt="${k}" class="${ptab === k ? 'on' : ''}">${t}</button>`).join('')}</div>
     <section class="pnl" data-p="look"${ptab === 'look' ? '' : ' hidden'}><div class="card"><h2>Foto pribadi</h2><div class="phrow"><div id="phprev"></div><div><p class="muted" id="phinfo" style="margin:0 0 10px"></p>
       <div class="acts"><button class="btn" id="phpick">Pilih foto</button><button class="btn ghost" id="phuse" hidden>Pakai foto ini</button><button class="btn ghost del" id="phdel" hidden>Hapus foto</button></div></div></div>
@@ -1686,7 +1730,7 @@ let bq = '';
 let lio;
 async function vBoard(j = 0) {
   V.innerHTML = `<h1>Leaderboard</h1><div class="tabs">` +
-    ['Semua', 1, 2, 3, 4, 'Tathbiq', 'Sorof'].map((x, n) => `<button data-j="${n}" class="${n === j ? 'on' : ''}">${n === 5 ? '📚 Tathbiq' : n === 6 ? '🧩 Sorof' : n ? 'Jilid ' + x : x}</button>`).join('') +
+    ['Semua', 1, 2, 3, 4, 'Tathbiq', 'Sorof', 'Lisan'].map((x, n) => `<button data-j="${n}" class="${n === j ? 'on' : ''}">${n === 5 ? '📚 Tathbiq' : n === 6 ? '🧩 Sorof' : n === 7 ? '🗣️ Lisan' : n ? 'Jilid ' + x : x}</button>`).join('') +
     `</div><input type="search" id="sq" placeholder="Cari nama murid…" value="${esc(bq)}" autocomplete="off"><div class="card" id="lbr"><p class="muted">Memuat…</p></div>`;
   V.querySelectorAll('[data-j]').forEach(b => b.onclick = () => vBoard(+b.dataset.j));
   let t, seq = 0, first = true;
@@ -1697,7 +1741,7 @@ async function vBoard(j = 0) {
       if (my !== seq) return;
       const box = $('#lbr');
       box.classList.toggle('nofx', !first);
-      box.innerHTML = d.rows.length ? d.rows.map((r, n) => `<div class="lrow${r.username === me.username ? ' me' : ''}${r.total > 0 && r.rank <= 3 ? ' top' + r.rank : ''}${nc(r.nm) ? ' hasnm' : ''}" data-u="${esc(r.username)}" data-rk="${r.rank}" tabindex="0" role="button" title="Lihat profil" style="--i:${Math.min(n, 12)}"><span class="rk r${r.rank}">${r.rank < 4 ? ['🥇', '🥈', '🥉'][r.rank - 1] : r.rank}</span><b class="un">${av(r.ph ? pkey(r.username, r.ph) : r.avatar, '', r.fx, r.total > 0 && r.rank <= 3 ? r.rank : 0)}<span class="uname${nc(r.nm) ? ' ' + nc(r.nm) : ''}">${esc(r.username)}</span>${bdg(r.bd)}</b><span class="muted" style="margin:0">${j === 5 ? '📚' : j === 6 ? '🧩' : r.jilids + ' jilid'}</span><b>${r.total} XP</b></div>`).join('')
+      box.innerHTML = d.rows.length ? d.rows.map((r, n) => `<div class="lrow${r.username === me.username ? ' me' : ''}${r.total > 0 && r.rank <= 3 ? ' top' + r.rank : ''}${nc(r.nm) ? ' hasnm' : ''}" data-u="${esc(r.username)}" data-rk="${r.rank}" tabindex="0" role="button" title="Lihat profil" style="--i:${Math.min(n, 12)}"><span class="rk r${r.rank}">${r.rank < 4 ? ['🥇', '🥈', '🥉'][r.rank - 1] : r.rank}</span><b class="un">${av(r.ph ? pkey(r.username, r.ph) : r.avatar, '', r.fx, r.total > 0 && r.rank <= 3 ? r.rank : 0)}<span class="uname${nc(r.nm) ? ' ' + nc(r.nm) : ''}">${esc(r.username)}</span>${bdg(r.bd)}</b><span class="muted" style="margin:0">${j === 5 ? '📚' : j === 6 ? '🧩' : j === 7 ? '🗣️' : r.jilids + ' jilid'}</span><b>${r.total} XP</b></div>`).join('')
         : `<p class="muted">${bq ? 'Tidak ada murid bernama "' + esc(bq) + '".' : 'Belum ada nilai.'}</p>`;
       box.onclick = e => { const r = e.target.closest('.lrow'); if (r) openPlayer(r.dataset.u, j === 0 ? +r.dataset.rk : 0); };
       box.onkeydown = e => { if (e.key === 'Enter' && e.target.classList.contains('lrow')) e.target.click(); };
@@ -1786,8 +1830,8 @@ const loadX = () => window.XLSX ? Promise.resolve() : xlsxP ||= new Promise((ok,
 let admTab = 'stat';
 const ago = t => { if (!t) return 'belum pernah'; const m = (Date.now() - new Date(t)) / 6e4; return m < 1 ? 'baru saja' : m < 60 ? Math.floor(m) + ' menit lalu' : m < 1440 ? Math.floor(m / 60) + ' jam lalu' : Math.floor(m / 1440) + ' hari lalu'; };
 function vAdmin() {
-  V.innerHTML = `<h1>Panel Admin</h1><div class="tabs">${[['stat', '📊 Statistik'], ['soal', '📝 Kelola soal'], ['oral', '🗣️ Soal lisan'], ['sorof', '🧩 Bank Sorof'], ['user', '👥 Kelola murid'], ['groq', '🤖 Groq'], ['lap', '🚩 Laporan' + (me.reports ? ' (' + me.reports + ')' : '')]].map(([k, n]) => `<button data-t="${k}" class="${k === admTab ? 'on' : ''}">${n}</button>`).join('')}</div><div id="ab"></div>`;
-  const show = t => { admTab = t; V.querySelectorAll('[data-t]').forEach(x => x.classList.toggle('on', x.dataset.t === t)); const ab = $('#ab'); ab.innerHTML = ''; ({ stat: adminStats, soal: adminSoal, oral: adminOral, sorof: adminSorof, user: adminUsers, lap: adminReports, groq: adminGroq })[t](ab); };
+  V.innerHTML = `<h1>Panel Admin</h1><div class="tabs">${[['stat', '📊 Statistik'], ['soal', '📝 Kelola soal'], ['oral', '🗣️ Soal lisan'], ['sorof', '🧩 Bank Sorof'], ['user', '👥 Kelola murid'], ['ev', '📅 Event harian'], ['groq', '🤖 Groq'], ['lap', '🚩 Laporan' + (me.reports ? ' (' + me.reports + ')' : '')]].map(([k, n]) => `<button data-t="${k}" class="${k === admTab ? 'on' : ''}">${n}</button>`).join('')}</div><div id="ab"></div>`;
+  const show = t => { admTab = t; V.querySelectorAll('[data-t]').forEach(x => x.classList.toggle('on', x.dataset.t === t)); const ab = $('#ab'); ab.innerHTML = ''; ({ stat: adminStats, soal: adminSoal, oral: adminOral, sorof: adminSorof, user: adminUsers, lap: adminReports, groq: adminGroq, ev: adminEvents })[t](ab); };
   V.querySelectorAll('[data-t]').forEach(b => b.onclick = () => show(b.dataset.t));
   show(admTab);
 }
@@ -2163,6 +2207,27 @@ async function adminGroq(box) {
     try { const r = await api('admin/groq-test', {}); o.innerHTML = r.ok ? '✅ Kunci diterima Groq. ' + r.models.map(([m, ok]) => esc(m) + (ok ? ' ✅ tersedia' : ' ⚠️ tidak ditemukan di daftar')).join(' · ') : '❌ ' + esc(r.msg); }
     catch (x) { o.textContent = x.message; }
     b.disabled = false;
+  };
+}
+
+/* ---------- Admin: pengaturan event harian ---------- */
+const EVN = { daily: ['🎯 Kuis Harian', 'Soal pilihan ganda acak dari semua jilid'], fast: ['⚡ Cepat Tepat', 'Soal berbatas waktu 10 sampai 5 detik (jumlah soal tetap 10)'], sorof: ['🧩 Sorof Harian', 'Soal Sorof acak dari semua level yang tersedia'], oral: ['🗣️ Lisan Harian', 'Lafadz acak dari semua jilid, dinilai AI (memakai kuota Groq)'] };
+async function adminEvents(box) {
+  box.innerHTML = '<p class="muted">Memuat…</p>';
+  let d; try { d = await api('admin/events'); } catch (e) { box.textContent = e.message; return; }
+  if (!$('#ab')) return;
+  box.innerHTML = `<p class="muted">Atur tiap tantangan harian. Perubahan berlaku untuk murid yang memulai setelah disimpan (maksimal sekitar 10 detik untuk semua server). Murid yang sudah memulai hari ini tidak terpengaruh jumlah soalnya. Menaikkan nilai lulus juga berlaku untuk spin yang belum diambil.</p>` +
+    Object.keys(EVN).map(k => { const c = d.cfg[k], [lo, hi] = d.range[k]; return `<div class="card" data-ev="${k}"><div class="meta"><b>${EVN[k][0]}</b><span class="chip">${d.today[k]} murid selesai hari ini</span></div>
+      <p class="muted">${EVN[k][1]}</p>
+      <label class="chk"><input type="checkbox" data-f="on"${c.on ? ' checked' : ''}> Aktif</label>
+      <label class="muted" style="display:block;margin:6px 0 2px;font-size:.85rem">Jumlah ${k === 'oral' ? 'lafadz' : 'soal'} (${lo === hi ? 'tetap ' + lo : lo + '–' + hi})</label><input type="number" data-f="n" min="${lo}" max="${hi}" value="${c.n}"${lo === hi ? ' disabled' : ''}>
+      <label class="muted" style="display:block;margin:6px 0 2px;font-size:.85rem">Nilai minimal untuk 1 spin (50–100)</label><input type="number" data-f="pass" min="50" max="100" value="${c.pass}"></div>`; }).join('') +
+    `<div class="err" id="eve"></div><div class="row"><span></span><button class="btn" id="evs">Simpan pengaturan</button></div>`;
+  $('#evs').onclick = async e => {
+    const b = e.currentTarget; b.disabled = true; $('#eve').textContent = '';
+    const cfg = {}; box.querySelectorAll('[data-ev]').forEach(c => { cfg[c.dataset.ev] = { on: c.querySelector('[data-f=on]').checked, n: +c.querySelector('[data-f=n]').value, pass: +c.querySelector('[data-f=pass]').value }; });
+    try { await api('admin/events', { cfg }); toast('Pengaturan event harian disimpan', '✅'); adminEvents(box); }
+    catch (x) { $('#eve').textContent = x.message; b.disabled = false; }
   };
 }
 
