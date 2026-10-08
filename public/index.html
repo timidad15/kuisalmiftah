@@ -635,18 +635,39 @@ function fxBox(k) {
   for (const f of FXM.fx[k].f) if (f) { x0 = Math.min(x0, f[4] / sc); y0 = Math.min(y0, f[5] / sc); x1 = Math.max(x1, (f[4] + f[2]) / sc); y1 = Math.max(y1, (f[5] + f[3]) / sc); }
   return FXU[k] = { x: Math.floor(x0), y: Math.floor(y0), w: Math.ceil(x1 - x0) + 1, h: Math.ceil(y1 - y0) + 1 };
 }
+/* Pemutar sprite v2: (1) kanvas digambar pada kerapatan piksel layar (maks 1.5) sehingga hanya ada SATU kali pembesaran, bukan dua;
+   (2) antar-frame di-crossfade (mode 'lighter' = penjumlahan, hasilnya benar untuk efek cahaya) supaya gerak terasa 60 fps dari data 24 fps;
+   (3) kualitas Rendah memakai mode lompat-frame lama; (4) bitmap efek yang tidak terpasang dilepas 15 detik setelah selesai (hemat RAM). */
+function fxRelease(k) {
+  if (k === ((me && me.fxa) || 'confetti')) return;
+  setTimeout(() => {
+    const s = FXS[k];
+    if (s && s.st === 2 && !(s.act > 0)) { try { s.bmp && s.bmp.close && s.bmp.close(); } catch (e) {} delete FXS[k]; }
+  }, 15000);
+}
 function fxStart(k, r) {
-  const m = FXM.fx[k], s = FXS[k], u = fxBox(k), [cx, cy] = cen(r), sc = FXM.sc, fr = m.f, dt = 1000 / FXM.fps;
-  const cv = document.createElement('canvas'); cv.width = u.w; cv.height = u.h;
+  const m = FXM.fx[k], s = FXS[k], u = fxBox(k), [cx, cy] = cen(r), sc = FXM.sc, fr = m.f, dt = 1000 / FXM.fps, n = fr.length;
+  const d = Math.max(1, Math.min(window.devicePixelRatio || 1, Q().dpr, 1.5)), smooth = !LITE(); // tekstur setengah resolusi: kerapatan >1.5 tidak menambah detail
+  const cv = document.createElement('canvas'); cv.width = Math.ceil(u.w * d); cv.height = Math.ceil(u.h * d);
   cv.style.cssText = `position:fixed;left:${Math.round(cx + u.x)}px;top:${Math.round(cy + u.y)}px;width:${u.w}px;height:${u.h}px;pointer-events:none;z-index:98`;
   document.body.appendChild(cv);
-  const g = cv.getContext('2d'); let last = -1; const t0 = performance.now();
+  const g = cv.getContext('2d'); g.imageSmoothingEnabled = true; g.imageSmoothingQuality = 'high';
+  s.act = (s.act | 0) + 1;
+  const draw = (f, a) => {
+    if (!f || a < .004) return;
+    g.globalAlpha = a;
+    g.drawImage(s.bmp, f[0], f[1], f[2], f[3], (f[4] / sc - u.x) * d, (f[5] / sc - u.y) * d, f[2] / sc * d, f[3] / sc * d);
+  };
+  let last = -1, lastA = -1; const t0 = performance.now();
   const tick = now => {
-    const i = Math.floor((now - t0) / dt);
-    if (i >= fr.length) { cv.remove(); return; }
-    if (i !== last) {
-      last = i; g.clearRect(0, 0, u.w, u.h);
-      const f = fr[i]; if (f) g.drawImage(s.bmp, f[0], f[1], f[2], f[3], f[4] / sc - u.x, f[5] / sc - u.y, f[2] / sc, f[3] / sc);
+    const p = (now - t0) / dt, i = Math.floor(p);
+    if (i >= n) { cv.remove(); s.act--; if (!(s.act > 0)) fxRelease(k); return; }
+    const a = smooth ? p - i : 0;
+    if (i !== last || (smooth && Math.abs(a - lastA) > .03)) { // gambar ulang hanya bila tampilan benar-benar berubah
+      last = i; lastA = a;
+      g.globalCompositeOperation = 'source-over'; g.globalAlpha = 1; g.clearRect(0, 0, cv.width, cv.height);
+      if (smooth) { g.globalCompositeOperation = 'lighter'; draw(fr[i], 1 - a); if (i + 1 < n) draw(fr[i + 1], a); }
+      else draw(fr[i], 1);
     }
     requestAnimationFrame(tick);
   };
