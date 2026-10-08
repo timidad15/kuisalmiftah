@@ -44,6 +44,10 @@ h1{font-size:clamp(1.6rem,5vw,2.4rem);line-height:1.1;letter-spacing:-.03em;marg
 .lv{display:grid;grid-template-columns:repeat(3,1fr);gap:8px}.lv .btn{padding:10px 4px;text-align:center}
 .row{display:flex;gap:10px;justify-content:space-between;margin-top:14px;flex-wrap:wrap}
 .tabs{display:flex;gap:6px;margin-bottom:14px;flex-wrap:wrap}.tabs button{padding:8px 16px;border-radius:999px;background:var(--surface);border:1px solid var(--line);font-weight:600}
+.chk .ch{display:flex;justify-content:space-between;align-items:baseline;gap:8px;flex-wrap:wrap;margin-bottom:8px}
+.cprog{height:6px;border-radius:99px;background:var(--line);overflow:hidden;margin-bottom:6px}.cprog i{display:block;height:100%;width:0;background:var(--accent);transition:width .5s}
+.crow{display:flex;align-items:center;gap:10px;padding:10px 4px;border-bottom:1px solid var(--line);cursor:pointer}.crow b{flex:0 0 auto}.crow small{flex:1;color:var(--muted,#888);text-align:right;min-width:0}.crow .cm{width:22px;text-align:center}.crow.fin b{opacity:.6}.crow.off{opacity:.5}
+.tabs.sub button{padding:5px 12px;font-size:.88em;background:transparent}
 .tabs button.on{background:var(--accent);color:var(--on);border-color:transparent}
 .auth{max-width:400px;margin:8vh auto 0}.auth .btn{width:100%}
 .bar{height:8px;background:var(--soft);border-radius:9px;overflow:hidden;margin-bottom:14px}.bar i{display:block;height:100%;background:var(--accent);transition:width .2s}
@@ -453,7 +457,8 @@ const setRep = n => {
   if (me) me.reports = Math.max(0, n);
   const nv = $('#navAdmin'); if (nv && me && me.role === 'admin') nv.textContent = 'Panel Admin' + (me.reports ? ' 🚩' + me.reports : '');
   const pb = document.querySelector('.bn[data-v="profile"]'); if (pb) pb.classList.toggle('dot', !!(me && me.role === 'admin' && me.reports));
-  const tb = document.querySelector('[data-t="lap"]'); if (tb && me) tb.textContent = '🚩 Laporan' + (me.reports ? ' (' + me.reports + ')' : '');
+  const tb = document.querySelector('[data-s="lap"]'); if (tb && me) tb.textContent = '🚩 Laporan' + (me.reports ? ' (' + me.reports + ')' : '');
+  const gb = document.querySelector('[data-g="usr"]'); if (gb && me) gb.textContent = '👥 Murid' + (me.reports ? ' 🚩' + me.reports : '');
 };
 async function api(p, b) {
   const r = await fetch('/api/' + p, {
@@ -1180,20 +1185,10 @@ function vHome() {
       <div class="track" style="--p:${p};--n:${RANKS.length}">${RANKS.map((r, n) => `<div class="stp ${n < ri ? 'done' : n === ri ? 'cur' : 'lock'}" style="--rc:${r[3]}"><span class="dot">${RI(n, 46)}</span><b>${r[1]}</b><small>${r[0]} XP</small></div>`).join('')}</div>
     </div>
     <div class="sec"><h2>Tantangan Harian</h2><span>Sekali sehari, menangkan hadiah ${GL}</span></div>
-    <div class="modes">
-      <div class="mode dly"><span class="ico">🎯</span><span class="tag">🎯 Kuis Harian</span><h2>Soal acak, spin hadiah</h2>
-        <p id="dpt">Nilai minimal ${DAILY_PASS} untuk memutar hadiah sampai ${GL} 1000. Satu kesempatan per hari.</p>
-        <div class="ft"><small id="dst">Satu kesempatan per hari</small><button class="btn" id="dailyGo">Buka</button></div></div>
-      <div class="mode fst"><span class="ico">⚡</span><span class="tag">⚡ Cepat Tepat</span><h2>Tiap soal berpacu dengan waktu</h2>
-        <p id="fpt">Mulai 10 detik per soal, makin cepat sampai 5 detik. Nilai minimal ${EVP.fast} untuk memutar hadiah. Satu kesempatan per hari.</p>
-        <div class="ft"><small id="fst">Satu kesempatan per hari</small><button class="btn" id="fastGo">Buka</button></div></div>
-      <div class="mode srf"><span class="ico">🧩</span><span class="tag">🧩 Sorof Harian</span><h2>Sighot dan bentuk fi'il</h2>
-        <p id="spt">Soal Sorof acak dari semua level. Nilai minimal ${EVP.sorof} untuk memutar hadiah. Satu kesempatan per hari.</p>
-        <div class="ft"><small id="sst">Satu kesempatan per hari</small><button class="btn" id="sorofGo">Buka</button></div></div>
-      <div class="mode lsn"><span class="ico">🗣️</span><span class="tag">🗣️ Lisan Harian</span><h2>Praktek lafadz</h2>
-        <p id="opt">Beberapa lafadz acak, dijawab dengan tulisanmu. Nilai minimal ${EVP.oral} untuk memutar hadiah. Satu kesempatan per hari.</p>
-        <div class="ft"><small id="ost2">Satu kesempatan per hari</small><button class="btn" id="oralGo">Buka</button></div></div>
-    </div>
+    <div class="card chk" id="chk"><div class="ch"><b id="chn">Memuat…</b><span class="muted" id="chs">Sekali sehari, hadiah ${GL}</span></div>
+      <div class="cprog"><i id="chp"></i></div>
+      ${[['dly', '🎯', 'Kuis Harian'], ['fast', '⚡', 'Cepat Tepat'], ['sorof', '🧩', 'Sorof Harian'], ['oral', '🗣️', 'Lisan Harian']].map(([k, ic, n]) => `<div class="crow" data-ck="${k}"><span class="ci">${ic}</span><b>${n}</b><small id="cs_${k}">…</small><span class="cm" id="cm_${k}"></span></div>`).join('')}
+      <div class="row"><span></span><button class="btn" id="dailyGo">Lanjutkan</button></div></div>
     <div class="sec"><h2>Latihan</h2><span>Pilih jenis kuis, lalu jilid dan levelnya</span></div>
     <div class="tabs htabs"><button data-ht="tulis">✍️ Kuis Tulis</button><button data-ht="lisan">🗣️ Kuis Lisan</button><button data-ht="sorof">🧩 Kuis Sorof</button></div>
     <div id="hpane"></div>`;
@@ -1259,18 +1254,27 @@ function vHome() {
   V.querySelectorAll('[data-ht]').forEach(b => b.onclick = () => { if (b.dataset.ht === homeTab) return; setHomeTab(b.dataset.ht); drawPane(true); });
   drawPane(false);
   count($('#tx'), tot);
-  $('#dailyGo').onclick = () => go('daily'); $('#fastGo').onclick = () => go('daily'); $('#sorofGo').onclick = () => go('daily'); $('#oralGo').onclick = () => go('daily');
+  $('#dailyGo').onclick = () => go('daily'); V.querySelectorAll('.crow').forEach(r => r.onclick = () => go('daily'));
   setTimeout(() => { const g = $('#pg'); if (g) { g.style.background = rk[3]; g.style.width = frac * 100 + '%'; } }, 80);
   // status kuis harian dimuat belakangan agar beranda tampil langsung
   api('daily').then(d => {
     setEvp(d);
-    const put = (id, X, pend, on) => { const e = $(id); if (!e) return; e.textContent = !X && !on ? 'Dinonaktifkan admin' : pend ? '🎰 Spin hadiah siap!' : !X ? 'Belum dikerjakan hari ini' : !X.done ? 'Hari ini hangus' : '✅ Selesai · nilai ' + X.score; if (pend) e.classList.add('badge'); };
-    put('#dst', d.today, d.pending, d.dly.on); put('#fst', d.fast.today, d.fast.pending, d.fast.on); put('#sst', d.sorof.today, d.sorof.pending, d.sorof.on); put('#ost2', d.oral.today, d.oral.pending, d.oral.on);
-    const tx = (id, t) => { const e = $(id); if (e) e.textContent = t; };
-    tx('#dpt', `${d.dly.n} soal acak. Nilai minimal ${d.dly.pass} untuk memutar hadiah sampai ${GL} 1000. Satu kesempatan per hari.`);
-    tx('#fpt', `Mulai 10 detik per soal, makin cepat sampai 5 detik. Nilai minimal ${d.fast.pass} untuk memutar hadiah. Satu kesempatan per hari.`);
-    tx('#spt', `${d.sorof.n} soal Sorof acak dari semua level. Nilai minimal ${d.sorof.pass} untuk memutar hadiah. Satu kesempatan per hari.`);
-    tx('#opt', `${d.oral.n} lafadz acak, dijawab dengan tulisanmu. Nilai minimal ${d.oral.pass} untuk memutar hadiah. Satu kesempatan per hari.`);
+    const rows = [['dly', d.dly, d.today, d.pending], ['fast', d.fast, d.fast.today, d.fast.pending], ['sorof', d.sorof, d.sorof.today, d.sorof.pending], ['oral', d.oral, d.oral.today, d.oral.pending]];
+    let done = 0, act = 0, pend = 0;
+    rows.forEach(([k, E, X, p]) => {
+      const st = $('#cs_' + k), mk = $('#cm_' + k); if (!st) return;
+      const on = E.on; if (on) act++;
+      let t, m = '○';
+      if (!on) { t = 'Dinonaktifkan'; m = '–'; }
+      else if (p) { t = 'Spin hadiah siap!'; m = '🎰'; pend++; }
+      else if (!X) t = 'Min. ' + E.pass + ' · belum dikerjakan';
+      else if (!X.done) { t = 'Hari ini hangus'; m = '✕'; }
+      else { t = 'Nilai ' + X.score; m = '✅'; done++; }
+      st.textContent = t; mk.textContent = m; st.closest('.crow').classList.toggle('fin', m === '✅'); st.closest('.crow').classList.toggle('off', !on);
+    });
+    $('#chn').textContent = done + '/' + act + ' selesai' + (pend ? ' · ' + pend + ' spin siap' : '');
+    $('#chp').style.width = (act ? done / act * 100 : 0) + '%';
+    $('#dailyGo').textContent = act && done >= act && !pend ? 'Lihat' : 'Lanjutkan';
   }).catch(() => {});
 }
 
@@ -1827,13 +1831,28 @@ const loadX = () => window.XLSX ? Promise.resolve() : xlsxP ||= new Promise((ok,
   e.onload = ok; e.onerror = () => { xlsxP = null; no(new Error('Gagal memuat pustaka Excel. Periksa koneksi internet.')); };
   document.head.appendChild(e);
 });
-let admTab = 'stat';
-const ago = t => { if (!t) return 'belum pernah'; const m = (Date.now() - new Date(t)) / 6e4; return m < 1 ? 'baru saja' : m < 60 ? Math.floor(m) + ' menit lalu' : m < 1440 ? Math.floor(m / 60) + ' jam lalu' : Math.floor(m / 1440) + ' hari lalu'; };
+let admTab = 'stat', admSub = { bank: 'soal', usr: 'user', sys: 'ev' };
+const ADM_G = () => [
+  ['stat', '📊 Ringkasan', [['stat', '', adminStats]]],
+  ['bank', '📚 Bank soal', [['soal', '📝 Tulis', adminSoal], ['oral', '🗣️ Lisan', adminOral], ['sorof', '🧩 Sorof', adminSorof]]],
+  ['usr', '👥 Murid' + (me.reports ? ' 🚩' + me.reports : ''), [['user', '👥 Murid', adminUsers], ['lap', '🚩 Laporan' + (me.reports ? ' (' + me.reports + ')' : ''), adminReports]]],
+  ['sys', '⚙️ Sistem', [['ev', '📅 Event harian', adminEvents], ['groq', '🤖 Groq', adminGroq]]]
+];
 function vAdmin() {
-  V.innerHTML = `<h1>Panel Admin</h1><div class="tabs">${[['stat', '📊 Statistik'], ['soal', '📝 Kelola soal'], ['oral', '🗣️ Soal lisan'], ['sorof', '🧩 Bank Sorof'], ['user', '👥 Kelola murid'], ['ev', '📅 Event harian'], ['groq', '🤖 Groq'], ['lap', '🚩 Laporan' + (me.reports ? ' (' + me.reports + ')' : '')]].map(([k, n]) => `<button data-t="${k}" class="${k === admTab ? 'on' : ''}">${n}</button>`).join('')}</div><div id="ab"></div>`;
-  const show = t => { admTab = t; V.querySelectorAll('[data-t]').forEach(x => x.classList.toggle('on', x.dataset.t === t)); const ab = $('#ab'); ab.innerHTML = ''; ({ stat: adminStats, soal: adminSoal, oral: adminOral, sorof: adminSorof, user: adminUsers, lap: adminReports, groq: adminGroq, ev: adminEvents })[t](ab); };
-  V.querySelectorAll('[data-t]').forEach(b => b.onclick = () => show(b.dataset.t));
-  show(admTab);
+  V.innerHTML = `<h1>Panel Admin</h1><div class="tabs" id="agrp"></div><div class="tabs sub" id="asub"></div><div id="ab"></div>`;
+  const draw = () => {
+    const G = ADM_G();
+    $('#agrp').innerHTML = G.map(([k, n]) => `<button data-g="${k}" class="${k === admTab ? 'on' : ''}">${n}</button>`).join('');
+    $('#agrp').querySelectorAll('[data-g]').forEach(b => b.onclick = () => { admTab = b.dataset.g; draw(); });
+    const g = G.find(x => x[0] === admTab) || G[0], subs = g[2];
+    const cur = subs.find(x => x[0] === admSub[g[0]]) || subs[0];
+    if (g[0] !== 'stat') admSub[g[0]] = cur[0];
+    const sb = $('#asub'); sb.style.display = subs.length > 1 ? '' : 'none';
+    sb.innerHTML = subs.length > 1 ? subs.map(([k, n]) => `<button data-s="${k}" class="${k === cur[0] ? 'on' : ''}">${n}</button>`).join('') : '';
+    sb.querySelectorAll('[data-s]').forEach(b => b.onclick = () => { admSub[g[0]] = b.dataset.s; draw(); });
+    const ab = $('#ab'); ab.innerHTML = ''; cur[2](ab);
+  };
+  draw();
 }
 
 /* ---------- Admin: statistik ---------- */
