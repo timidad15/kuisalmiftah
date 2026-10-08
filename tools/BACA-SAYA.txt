@@ -1,0 +1,8 @@
+Merender ulang efek jawaban benar (butuh Python + playwright + pillow, dan Chromium untuk playwright):
+  1. python bake.py            -> hasil frame PNG di folder frames/ (membaca mesin partikel dari index.orig.html)
+  2. python assemble.py 62 0.5 24 v2 ../public/fx 85
+       argumen: kualitas RGB, skala tekstur, fps, versi nama berkas, folder keluaran, kualitas alpha
+       Jangan turunkan kualitas alpha di bawah 85 (halo cahaya jadi berpita).
+  3. Salin isi meta.json ke konstanta FXM di index.html, ganti 'v1' di sw.js (FX_DEFAULT) bila versi berubah,
+     lalu naikkan VERSI di sw.js.
+Ubah efek: edit FX di index.orig.html (mesin lama), lalu ulangi langkah di atas.
