@@ -2209,6 +2209,15 @@ async function adminSorof(box) {
 /* ---------- Admin: pemakaian Groq (token, kuota, kesehatan penilai AI) ---------- */
 const nf = n => Number(n || 0).toLocaleString('id-ID');
 const agoS = s => s < 90 ? s + ' dtk lalu' : s < 5400 ? Math.round(s / 60) + ' mnt lalu' : Math.round(s / 3600) + ' jam lalu';
+const ago = d => {
+  if (!d) return 'belum pernah';
+  const s = Math.max(0, Math.round((Date.now() - new Date(d)) / 1000));
+  if (isNaN(s)) return '-';
+  if (s < 90) return s + ' dtk lalu';
+  if (s < 5400) return Math.round(s / 60) + ' mnt lalu';
+  if (s < 129600) return Math.round(s / 3600) + ' jam lalu';
+  return Math.round(s / 86400) + ' hari lalu';
+};
 async function adminGroq(box) {
   box.innerHTML = '<p class="muted">Memuat…</p>';
   let g; try { g = await api('admin/groq'); } catch (e) { box.textContent = e.message; return; }
