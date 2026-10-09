@@ -556,6 +556,44 @@ const QT = {
 const QN = { high: 'Tinggi', mid: 'Sedang', low: 'Rendah' };
 const qGet = k => { try { return localStorage.getItem(k); } catch (e) { return null; } };
 const qSet = (k, v) => { try { localStorage.setItem(k, v); } catch (e) {} };
+
+/* ---------- Suara dan getaran: dibuat dengan Web Audio (tanpa file audio). Bisa dimatikan di Profil > Pengaturan. ---------- */
+const SFX = (() => {
+  let ac = null, run = 0, last = 0;
+  const st = { snd: qGet('snd') !== '0', hap: qGet('hap') !== '0' };
+  const ctx = () => { // AudioContext dibuat saat murid menyentuh layar (syarat browser), lalu dipakai ulang
+    if (!st.snd || document.hidden) return null;
+    try { ac = ac || new (window.AudioContext || window.webkitAudioContext)(); if (ac.state === 'suspended') ac.resume(); return ac; } catch (e) { return null; }
+  };
+  const tone = (c, f, t0, d, type = 'sine', v = 0.16) => { // satu nada: frekuensi, mulai (detik), lama, gelombang, volume
+    const o = c.createOscillator(), g = c.createGain(), t = c.currentTime + t0;
+    o.type = type; o.frequency.setValueAtTime(f, t);
+    g.gain.setValueAtTime(0.0001, t); g.gain.exponentialRampToValueAtTime(v, t + 0.015); g.gain.exponentialRampToValueAtTime(0.0001, t + d);
+    o.connect(g); g.connect(c.destination); o.start(t); o.stop(t + d + 0.03);
+  };
+  const vib = pat => { if (st.hap && navigator.vibrate) { try { navigator.vibrate(pat); } catch (e) {} } };
+  return {
+    st,
+    set(k, v) { st[k] = !!v; qSet(k, v ? '1' : '0'); },
+    ok() { // jawaban benar: dua nada naik; makin tinggi nadanya tiap benar beruntun (reset bila salah atau jeda > 20 detik)
+      const now = Date.now(); run = now - last > 20000 ? 1 : run + 1; last = now;
+      vib(12);
+      const c = ctx(); if (!c) return;
+      const f = 659.25 * Math.pow(2, Math.min(run - 1, 9) / 12);
+      tone(c, f, 0, 0.16); tone(c, f * 1.5, 0.07, 0.24);
+    },
+    no() { // jawaban salah atau waktu habis: dua nada turun, lembut
+      run = 0; vib([35, 45, 35]);
+      const c = ctx(); if (!c) return;
+      tone(c, 196, 0, 0.2, 'triangle', 0.2); tone(c, 147, 0.13, 0.32, 'triangle', 0.2);
+    },
+    win() { // hasil bagus atau hadiah: arpeggio naik
+      vib([20, 40, 20, 40, 90]);
+      const c = ctx(); if (!c) return;
+      [523.25, 659.25, 783.99, 1046.5].forEach((f, i) => tone(c, f, i * 0.09, i === 3 ? 0.55 : 0.18, 'sine', 0.15));
+    },
+  };
+})();
 const FXQ = (() => { // mode: auto | high | mid | low. Otomatis: awal dari jenis perangkat, lalu turun sendiri bila efek terukur patah-patah.
   const mob = /Android|Mobi|iPhone|iPad/i.test(navigator.userAgent);
   const weak = (navigator.deviceMemory && navigator.deviceMemory <= 2) || (navigator.hardwareConcurrency && navigator.hardwareConcurrency <= 4 && mob);
@@ -841,7 +879,7 @@ const FX = {
 };
 const WARM = {"fire":["144,24,0","168,24,0","168,48,0","192,48,0","216,48,0","216,72,0","240,72,0","240,96,0","255,120,24","255,144,24","255,144,48","255,168,48","255,168,72","255,192,48","255,192,72","255,192,96","255,216,120","255,216,144","255,216,96","255,240,144","255,240,168","255,240,192","255,96,0","255,96,24"],"comet":["120,24,0","120,48,0","144,48,0","168,48,0","168,72,0","192,72,0","192,72,24","216,72,24","216,96,24","240,120,24","240,96,24","255,120,24","255,120,48","255,144,48","255,168,48","255,168,72","255,192,72","255,192,96","255,216,120","255,216,144","255,216,168","255,216,96","255,240,144","255,240,168","255,240,192","255,240,216","255,255,240"]}; // warna sprite yang dipakai Api dan Komet, dibuat saat browser menganggur supaya jawaban benar pertama tidak tersendat
 function warmFx() { const k = WARM[me && me.fxa]; if (!k || RM) return; (window.requestIdleCallback || (f => setTimeout(f, 1500)))(() => E3.warm(k)); }
-function ansFx(el) { if (!RM) (FX[me.fxa] || FX.confetti)(el.getBoundingClientRect(), el); }
+function ansFx(el) { SFX.ok(); if (!RM) (FX[me.fxa] || FX.confetti)(el.getBoundingClientRect(), el); }
 
 /* ---------- Efek: tampilan ---------- */
 const SHOP = [
@@ -948,7 +986,7 @@ async function vDaily() {
   const mk = () => { const x = Math.random() * tot; let a = 0; for (const [g, w] of d.prizes) { a += w; if (x < a) return g; } return d.prizes[0][0]; };
   strip.innerHTML = Array.from({ length: 44 }, () => tile(mk())).join('');
   const reveal = r => {
-    const w = strip.children[WIN]; w.classList.add('win'); me.bonus = (me.bonus || 0) + r.prize; noteAch(r.ach);
+    const w = strip.children[WIN]; w.classList.add('win'); SFX.win(); me.bonus = (me.bonus || 0) + r.prize; noteAch(r.ach);
     $('#spmsg').innerHTML = `<div class="fb ok" style="font-size:1.1rem">${r.prize >= 1000 ? '🎰 JACKPOT! ' : ''}Kamu mendapat ${GL} ${r.prize}!</div>`;
     const rc = w.getBoundingClientRect();
     if (r.prize >= 1000) { FX.fireworks(rc); setTimeout(() => FX.galaxy(rc, w), 300); flash('rgba(245,197,24,.3)'); }
@@ -986,7 +1024,7 @@ function vDailyQuiz(d) {
       const k = b.dataset.k, ok = k === q.answer; ans[q.id] = k;
       clearInterval(tt); h.textContent = q.q; h.classList.remove('cur');
       [...all].find(x => x.dataset.k === q.answer).classList.add('ok');
-      if (ok) ansFx(b); else { b.classList.add('no'); wrong.push({ id: q.id, q: q.q, a: q[q.answer.toLowerCase()], k: q.answer }); }
+      if (ok) ansFx(b); else { b.classList.add('no'); SFX.no(); wrong.push({ id: q.id, q: q.q, a: q[q.answer.toLowerCase()], k: q.answer }); }
       $('#fb').innerHTML = ok ? `<div class="fb ok">${pick(['Benar!', 'Masya Allah, tepat!', 'Barakallahu fiik!'])}</div>` : `<div class="fb no">Belum tepat. Jawaban yang benar: ${q.answer}</div>`;
       $('#nx').hidden = false; $('#nx').focus();
     });
@@ -1023,7 +1061,7 @@ function vFastQuiz(d) {
       if (done) return; const el = Math.round(performance.now() - t0); stop();
       const k = b.dataset.k, ok = k === q.answer; ans[q.id] = k; tms[q.id] = el;
       key.classList.add('ok');
-      if (ok) ansFx(b); else { b.classList.add('no'); wrong.push({ id: q.id, q: q.q, a: q[q.answer.toLowerCase()], k: q.answer }); }
+      if (ok) ansFx(b); else { b.classList.add('no'); SFX.no(); wrong.push({ id: q.id, q: q.q, a: q[q.answer.toLowerCase()], k: q.answer }); }
       $('#fb').innerHTML = ok ? `<div class="fb ok">${pick(['Benar!', 'Cepat dan tepat!', 'Barakallahu fiik!'])} (${(el / 1000).toFixed(1)} dtk)</div>` : `<div class="fb no">Belum tepat. Jawaban yang benar: ${q.answer}</div>`;
       next(ok ? 800 : 1500);
     });
@@ -1033,7 +1071,7 @@ function vFastQuiz(d) {
       bar.style.transform = `scaleX(${left / L})`; tc.textContent = Math.ceil(left / 1000);
       const low = left < 3000; tm.classList.toggle('low', low); tc.classList.toggle('low', low);
       if (left <= 0) { // waktu habis = salah, jawaban tidak dikirim
-        stop(); key.classList.add('ok'); wrong.push({ id: q.id, q: q.q, a: q[q.answer.toLowerCase()], k: q.answer });
+        stop(); SFX.no(); key.classList.add('ok'); wrong.push({ id: q.id, q: q.q, a: q[q.answer.toLowerCase()], k: q.answer });
         $('#fb').innerHTML = `<div class="fb no">⏰ Waktu habis! Jawaban yang benar: ${q.answer}</div>`; next(1500); return;
       }
       raf = requestAnimationFrame(tick);
@@ -1048,7 +1086,7 @@ function vFastResult(r, wrong) {
     <div class="row"><span></span><button class="btn" id="dn">${r.pass ? '🎰 Spin hadiah' : 'Kembali'}</button></div></div>` +
     (wrong.length ? `<h2>Pembahasan (${wrong.length} salah atau lewat waktu)</h2>` + wrong.map((w, n) => `<div class="card" style="--i:${n}"><p dir="auto"><b>${esc(w.q)}</b></p><p class="muted" dir="auto">Jawaban benar: ${w.k}. ${esc(w.a)}</p>${w.id ? rptRow(w.id) : ''}</div>`).join('') : '');
   bindRpts();
-  if (r.pass) [0, 250, 500].forEach(t => setTimeout(() => burst(innerWidth / 2, 130, 36), t));
+  if (r.pass) [0, 250, 500].forEach(t => setTimeout(() => { if (!t) SFX.win(); burst(innerWidth / 2, 130, 36); }, t));
   $('#dn').onclick = () => go(r.pass ? 'daily' : 'home');
 }
 function vDailyResult(r, wrong, nm = 'Kuis Harian', need = DAILY_PASS) {
@@ -1057,7 +1095,7 @@ function vDailyResult(r, wrong, nm = 'Kuis Harian', need = DAILY_PASS) {
     <div class="row"><span></span><button class="btn" id="dn">${r.pass ? '🎰 Spin hadiah' : 'Kembali'}</button></div></div>` +
     (wrong.length ? `<h2>Pembahasan (${wrong.length} salah)</h2>` + wrong.map((w, n) => `<div class="card" style="--i:${n}"><p dir="auto"><b>${esc(w.q)}</b></p><p class="muted" dir="auto">Jawaban benar: ${w.k}. ${esc(w.a)}</p>${w.id ? rptRow(w.id) : ''}</div>`).join('') : '');
   bindRpts();
-  if (r.pass) [0, 250, 500].forEach(t => setTimeout(() => burst(innerWidth / 2, 130, 36), t));
+  if (r.pass) [0, 250, 500].forEach(t => setTimeout(() => { if (!t) SFX.win(); burst(innerWidth / 2, 130, 36); }, t));
   $('#dn').onclick = () => go(r.pass ? 'daily' : 'home');
 }
 
@@ -1123,7 +1161,7 @@ function vOralQuiz(d, j, daily) {
         <span class="chip pop">${perfect ? '✅ Semua benar, masya Allah!' : r.correct + ' dari ' + r.total + ' langkah benar'}</span>
         ${r.steps.map((x, n) => `<div class="ost ${x.ok ? 'ok' : 'no'}"><p class="muted">${n + 1}. ${qtx(x.q)}</p><p dir="auto"><b>${x.s ? esc(x.s) : '(dikosongkan)'}</b> ${x.ok ? '✅' : '❌'}</p>${x.ok ? '' : `<p class="muted" dir="auto">${x.fb ? esc(x.fb) + ' ' : ''}Jawaban contoh: <b>${esc(x.model)}</b></p>`}</div>`).join('')}
         <div class="row"><span></span><button class="btn" id="onn">${i < items.length - 1 ? 'Lafadz berikutnya →' : 'Lihat hasil'}</button></div></div>`;
-      if (perfect) burst(innerWidth / 2, 130, 24);
+      if (perfect) { SFX.ok(); burst(innerWidth / 2, 130, 24); }
       $('#onn').onclick = () => { if (i < items.length - 1) { i++; ask(); } else result(); };
     };
     draw();
@@ -1139,7 +1177,7 @@ function vOralQuiz(d, j, daily) {
         noteAch(r.ach); const e = $('#oxp'), b = $('#dn');
         if (e) e.textContent = 'Nilai ' + r.score + '. ' + (r.pass ? 'Kamu berhak 1× spin hadiah!' : 'Butuh minimal ' + EVP.oral + ' untuk spin. Coba lagi besok.');
         if (b) { b.disabled = false; b.textContent = r.pass ? '🎰 Spin hadiah' : 'Kembali'; b.onclick = () => go(r.pass ? 'daily' : 'home'); }
-        if (r.pass) [0, 250, 500].forEach(t2 => setTimeout(() => burst(innerWidth / 2, 130, 36), t2));
+        if (r.pass) [0, 250, 500].forEach(t2 => setTimeout(() => { if (!t2) SFX.win(); burst(innerWidth / 2, 130, 36); }, t2));
       }).catch(x => { const e = $('#oxp'), b = $('#dn'); if (e) e.textContent = x.message; if (b) { b.disabled = false; b.onclick = () => go('daily'); } });
       return;
     }
@@ -1148,7 +1186,7 @@ function vOralQuiz(d, j, daily) {
       <span class="chip pop" id="oxp">Menghitung XP…</span>
       <div style="text-align:left">${sum.map(x => `<div class="olr"><div class="lf" lang="ar" dir="rtl">${esc(x.it.lafadz)}</div><b>${x.r.correct}/${x.r.total}</b></div>`).join('')}</div>
       <div class="row"><button class="btn" id="oh">Kembali</button><button class="btn ghost" id="oa2">Latihan lagi</button></div></div>`;
-    if (p >= 70) [0, 250].forEach(t2 => setTimeout(() => burst(innerWidth / 2, 130, 30), t2));
+    if (p >= 70) [0, 250].forEach(t2 => setTimeout(() => { if (!t2) SFX.win(); burst(innerWidth / 2, 130, 30); }, t2));
     api('oral/finish', { token: d.token }).then(r => {
       const k = (11 + j) + ':' + d.level, prev = me.best[k] || 0, gain = Math.max(0, r.xp - prev), t0 = totalXp();
       me.best[k] = Math.max(prev, r.xp); noteRank(t0); noteAch(r.ach); oralCache = null;
@@ -1309,7 +1347,7 @@ function vQuiz(d, j, l) {
       clearInterval(tt); h.textContent = q.q; h.classList.remove('cur');
       [...all].find(x => x.dataset.k === q.answer).classList.add('ok');
       if (ok) { streak++; ansFx(b); }
-      else { b.classList.add('no'); streak = 0; wrong.push({ id: q.id, q: q.q, a: q[q.answer.toLowerCase()], k: q.answer }); }
+      else { b.classList.add('no'); SFX.no(); streak = 0; wrong.push({ id: q.id, q: q.q, a: q[q.answer.toLowerCase()], k: q.answer }); }
       const cb = $('#cb'); cb.textContent = '🔥 ' + streak; cb.classList.add('pop');
       $('#fb').innerHTML = ok
         ? `<div class="fb ok">${pick(['Benar!', 'Masya Allah, tepat!', 'Barakallahu fiik!'])}${streak > 2 ? ' ' + streak + ' beruntun!' : ''}</div>`
@@ -1338,7 +1376,7 @@ function vResult(r, j, l, wrong) {
     <div class="row"><button class="btn" id="hm">Kembali</button><button class="btn ghost" id="lb">Lihat leaderboard</button></div></div>` +
     (wrong.length ? `<h2>Pembahasan (${wrong.length} salah)</h2>` + wrong.map((w, n) => `<div class="card" style="--i:${n}"><p dir="auto"><b>${esc(w.q)}</b></p><p class="muted" dir="auto">Jawaban benar: ${w.k}. ${esc(w.a)}</p>${w.id ? rptRow(w.id) : ''}</div>`).join('') : '');
   bindRpts(); count($('#rx'), r.xp);
-  if (r.score >= 70) [0, 250, 500].forEach(t => setTimeout(() => burst(innerWidth / 2, 130, 36), t));
+  if (r.score >= 70) [0, 250, 500].forEach(t => setTimeout(() => { if (!t) SFX.win(); burst(innerWidth / 2, 130, 36); }, t));
   $('#hm').onclick = () => go('home'); $('#lb').onclick = () => go('board');
 }
 
@@ -1374,7 +1412,7 @@ function vSorofQuiz(d, L, daily) {
       clearInterval(tt); h.textContent = q.q; h.classList.remove('cur');
       [...all].find(x => x.dataset.k === q.answer).classList.add('ok');
       if (ok) { streak++; ansFx(b); }
-      else { b.classList.add('no'); streak = 0; wrong.push({ q: q.q, a: q[q.answer.toLowerCase()], k: q.answer }); }
+      else { b.classList.add('no'); SFX.no(); streak = 0; wrong.push({ q: q.q, a: q[q.answer.toLowerCase()], k: q.answer }); }
       const cb = $('#cb'); cb.textContent = '🔥 ' + streak; cb.classList.add('pop');
       $('#fb').innerHTML = ok
         ? `<div class="fb ok">${pick(['Benar!', 'Masya Allah, tepat!', 'Barakallahu fiik!'])}${streak > 2 ? ' ' + streak + ' beruntun!' : ''}</div>`
@@ -1403,7 +1441,7 @@ function vSorofResult(r, L, wrong) {
     <div class="row"><button class="btn" id="hm">Kembali</button><button class="btn ghost" id="sag">Ulangi level ini</button><button class="btn ghost" id="lb">Lihat leaderboard</button></div></div>` +
     (wrong.length ? `<h2>Pembahasan (${wrong.length} salah)</h2>` + wrong.map((w, n) => `<div class="card" style="--i:${n}"><p dir="auto"><b>${esc(w.q)}</b></p><p class="muted" dir="auto">Jawaban benar: ${w.k}. ${esc(w.a)}</p></div>`).join('') : '');
   count($('#rx'), r.xp);
-  if (r.score >= 70) [0, 250, 500].forEach(t => setTimeout(() => burst(innerWidth / 2, 130, 36), t));
+  if (r.score >= 70) [0, 250, 500].forEach(t => setTimeout(() => { if (!t) SFX.win(); burst(innerWidth / 2, 130, 36); }, t));
   $('#hm').onclick = () => go('home'); $('#lb').onclick = () => go('board');
   $('#sag').onclick = async () => { try { vSorofQuiz(await api('sorof/quiz?level=' + L.k), L); } catch (e) { alert(e.message); } };
 }
@@ -1436,7 +1474,7 @@ function vEndless(d) {
       clearInterval(tt); h.textContent = text; h.classList.remove('cur');
       [...all].find(x => x.dataset.k === q.answer).classList.add('ok');
       if (ok) { ansFx(b); $('#sc').classList.add('pop'); }
-      else { b.classList.add('no'); $('#hp').classList.add('shk'); }
+      else { b.classList.add('no'); SFX.no(); $('#hp').classList.add('shk'); }
       $('#hp').textContent = hearts(); $('#sc').textContent = '⭐ ' + score;
       $('#fb').innerHTML = ok ? `<div class="fb ok">${pick(['Benar!', 'Masya Allah, tepat!', 'Barakallahu fiik!'])} +${pts} XP</div>`
         : `<div class="fb no">Nyawa berkurang. Jawaban yang benar: ${q.answer}</div>`;
@@ -1463,7 +1501,7 @@ function vEndResult(r) {
     <span class="chip pop">${gain ? '+' + gain + ' XP dan +' + Math.floor(gain * (me.rate || 1)) + ' ' + GL + ' masuk ke totalmu (rekor baru!)' : 'Rekor Tathbiq-mu: ' + me.tathRaw + ' XP' + (me.tathRaw > cap ? ' (yang dihitung ke total maksimal ' + cap + ' XP)' : '') + '. Lampaui untuk menambah total.'}</span>
     <div class="row"><button class="btn" id="hm">Kembali</button><button class="btn ghost" id="lb">Lihat leaderboard</button></div></div>`;
   count($('#rx'), r.score);
-  if (gain) [0, 250, 500].forEach(t => setTimeout(() => burst(innerWidth / 2, 130, 36), t));
+  if (gain) [0, 250, 500].forEach(t => setTimeout(() => { if (!t) SFX.win(); burst(innerWidth / 2, 130, 36); }, t));
   $('#hm').onclick = () => go('home'); $('#lb').onclick = () => go('board');
 }
 
@@ -1632,6 +1670,9 @@ async function vProfile() {
     <section class="pnl" data-p="set"${ptab === 'set' ? '' : ' hidden'}><div class="card"><h2>Kualitas efek jawaban</h2><p class="muted">Kalau efek di menu Efek atau saat menjawab terasa patah-patah, pilih kualitas lebih rendah. Otomatis menyesuaikan sendiri dengan kemampuan perangkatmu.</p>
     <div class="tabs" id="fxq">${[['auto', 'Otomatis'], ['high', 'Tinggi'], ['mid', 'Sedang'], ['low', 'Rendah']].map(([k, t]) => `<button data-fq="${k}" class="${FXQ.mode === k ? 'on' : ''}">${t}</button>`).join('')}</div>
     <p class="muted" id="fxqn"></p><button class="btn ghost" id="fxt">Coba efek</button></div>
+    <div class="card"><h2>Suara dan getaran</h2><p class="muted">Bunyi singkat saat jawabanmu benar atau salah, dan saat hasil keluar.</p>
+    <label class="chk"><input type="checkbox" id="sndOn"${SFX.st.snd ? ' checked' : ''}> Suara</label>
+    ${navigator.vibrate ? `<label class="chk"><input type="checkbox" id="hapOn"${SFX.st.hap ? ' checked' : ''}> Getaran</label>` : '<p class="muted" style="font-size:.85rem">Getaran belum didukung di perangkat atau browser ini.</p>'}</div>
     <div class="card"><h2>Bantuan dan akun</h2><div class="slist"><button class="srow" id="pGuide"><span>📖</span><b>Panduan</b><small>Cara memakai Al-Miftah</small></button><button class="srow" id="pTheme"><span>🌓</span><b>Ganti tema</b><small>Terang atau gelap</small></button>${ADM() ? `<button class="srow adminlnk" data-v="admin"><span>🛠️</span><b>Panel Admin</b><small>${me.reports ? me.reports + ' laporan soal menunggu' : 'Kelola soal dan murid'}</small></button>` : ''}<a class="srow" href="/privasi.html" style="text-decoration:none;color:inherit"><span>🔒</span><b>Kebijakan privasi</b><small>Data apa yang kami simpan</small></a>${ADM() ? '' : `<button class="srow out" id="pDel"><span>🗑️</span><b>Hapus akun</b><small>Hapus akun dan semua datamu secara permanen</small></button>`}<button class="srow out" id="pOut"><span>🚪</span><b>Keluar</b><small>Akhiri sesi di perangkat ini</small></button></div></div></section>
     <section class="pnl" data-p="win"${ptab === 'win' ? '' : ' hidden'}><div class="card"><h2>Rank</h2><div class="phrow"><span>${RI(ri, 56)}</span><div style="flex:1;min-width:160px"><b style="font-size:1.1rem">${RANKS[ri][1]}</b><div class="muted" style="margin:2px 0 8px">${xp} XP${RANKS[ri + 1] ? ' · ' + (RANKS[ri + 1][0] - xp) + ' XP lagi menuju ' + RANKS[ri + 1][1] : ' · tingkat tertinggi'}</div><div class="bar" style="margin:0"><i style="width:${RANKS[ri + 1] ? Math.round((xp - RANKS[ri][0]) / (RANKS[ri + 1][0] - RANKS[ri][0]) * 100) : 100}%;background:${RANKS[ri][3]}"></i></div></div></div></div><div class="card"><h2>Jilid dan Tathbiq (${myFx()}/11)</h2><div class="chips">${[1, 2, 3, 4].map(j => `<span class="pchip${AJD(j) ? ' on' : ''}" style="--c:${JC[j][0]}">${AJD(j) ? '🏅' : '🔒'} Jilid ${j}${AJD(j) ? '' : ' · ' + JN(j) + '/3'}</span>`).join('')}</div><p class="muted" style="margin:12px 0 0">${TAT() ? 'Mode Tathbiq: tahap ' + TS() + ' dari ' + STG.length + (TS() ? ' (' + STG[TS() - 1][0] + ')' : '') + '.' : 'Mode Tathbiq terbuka setelah keempat jilid selesai.'}</p></div><div class="card"><h2>Pencapaian</h2><p class="muted" id="pcnt">Memuat…</p><button class="btn" id="pgoAch">Lihat semua pencapaian →</button></div></section>`;
   V.querySelectorAll('[data-pt]').forEach(b => b.onclick = () => { ptab = b.dataset.pt; V.querySelectorAll('[data-pt]').forEach(x => x.classList.toggle('on', x === b)); V.querySelectorAll('.pnl').forEach(x => { x.hidden = x.dataset.p !== ptab; }); });
@@ -1677,6 +1718,7 @@ async function vProfile() {
   };
   const qn = () => { $('#fxqn').textContent = 'Sekarang: ' + QN[FXQ.level] + (FXQ.mode === 'auto' ? ' (otomatis)' : ''); };
   V.querySelectorAll('[data-fq]').forEach(b => b.onclick = () => { FXQ.set(b.dataset.fq); V.querySelectorAll('[data-fq]').forEach(x => x.classList.toggle('on', x === b)); qn(); });
+  { const sn = $('#sndOn'), hp = $('#hapOn'); sn.onchange = () => { SFX.set('snd', sn.checked); if (sn.checked) SFX.ok(); }; if (hp) hp.onchange = () => { SFX.set('hap', hp.checked); if (hp.checked) navigator.vibrate(30); }; }
   $('#fxt').onclick = e => { if (!RM) (FX[me.fxa] || FX.confetti)(e.currentTarget.getBoundingClientRect(), e.currentTarget); }; qn();
   $('#ps').onclick = save; $('#fxs').onclick = save;
   $('#pws').onclick = async () => {
