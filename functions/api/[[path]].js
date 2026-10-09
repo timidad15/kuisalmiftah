@@ -14,10 +14,12 @@ const RANK_MIN = [0, 400, 900, 1600, 2500, 3500];  // batas XP tiap rank (harus 
 const RANK_PAY = [50, 100, 150, 250, 350, 500];    // Gold harian per rank: Bronze, Silver, Gold, Platinum, Diamond, Legend
 const GRANTED = new Map();                         // uid -> hari (WIB) bonus rank sudah diperiksa; menghemat satu query per /me
 const wibDay = () => new Date(Date.now() + 7 * 36e5).toISOString().slice(0, 10);
-const SHOP = { stars: 100, bubbles: 200, petals: 300, coins: 450, fireworks: 600, fire: 900, ice: 1100, lightning: 1500, comet: 2000, galaxy: 2800 };
-// Efek (toko): gaya nama di leaderboard (kunci diawali n_). Disimpan di purchases seperti efek jawaban; yang terpasang ada di users.fxn.
-const NSHOP = { n_mint: 100, n_ocean: 150, n_grape: 300, n_sunset: 400, n_shimmer: 600, n_neon: 800, n_blaze: 1100, n_frost: 1300, n_glitch: 2000, n_rainbow: 2500 };
-const PRICES = { ...SHOP, ...NSHOP };
+// Toko: menjual kitab (data di tabel kitab, diatur admin). Pembelian disimpan di purchases dengan item 'kitab:<id>' dan harga saat dibeli.
+// Efek jawaban benar selalu konfeti dan tidak bisa diatur; gaya nama sudah dihapus. Pembelian efek lama di purchases diabaikan (otomatis tidak lagi mengurangi Gold).
+const KITAB_COVER_MAX = 60000;                     // batas keras sampul kitab (byte). Klien menargetkan <= 55 KB (WebP/JPEG).
+let kitabReady;
+const kitabEnsure = sql => kitabReady ||= sql.transaction([
+  sql`create table if not exists kitab (id serial primary key, title text not null, descr text not null default '', price int not null default 0, url text not null default '', cover bytea, mime text, cover_v int not null default 0, active boolean not null default true, ord int not null default 0, created_at timestamptz not null default now())`]).catch(e => { kitabReady = null; throw e; });
 // Kuis harian: 10 soal acak semua jilid; nilai >= DAILY_PASS memberi 1 spin. Hadiah = [gold, bobot]. Spin ke-PITY sejak hadiah >= RARE terakhir dijamin langka.
 const DAILY_N = 10, DAILY_PASS = 80, RARE = 500, PITY = 10;
 const PRIZES = [[150, 30], [200, 25], [300, 20], [500, 13], [750, 7], [1000, 5]]; // hadiah minimal 150 gold; rata-rata sekitar 322 gold per spin
@@ -54,8 +56,7 @@ const evCfg = async sql => {
 // <ach-pure>
 const STREAK_SKIP_DOW = 5; // hari yang tidak memutus streak (0 = Ahad ... 5 = Jumat, libur madrasah). Isi -1 untuk mematikan.
 const AG = { Umum: 25, Langka: 75, Epik: 150, Legendaris: 300, Mitos: 500 }; // Gold hadiah per tingkat, sekali per pencapaian
-const ACH_GROUPS = ['Konsistensi', 'Ketepatan', 'Tathbiq', 'Efek & Hoki', 'Profil & Komunitas', 'Peringkat'];
-const LEGEND_ITEMS = new Set(['lightning', 'comet', 'galaxy', 'n_blaze', 'n_frost', 'n_glitch', 'n_rainbow']); // item Legendaris + Mitos di menu Efek (harus sama dengan tier di index.html)
+const ACH_GROUPS = ['Konsistensi', 'Ketepatan', 'Tathbiq', 'Hoki', 'Profil & Komunitas', 'Peringkat'];
 // A(kunci, grup, nama, deskripsi, ikon, tingkat, metrik, target, { h: tersembunyi, ok: syarat tambahan })
 const A = (k, g, n, d, i, t, m, need, o = {}) => ({ k, g, n, d, i, t, gold: AG[t], m, need, h: o.h ? 1 : 0, np: o.np ? 1 : 0, ok: o.ok });
 const ACH = [
@@ -84,10 +85,6 @@ const ACH = [
   A('correct1000', 1, 'Seribu Benar', 'Kumpulkan 1000 jawaban benar', '📚', 'Epik', 'correct', 1000),
   A('clean', 2, 'Tanpa Cela', 'Capai soal ke-31 Tathbiq tanpa kehilangan nyawa', '🛡️', 'Legendaris', 'clean', 1),
   A('marathon', 2, 'Maraton', 'Jawab 100 soal dalam satu sesi Tathbiq', '🏃', 'Epik', 'marathon', 100),
-  A('legend3', 3, 'Kolektor Legendaris', 'Miliki 3 item Legendaris atau Mitos di menu Efek', '💠', 'Legendaris', 'legend', 3),
-  A('legend5', 3, 'Kolektor Agung', 'Miliki 5 item Legendaris atau Mitos di menu Efek', '🔱', 'Mitos', 'legend', 5),
-  A('fxall', 3, 'Koleksi Efek Penuh', 'Miliki semua efek jawaban di menu Efek', '🎆', 'Mitos', 'fxOwned', Object.keys(SHOP).length),
-  A('nmall', 3, 'Koleksi Nama Penuh', 'Miliki semua gaya nama di menu Efek', '✒️', 'Mitos', 'nmOwned', Object.keys(NSHOP).length),
   A('jackpot', 3, 'Jackpot', 'Dapatkan hadiah 1000 Gold dari spin kuis harian', '🎰', 'Mitos', 'jackpot', 1, { h: 1 }),
   A('photo', 4, 'Wajah Baru', 'Unggah foto pribadi', '📷', 'Umum', 'photo', 1),
   A('vet30', 4, 'Murid Lama', 'Akun berusia 30 hari dan aktif minimal 10 hari', '🕌', 'Langka', 'age', 30, { ok: m => m.active >= 10 }),
@@ -121,7 +118,6 @@ function calcMetrics(raw, today) {
   const m = {
     streak: sk.best, streakCur: sk.cur, dstreak: dk.best, dstreakCur: dk.cur, subuh: raw.subuh, improved: raw.improved ? 1 : 0,
     run: raw.bestRun, correct: raw.correct, clean: raw.clean ? 1 : 0, marathon: Math.max(0, raw.maxn - 1),
-    legend: [...LEGEND_ITEMS].filter(k => own.has(k)).length, fxOwned: Object.keys(SHOP).filter(k => own.has(k)).length, nmOwned: Object.keys(NSHOP).filter(k => own.has(k)).length,
     fastPerf: raw.fastPerf ? 1 : 0, rankPos: raw.rank ? raw.rank.pos : 0, players: raw.rank ? raw.rank.players : 0,
     rankScore: raw.rank && raw.rank.players >= RANK_MIN_PLAYERS && raw.rank.xp >= RANK_MIN_XP && raw.rank.pos <= 3 ? 4 - raw.rank.pos : 0,
     jackpot: raw.jackpot ? 1 : 0, photo: raw.photo ? 1 : 0, age: raw.age || 0, active: new Set(raw.days).size, accepted: raw.accepted,
@@ -496,6 +492,20 @@ export async function onRequest({ request, env, params, waitUntil }) {
       return new Response(bytes, { headers: { ...h, 'Cache-Control': 'public, max-age=31536000, immutable' } });
     }
 
+    // ---------- Sampul kitab (publik: dipanggil lewat <img>). URL memuat versi (?v=) sehingga aman di-cache lama. ----------
+    if (route === 'GET kitab-cover') {
+      const id = Math.trunc(+url.searchParams.get('id')) || 0, cache = caches.default;
+      const hit = await cache.match(request);
+      if (hit) return hit;
+      await kitabEnsure(sql);
+      const [p] = id >= 1 && id <= 2147483647 ? await sql`select encode(cover, 'base64') d, mime from kitab where id = ${id}::int and cover is not null` : [];
+      if (!p) return new Response('Not found', { status: 404, headers: { 'Cache-Control': 'public, max-age=60' } });
+      const h = { 'Content-Type': p.mime, 'X-Content-Type-Options': 'nosniff', 'Content-Security-Policy': "default-src 'none'" };
+      const bytes = Uint8Array.from(atob(p.d), c => c.charCodeAt(0));
+      if (waitUntil) waitUntil(cache.put(request, new Response(bytes, { headers: { ...h, 'Cache-Control': 'public, max-age=' + PHOTO_EDGE_S } })));
+      return new Response(bytes, { headers: { ...h, 'Cache-Control': 'public, max-age=31536000, immutable' } });
+    }
+
     // ---------- Daftar & masuk ----------
     if (route === 'POST register') {
       const un = String(body.username || ''), pw = String(body.password || '');
@@ -559,7 +569,7 @@ export async function onRequest({ request, env, params, waitUntil }) {
         sql`select username, role, avatar, fx, fxa, fxn, on_board, photo_v, use_photo, badges from users where id = ${uid}`,
         bestOf(uid),
         sql`select least(ceil(coalesce(max(n), 0) / 10.0), 7)::int as s from endless_runs where user_id = ${uid}`,
-        sql`select coalesce(sum(price), 0)::int s from purchases where user_id = ${uid}`,
+        sql`select coalesce(sum(price), 0)::int s from purchases where user_id = ${uid} and item like 'kitab:%'`,
         sql`select gold_total_bonus(${uid}::int) s`,
         sql`select case when (select role from users where id = ${uid}) = 'admin' then (select count(distinct question_id) from question_reports where status = 'open') else 0 end::int n`,
         sql`select coalesce(sum(gold), 0)::int s from user_achievements where user_id = ${uid}`,
@@ -568,7 +578,7 @@ export async function onRequest({ request, env, params, waitUntil }) {
       if (!usr) return bad('Silakan masuk dulu', 401);
       const ach = jilidDone(best);
       const xpTot = best.reduce((a, r) => a + r.xp, 0), ri = Math.max(0, RANK_MIN.filter(m => m <= xpTot).length - 1);
-      return J({ rankGot: got, rankPay: usr.role === 'admin' ? 0 : RANK_PAY[ri], pays: RANK_PAY, starter: STARTER_GOLD, reports: rq.n, username: usr.username, role: usr.role, avatar: usr.avatar, photo: usr.photo_v, usePhoto: usr.use_photo, fxp: usr.fx, fxa: usr.fxa, fxn: usr.fxn, board: usr.on_board, spent: sp.s, bonus: bn.s + ag.s, bd: badgeInfo(usr.badges), unseen: un.map(r => ACHBY[r.key]).filter(Boolean).map(achMini), rate: GOLD_RATE, tcap: TCAP, tathRaw: tr.s, tstage: t.s, pass: PASS_PCT, ach, tathbiq: usr.role === 'admin' || ach.every(Boolean), best: Object.fromEntries(best.map(r => [r.jilid + ':' + r.level, r.xp])) });
+      return J({ rankGot: got, rankPay: usr.role === 'admin' ? 0 : RANK_PAY[ri], pays: RANK_PAY, starter: STARTER_GOLD, reports: rq.n, username: usr.username, role: usr.role, avatar: usr.avatar, photo: usr.photo_v, usePhoto: usr.use_photo, fxp: usr.fx, board: usr.on_board, spent: sp.s, bonus: bn.s + ag.s, bd: badgeInfo(usr.badges), unseen: un.map(r => ACHBY[r.key]).filter(Boolean).map(achMini), rate: GOLD_RATE, tcap: TCAP, tathRaw: tr.s, tstage: t.s, pass: PASS_PCT, ach, tathbiq: usr.role === 'admin' || ach.every(Boolean), best: Object.fromEntries(best.map(r => [r.jilid + ':' + r.level, r.xp])) });
     }
 
     if (route === 'GET quiz') {
@@ -791,46 +801,42 @@ export async function onRequest({ request, env, params, waitUntil }) {
       return J({ ok: true });
     }
 
-    // ---------- Efek ----------
+    // ---------- Toko kitab ----------
     const shopState = async () => {
-      const [best, own, [u], [bn], [ag]] = await sql.transaction([bestOf(uid), sql`select item, price from purchases where user_id = ${uid}`, sql`select fxa, fxn, role from users where id = ${uid}`, sql`select gold_total_bonus(${uid}::int) s`, sql`select coalesce(sum(gold), 0)::int s from user_achievements where user_id = ${uid}`]);
-      const earned = Math.floor(best.reduce((a, r) => a + r.xp, 0) * GOLD_RATE), spent = own.reduce((a, r) => a + r.price, 0), admin = !!u && u.role === 'admin';
-      return { gold: Math.max(0, earned + bn.s + ag.s - spent), earned, bonus: bn.s + ag.s, spent, admin, owned: admin ? Object.keys(PRICES) : own.map(r => r.item), equipped: u ? u.fxa : null, equippedName: u ? u.fxn : null, prices: PRICES };
+      await kitabEnsure(sql);
+      const [best, [sp], [u], [bn], [ag], rows] = await sql.transaction([
+        bestOf(uid),
+        sql`select coalesce(sum(price), 0)::int s from purchases where user_id = ${uid} and item like 'kitab:%'`,
+        sql`select role from users where id = ${uid}`,
+        sql`select gold_total_bonus(${uid}::int) s`,
+        sql`select coalesce(sum(gold), 0)::int s from user_achievements where user_id = ${uid}`,
+        // kitab aktif, ditambah kitab nonaktif yang sudah dibeli murid ini (pembeli lama tetap bisa mengunduh)
+        sql`select k.id, k.title, k.descr, k.price, k.cover_v, k.url, p.item is not null as owned from kitab k left join purchases p on p.user_id = ${uid}::int and p.item = 'kitab:' || k.id::text where k.active or p.item is not null order by k.ord, k.id`]);
+      const earned = Math.floor(best.reduce((a, r) => a + r.xp, 0) * GOLD_RATE), spent = sp.s, admin = !!u && u.role === 'admin';
+      // link download HANYA dikirim untuk kitab yang sudah dimiliki (atau admin)
+      return { gold: Math.max(0, earned + bn.s + ag.s - spent), earned, bonus: bn.s + ag.s, spent, admin,
+        items: rows.map(r => { const own = admin || r.owned; return { id: r.id, title: r.title, desc: r.descr, price: r.price, cv: r.cover_v, owned: !!own, url: own ? r.url : undefined }; }) };
     };
     if (route === 'GET shop') return J(await shopState());
     if (route === 'POST shop/buy') {
-      const item = String(body.item || '');
-      if (!Object.hasOwn(PRICES, item)) return bad('Item tidak ditemukan', 404);
-      const price = PRICES[item];
+      const id = Math.trunc(+body.id);
+      if (!(id >= 1 && id <= 2147483647)) return bad('Kitab tidak ditemukan', 404);
+      await kitabEnsure(sql);
+      const [k] = await sql`select id, price from kitab where id = ${id}::int and active`;
+      if (!k) return bad('Kitab tidak ditemukan', 404);
+      const item = 'kitab:' + k.id;
       // kunci per pengguna: dua pembelian bersamaan tidak bisa melewati saldo
       const [, ins] = await sql.transaction([
         sql`select pg_advisory_xact_lock(${uid}::int)`,
         sql`with best as (select max(case when level = 'endless' then least(score, ${TCAP}::int)::numeric else round((case level when 'easy' then 100 when 'medium' then 200 else 300 end) * correct::numeric / total) end) xp from attempts where user_id = ${uid} group by jilid, level),
-            bal as (select coalesce((select sum(xp) from best), 0) * ${GOLD_RATE}::numeric + coalesce(gold_total_bonus(${uid}::int), 0) + coalesce((select sum(gold) from user_achievements where user_id = ${uid}), 0) - coalesce((select sum(price) from purchases where user_id = ${uid}), 0) g)
-          insert into purchases (user_id, item, price) select ${uid}::int, ${item}::text, ${price}::int from bal where g >= ${price}::int on conflict do nothing returning item`]);
+            bal as (select coalesce((select sum(xp) from best), 0) * ${GOLD_RATE}::numeric + coalesce(gold_total_bonus(${uid}::int), 0) + coalesce((select sum(gold) from user_achievements where user_id = ${uid}), 0) - coalesce((select sum(price) from purchases where user_id = ${uid} and item like 'kitab:%'), 0) g)
+          insert into purchases (user_id, item, price) select ${uid}::int, ${item}::text, ${k.price}::int from bal where g >= ${k.price}::int on conflict do nothing returning item`]);
       if (!ins.length) {
         const [own] = await sql`select 1 from purchases where user_id = ${uid} and item = ${item}`;
-        return own ? bad('Item ini sudah kamu miliki', 409) : bad('Gold belum cukup', 402);
+        return own ? bad('Kamu sudah memiliki kitab ini', 409) : bad('Gold belum cukup', 402);
       }
       const ach = await evalAch(uid);
       return J({ ...(await shopState()), ach });
-    }
-    if (route === 'POST shop/equip') {
-      const item = String(body.item || 'confetti');
-      if (item === 'n_none') { // lepas gaya nama
-        await sql`update users set fxn = null where id = ${uid}`; LB.clear();
-        return J(await shopState());
-      }
-      if (item !== 'confetti' && !Object.hasOwn(PRICES, item)) return bad('Item tidak ditemukan', 404);
-      const st = await shopState();
-      if (item !== 'confetti' && !st.owned.includes(item)) return bad('Beli dulu item ini', 403);
-      if (item.startsWith('n_')) { // gaya nama -> users.fxn
-        await sql`update users set fxn = ${item} where id = ${uid}`; LB.clear();
-        return J({ ...st, equippedName: item });
-      }
-      const fx = item === 'confetti' ? null : item; // efek jawaban benar -> users.fxa
-      await sql`update users set fxa = ${fx} where id = ${uid}`;
-      return J({ ...st, equipped: fx });
     }
 
     // ---------- Event harian (hari mengikuti WIB) ----------
@@ -1016,7 +1022,7 @@ export async function onRequest({ request, env, params, waitUntil }) {
                  max(case when level = 'endless' then (case when ${j}::int = 5 then score else least(score, ${TCAP}::int) end)::numeric else round((case level when 'easy' then 100 when 'medium' then 200 else 300 end) * correct::numeric / total) end)::int xp
           from attempts where case when ${j}::int = 0 then true when ${j}::int = 5 then level = 'endless' when ${j}::int = 6 then jilid between 6 and 11 when ${j}::int = 7 then jilid between 12 and 15 else jilid = ${j}::int end group by 1, 2, 3),
         ranked as (
-          select rank() over (order by sum(xp) desc)::int as rank, u.id, u.username, u.avatar, u.role, u.fx as pick, u.fxn as nm,
+          select rank() over (order by sum(xp) desc)::int as rank, u.id, u.username, u.avatar, u.role, u.fx as pick, null::text as nm,
                  case when u.use_photo then u.photo_v end as ph, u.badges,
                  sum(xp)::int as total, (count(distinct jilid) filter (where jilid between 1 and 4))::int as jilids
           from best join users u on u.id = best.user_id where u.role <> 'admin' or u.on_board group by u.id, u.username, u.avatar, u.role, u.fx, u.fxn, u.photo_v, u.use_photo, u.badges)
@@ -1044,19 +1050,20 @@ export async function onRequest({ request, env, params, waitUntil }) {
     // Hanya data publik: XP, pencapaian, efek foto, dan koleksi item. Gold, riwayat percobaan, dan data akun TIDAK dikirim.
     if (route === 'GET player') {
       const un = (url.searchParams.get('u') || '').trim().slice(0, 30);
-      const [t] = un ? await sql`select id, username, role, avatar, fx, fxa, fxn, on_board, created_at, photo_v, use_photo, badges from users where lower(username) = lower(${un})` : [];
+      const [t] = un ? await sql`select id, username, role, avatar, fx, on_board, created_at, photo_v, use_photo, badges from users where lower(username) = lower(${un})` : [];
       if (!t || (t.role === 'admin' && !t.on_board)) return bad('Pemain tidak ditemukan', 404);
+      await kitabEnsure(sql);
       const [best, [en], own] = await sql.transaction([
         bestOf(t.id),
         sql`select least(ceil(coalesce(max(n), 0) / 10.0), 7)::int s from endless_runs where user_id = ${t.id}`,
-        sql`select item from purchases where user_id = ${t.id}`]);
+        sql`select k.id, k.title, k.cover_v from purchases p join kitab k on p.item = 'kitab:' || k.id::text where p.user_id = ${t.id} order by k.ord, k.id`]);
       const admin = t.role === 'admin', ach = admin ? [true, true, true, true] : jilidDone(best);
       const mx = admin ? 11 : ach.filter(Boolean).length + en.s;
       return J({
         username: t.username, admin, avatar: t.avatar, ph: t.use_photo ? t.photo_v : null, bd: badgeInfo(t.badges), since: t.created_at,
         fx: t.fx == null ? mx : Math.min(t.fx, mx),
         total: best.reduce((a, r) => a + r.xp, 0), best: Object.fromEntries(best.map(r => [r.jilid + ':' + r.level, r.xp])),
-        ach, tstage: admin ? 7 : en.s, owned: admin ? Object.keys(PRICES) : own.map(r => r.item), equipped: t.fxa, nm: t.fxn
+        ach, tstage: admin ? 7 : en.s, kitab: own.map(r => ({ id: r.id, t: r.title, v: r.cover_v }))
       });
     }
 
@@ -1227,6 +1234,59 @@ export async function onRequest({ request, env, params, waitUntil }) {
     const u = await getUser();
     if (!u) return bad('Silakan masuk dulu', 401);
     if (u.role !== 'admin') return bad('Khusus admin', 403);
+
+    // ---------- Toko kitab (admin) ----------
+    const kitabList = async () => {
+      await kitabEnsure(sql);
+      const rows = await sql`select k.id, k.title, k.descr, k.price, k.url, k.cover_v, k.active, k.ord, (select count(*)::int from purchases p where p.item = 'kitab:' || k.id::text) sold from kitab k order by k.ord, k.id`;
+      return rows.map(r => ({ id: r.id, title: r.title, desc: r.descr, price: r.price, url: r.url, cv: r.cover_v, active: r.active, ord: r.ord, sold: r.sold }));
+    };
+    if (route === 'GET admin/kitab') return J({ list: await kitabList(), coverMax: KITAB_COVER_MAX });
+    if (route === 'POST admin/kitab-save') {
+      const id = body.id == null ? null : Math.trunc(+body.id);
+      if (id !== null && !(id >= 1 && id <= 2147483647)) return bad('Kitab tidak valid');
+      const title = String(body.title ?? '').trim().replace(/\s+/g, ' '), descr = String(body.desc ?? '').trim(), link = String(body.url ?? '').trim();
+      const price = Math.round(+body.price), ord = Math.round(+body.ord || 0), active = body.active !== false, removeCover = body.removeCover === true;
+      if (!title || title.length > 100) return bad('Judul wajib diisi (maksimal 100 huruf)');
+      if (descr.length > 600) return bad('Deskripsi maksimal 600 huruf');
+      if (!(price >= 0 && price <= 1000000)) return bad('Harga harus antara 0 dan 1.000.000 Gold');
+      if (!/^https?:\/\/\S+$/i.test(link) || link.length > 600) return bad('Link download harus diawali http:// atau https://');
+      if (!(ord >= -9999 && ord <= 9999)) return bad('Urutan harus antara -9999 dan 9999');
+      let cover = null, mime = null;
+      if (body.cover) {
+        const c = String(body.cover);
+        if (c.length > Math.ceil(KITAB_COVER_MAX / 3) * 4 || !/^[A-Za-z0-9+/]+={0,2}$/.test(c)) return bad('Foto sampul tidak valid');
+        let raw; try { raw = Uint8Array.from(atob(c), x => x.charCodeAt(0)); } catch { return bad('Foto sampul tidak valid'); }
+        mime = raw.length <= KITAB_COVER_MAX ? photoMime(raw) : null;
+        if (!mime) return bad('Foto sampul harus berupa WebP atau JPEG utuh, maksimal ' + Math.round(KITAB_COVER_MAX / 1000) + ' KB');
+        cover = c;
+      }
+      await kitabEnsure(sql);
+      let row;
+      if (id === null) {
+        [row] = await sql`insert into kitab (title, descr, price, url, active, ord, cover, mime, cover_v)
+          values (${title}::text, ${descr}::text, ${price}::int, ${link}::text, ${active}::boolean, ${ord}::int,
+            case when ${cover}::text is null then null else decode(${cover}::text, 'base64') end, ${mime}::text,
+            case when ${cover}::text is null then 0 else extract(epoch from now())::int end) returning id`;
+      } else {
+        [row] = await sql`update kitab set title = ${title}::text, descr = ${descr}::text, price = ${price}::int, url = ${link}::text, active = ${active}::boolean, ord = ${ord}::int,
+            cover = case when ${cover}::text is not null then decode(${cover}::text, 'base64') when ${removeCover}::boolean then null else cover end,
+            mime = case when ${cover}::text is not null then ${mime}::text when ${removeCover}::boolean then null else mime end,
+            cover_v = case when ${cover}::text is not null then greatest(cover_v + 1, extract(epoch from now())::int) when ${removeCover}::boolean then 0 else cover_v end
+          where id = ${id}::int returning id`;
+        if (!row) return bad('Kitab tidak ditemukan', 404);
+      }
+      return J({ ok: true, id: row.id, list: await kitabList() });
+    }
+    if (route === 'POST admin/kitab-delete') {
+      const id = Math.trunc(+body.id);
+      if (!(id >= 1 && id <= 2147483647)) return bad('Kitab tidak valid');
+      await kitabEnsure(sql);
+      const [c] = await sql`select count(*)::int n from purchases where item = ${'kitab:' + id}::text`;
+      if (c.n > 0) return bad('Kitab ini sudah dibeli ' + c.n + ' murid, jadi tidak bisa dihapus. Nonaktifkan saja agar tidak tampil lagi di toko (pembeli lama tetap bisa mengunduh).', 409);
+      await sql`delete from kitab where id = ${id}::int`;
+      return J({ ok: true, list: await kitabList() });
+    }
 
     if (route === 'GET admin/stats') {
       // statistik hanya menghitung murid (bukan admin). Batas rank memakai RANK_MIN (harus sama dengan RANKS di index.html).
