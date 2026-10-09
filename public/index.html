@@ -407,26 +407,6 @@ select,textarea{font:inherit;color:var(--ink);background:var(--surface);border:1
 .htabs{max-width:560px}.sorof .lvls{grid-template-columns:repeat(3,1fr)}
 @media(max-width:560px){.sorof .lvls{grid-template-columns:repeat(2,1fr)}}
 @media(max-width:480px){.htabs button{padding:10px 6px;font-size:.84rem}}
-/* ===== Optimasi performa: hanya transform/opacity yang dianimasikan (jalan di compositor, tanpa menggambar ulang bayangan/teks) ===== */
-@keyframes glowp{from{opacity:.55}to{opacity:1}}
-@keyframes zapp{0%,100%{opacity:.55}8%{opacity:1}14%{opacity:.35}55%{opacity:.55}60%{opacity:1}66%{opacity:.35}}
-.avw.t2,.avw.t3,.avw.t4{animation:none;box-shadow:0 0 calc(var(--t)*3) 0 var(--c1)}
-.avw.t3::after,.avw.t4::after{filter:none}
-.fire,.zap,.spk{animation:none;box-shadow:none}
-.fire::before,.zap::before,.spk::before{content:'';position:absolute;inset:0;border-radius:50%;z-index:-1;pointer-events:none}
-.fire::before{box-shadow:0 0 12px 4px #ffb300,0 0 28px 10px rgba(255,80,0,.7);animation:glowp 1s ease-in-out infinite alternate}
-.zap::before{box-shadow:0 0 16px 5px #7fd6ff,0 0 34px 12px rgba(80,160,255,.8);animation:zapp 1.8s linear infinite}
-.spk::before{box-shadow:0 0 14px 4px #ffa6e8,0 0 28px 10px rgba(199,125,255,.7);animation:glowp 2s ease-in-out infinite alternate}
-.lite .fire::before,.lite .zap::before,.lite .spk::before{animation:none;opacity:.8}
-.lite .fire,.lite .zap,.lite .spk,.lite .avw.t2,.lite .avw.t3,.lite .avw.t4{box-shadow:none}
-.nfx.n_neon{animation:none;text-shadow:0 0 6px #d6fdff,0 0 16px #00d4ff}
-/* Leaderboard: animasi hiasan hanya untuk 12 baris teratas; sisanya statis */
-.lrow:nth-child(n+13) .avw,.lrow:nth-child(n+13) .avw::before,.lrow:nth-child(n+13) .avw::after,.lrow:nth-child(n+13) .nfx{animation:none}
-/* Menu Efek: ikon hanya berputar saat disorot atau terpasang, tanpa filter dan tanpa bayangan beranimasi */
-.si.hi{animation:none;box-shadow:0 0 18px -8px var(--tc)}
-.si .stage span{animation:none;filter:none}
-.si:hover .stage span,.si.eq .stage span{animation:flip3 5s linear infinite}
-.lite .si:hover .stage span,.lite .si.eq .stage span{animation:none}
 </style>
 </head>
 <body>
@@ -609,81 +589,259 @@ function part(x, y, o) { // satu partikel DOM (dipakai kilat layar)
   p.animate(o.kf, { duration: o.ms, easing: o.e || 'ease-out', delay: o.d || 0, fill: 'forwards' }).onfinish = () => p.remove();
 }
 const cen = r => [r.left + r.width / 2, r.top + r.height / 2];
+const glow = (el, c) => { // bayangan statis pada lapisan sendiri; yang dianimasikan hanya opasitas (ditangani GPU, tanpa menggambar ulang)
+  const g = Q().glow; if (!el || !g || RM) return;
+  const r = el.getBoundingClientRect(); if (!r.width) return;
+  const d = document.createElement('div');
+  d.style.cssText = `position:fixed;left:${r.left}px;top:${r.top}px;width:${r.width}px;height:${r.height}px;border-radius:${getComputedStyle(el).borderRadius};pointer-events:none;z-index:97;will-change:opacity;box-shadow:0 0 ${g[0]}px ${g[1]}px ${c},0 0 ${g[1]}px ${Math.round(g[1] * 8 / 26)}px ${c}`;
+  document.body.appendChild(d);
+  d.animate([{ opacity: 1 }, { opacity: 0 }], { duration: 1100, easing: 'ease-out' }).onfinish = () => d.remove();
+};
 const flash = c => part(0, 0, { c: `width:100vw;height:100vh;background:${c};`, kf: [{ opacity: 1 }, { opacity: 0 }], ms: 420 });
+const shake = (px0, ms) => { const kq = Q().shake, px = px0 * kq; if (!RM && kq) V.animate(Array.from({ length: 9 }, (_, i) => ({ transform: `translate(${R(-px, px) * (1 - i / 9)}px,${R(-px, px) * (1 - i / 9)}px)` })).concat([{ transform: 'none' }]), { duration: ms }); };
 
-/* ---------- Efek jawaban benar: sprite sheet WebP ----------
-   Efek dirender sekali (dari mesin partikel 3D lama) lalu disimpan sebagai atlas WebP berkanal alpha di /fx/.
-   Di perangkat murid hanya ada drawImage per frame ke satu kanvas kecil: tanpa simulasi partikel, tanpa sort, tanpa blur.
-   Meta tiap efek: f = daftar frame [sx, sy, w, h, dx, dy] (0 = frame kosong); dx/dy relatif ke pusat tombol, dalam piksel tekstur; sc = skala tekstur, fps = laju sumber, x = crossfade (ketiganya opsional, menimpa nilai global). */
-const FXM = {"fps":24,"sc":0.75,"fx":{"confetti":{"n":"confetti.v2.webp","f":[[0,0,40,37,-20,-21],[40,0,68,59,-35,-33],[108,0,96,80,-50,-45],[204,0,149,120,-78,-65],[353,0,174,139,-91,-74],[527,0,198,157,-104,-82],[725,0,240,194,-126,-98],[965,0,261,211,-137,-105],[1226,0,278,228,-146,-111],[1504,0,295,243,-155,-116],[0,243,312,256,-164,-119],[312,243,348,281,-183,-125],[660,243,364,293,-192,-128],[1024,243,381,305,-201,-130],[1405,243,409,329,-217,-134],[0,572,423,340,-224,-135],[423,572,435,350,-230,-136],[858,572,447,361,-236,-136],[1305,572,459,371,-242,-136],[0,943,480,388,-253,-135],[480,943,491,397,-259,-134],[971,943,500,404,-264,-132],[1471,943,518,417,-274,-128],[0,1360,527,424,-279,-125],[527,1360,537,414,-284,-122],[1064,1360,545,418,-288,-118],[0,1784,554,402,-293,-115],[554,1784,444,364,-187,-107],[998,1784,450,369,-189,-103],[1448,1784,455,374,-191,-99],[0,2186,434,383,-164,-89],[434,2186,437,308,-165,-8],[871,2186,440,302,-166,-2],[1311,2186,443,246,-167,3],[0,2569,380,248,-168,9],0]},"stars":{"n":"stars.v2.webp","f":[[0,0,220,220,-110,-110],[220,0,218,218,-109,-109],[438,0,216,216,-108,-108],[654,0,212,212,-106,-106],[866,0,210,210,-105,-105],[1076,0,217,213,-108,-107],[1293,0,248,237,-122,-119],[1541,0,264,251,-129,-126],[0,251,281,263,-137,-132],[281,251,296,275,-143,-138],[577,251,311,286,-150,-143],[888,251,339,308,-162,-153],[1227,251,352,317,-167,-157],[1579,251,364,326,-172,-161],[0,577,387,343,-182,-168],[387,577,398,351,-186,-171],[785,577,409,357,-191,-173],[1194,577,419,365,-195,-176],[1613,577,427,371,-198,-178],[0,948,445,382,-205,-181],[445,948,453,388,-208,-183],[898,948,460,393,-211,-184],[1358,948,473,401,-216,-185],[0,1349,478,406,-217,-186],[478,1349,482,410,-218,-186],[960,1349,485,414,-219,-186],[1445,1349,485,416,-218,-185],[0,1765,485,418,-219,-181],[485,1765,487,418,-219,-178],[972,1765,489,415,-219,-173],[1461,1765,365,417,-220,-171],[0,2183,365,419,-220,-170],[365,2183,364,421,-219,-169],[729,2183,362,421,-218,-168],[1091,2183,357,421,-216,-166],[1448,2183,333,421,-194,-162],[0,2604,313,418,-190,-158],[313,2604,305,415,-185,-154],[618,2604,229,411,-112,-151],[847,2604,132,376,-16,-116],[979,2604,129,374,-14,-113],[1108,2604,79,200,-13,-110]]},"bubbles":{"n":"bubbles.v2.webp","f":[[0,0,249,248,-125,-124],[249,0,249,246,-126,-123],[498,0,249,244,-127,-122],[747,0,248,240,-128,-120],[995,0,249,238,-130,-119],[1244,0,249,230,-133,-115],[1493,0,249,222,-134,-112],[1742,0,255,224,-136,-124],[0,248,261,210,-138,-135],[261,248,266,173,-139,-146],[527,248,270,128,-140,-157],[797,248,273,135,-140,-168],[1070,248,274,140,-139,-178],[1344,248,275,146,-139,-188],[1619,248,274,153,-137,-199],[0,458,273,158,-136,-208],[273,458,271,164,-135,-218],[544,458,269,168,-133,-227],[813,458,269,175,-133,-237],[1082,458,269,180,-133,-246],[1351,458,269,185,-133,-255],[1620,458,271,189,-134,-263],[0,647,274,194,-135,-272],[274,647,278,175,-137,-280],[552,647,227,180,-139,-289],[779,647,228,183,-140,-296],[1007,647,187,186,-100,-304],[1194,647,183,188,-97,-312],[1377,647,67,170,18,-319],[1444,647,67,175,17,-327],[1511,647,67,178,15,-334],0],"fps":15,"x":1},"petals":{"n":"petals.v2.webp","f":[[0,0,248,248,-124,-124],[248,0,246,246,-123,-123],[494,0,250,244,-126,-122],[744,0,279,246,-144,-126],[1023,0,310,263,-162,-144],[1333,0,341,275,-180,-160],[1674,0,370,285,-198,-175],[0,285,397,288,-215,-188],[397,285,419,274,-230,-199],[816,285,440,236,-242,-209],[1256,285,457,220,-252,-217],[0,573,472,229,-262,-224],[472,573,493,237,-282,-229],[965,573,509,245,-300,-234],[1474,573,533,251,-317,-237],[0,824,561,257,-330,-239],[561,824,584,263,-341,-240],[1145,824,600,268,-349,-240],[0,1092,615,273,-358,-240],[615,1092,620,277,-360,-238],[1235,1092,620,281,-360,-236],[0,1373,617,284,-360,-233],[617,1373,613,287,-360,-229],[1230,1373,608,289,-360,-225],[0,1662,602,289,-360,-219],[602,1662,586,289,-350,-214],[1188,1662,570,286,-339,-207],[0,1951,564,282,-339,-199],[564,1951,561,276,-342,-189],[1125,1951,577,273,-346,-177],[0,2233,595,269,-352,-164],[595,2233,612,233,-360,-119],[1207,2233,617,229,-360,-108],[0,2502,618,223,-360,-95],[618,2502,576,193,-321,-59],[1194,2502,480,148,-318,-47],[1674,2502,183,36,-182,29]],"fps":15,"x":1},"coins":{"n":"coins.v2.webp","f":[[0,0,222,222,-111,-111],[222,0,220,220,-110,-110],[442,0,220,220,-110,-110],[662,0,218,222,-109,-113],[880,0,216,234,-108,-126],[1096,0,214,245,-107,-138],[1310,0,212,265,-105,-160],[1522,0,218,273,-103,-170],[1740,0,225,280,-102,-179],[0,280,240,285,-109,-187],[240,280,255,286,-116,-194],[495,280,284,274,-129,-206],[779,280,297,255,-135,-210],[1076,280,313,207,-142,-214],[1389,280,340,221,-154,-218],[0,566,354,229,-160,-219],[354,566,369,236,-167,-219],[723,566,383,244,-173,-218],[1106,566,397,251,-179,-216],[1503,566,425,265,-191,-209],[0,831,438,272,-196,-204],[438,831,451,279,-202,-198],[889,831,479,296,-214,-187],[1368,831,492,306,-219,-181],[0,1137,506,323,-225,-182],[506,1137,518,342,-230,-183],[1024,1137,524,361,-236,-184],[0,1498,535,403,-247,-186],[535,1498,540,425,-252,-187],[1075,1498,545,427,-257,-187],[0,1925,555,390,-267,-150],[555,1925,560,366,-272,-150],[1115,1925,566,385,-278,-148],[0,2315,534,353,-282,-113],[534,2315,544,353,-287,-113],[1078,2315,553,347,-288,-107],[0,2668,557,347,-288,-107],[557,2668,561,346,-288,-106],[1118,2668,527,307,-246,-67],[0,3015,530,306,-245,-66],[530,3015,518,290,-244,-50],[1048,3015,497,277,-243,-37],[1545,3015,488,257,-242,-20],[0,3321,486,249,-240,-13],[486,3321,484,241,-238,-6],[970,3321,483,213,-236,18],[1453,3321,371,161,-126,69],[0,3570,343,104,-121,93],[343,3570,275,103,-120,93],[618,3570,12,33,142,145],[630,3570,8,7,142,170],0,0,0,0,0,0,0,0,0],"sc":0.6},"fireworks":{"n":"fireworks.v2.webp","f":[[0,0,24,30,-17,-21],[24,0,24,30,-36,-47],[48,0,24,29,-56,-73],[72,0,91,111,-75,-99],[163,0,335,335,-249,-279],[498,0,333,333,-249,-278],[831,0,326,326,-245,-275],[1157,0,481,376,-243,-327],[0,376,474,370,-237,-327],[474,376,459,355,-225,-323],[933,376,429,399,-198,-321],[1362,376,414,392,-189,-315],[0,775,413,378,-199,-303],[413,775,394,437,-208,-365],[807,775,393,431,-216,-363],[1200,775,411,420,-224,-361],[1611,775,427,422,-231,-359],[0,1212,441,427,-237,-354],[441,1212,453,428,-242,-345],[894,1212,461,417,-243,-324],[1355,1212,456,399,-232,-297],[0,1640,455,413,-227,-304],[455,1640,461,429,-231,-309],[916,1640,422,446,-234,-313],[1338,1640,429,462,-237,-316],[0,2102,432,477,-237,-318],[432,2102,387,488,-189,-318],[819,2102,395,480,-195,-318],[1214,2102,402,490,-201,-317],[1616,2102,361,479,-206,-315],[0,2592,367,483,-211,-312],[367,2592,337,468,-216,-309],[704,2592,333,472,-219,-305],[1037,2592,335,410,-222,-301],[1372,2592,256,361,-184,-296],[1628,2592,258,252,-186,-181],[1886,2592,152,195,-161,-145],0],"fps":15,"x":1},"fire":{"n":"fire.v2.webp","f":[[0,0,408,408,-204,-204],[408,0,408,408,-204,-204],[816,0,408,408,-204,-204],[1224,0,404,404,-202,-202],[1628,0,404,404,-202,-202],[0,408,404,404,-202,-202],[404,408,402,402,-201,-201],[806,408,402,402,-201,-201],[1208,408,400,400,-200,-200],[1608,408,400,400,-200,-200],[0,812,396,396,-198,-198],[396,812,396,396,-198,-198],[792,812,392,392,-196,-196],[1184,812,392,390,-195,-195],[1576,812,394,388,-194,-194],[0,1208,393,384,-192,-192],[393,1208,391,382,-191,-191],[784,1208,387,378,-189,-189],[1171,1208,387,372,-188,-186],[1558,1208,400,368,-199,-187],[0,1592,402,373,-203,-194],[402,1592,398,372,-207,-200],[800,1592,390,372,-208,-212],[1190,1592,388,368,-207,-218],[1578,1592,390,358,-210,-224],[0,1965,390,339,-213,-230],[390,1965,389,322,-215,-235],[779,1965,386,260,-215,-245],[1165,1965,383,259,-211,-250],[1548,1965,378,235,-207,-229],[0,2304,362,234,-192,-238],[362,2304,357,223,-188,-233],[719,2304,359,210,-188,-225],[1078,2304,359,213,-187,-231],[1437,2304,354,215,-185,-236],[0,2538,330,217,-169,-246],[330,2538,307,218,-154,-251],[637,2538,288,216,-144,-255],[925,2538,237,207,-124,-264],[1162,2538,230,192,-117,-268],[1392,2538,227,153,-117,-271],[1619,2538,228,146,-118,-268],[0,2756,229,147,-119,-273],[229,2756,230,148,-120,-282],[459,2756,154,148,-120,-286],[613,2756,131,121,-121,-263],[744,2756,5,10,-120,-162],[749,2756,4,8,-120,-164],0]},"ice":{"n":"ice.v2.webp","f":[[0,0,350,350,-175,-175],[350,0,350,350,-175,-175],[700,0,348,348,-174,-174],[1048,0,344,344,-172,-172],[1392,0,342,342,-171,-171],[0,350,342,342,-171,-171],[342,350,338,338,-169,-169],[680,350,336,336,-168,-168],[1016,350,334,334,-167,-167],[1350,350,330,330,-165,-165],[1680,350,328,328,-164,-164],[0,692,314,314,-157,-157],[314,692,306,306,-153,-153],[620,692,302,292,-151,-146],[922,692,308,270,-154,-129],[1230,692,310,275,-155,-130],[1540,692,310,280,-155,-130],[0,1006,312,285,-156,-131],[312,1006,312,290,-156,-131],[624,1006,308,298,-154,-131],[932,1006,306,302,-153,-131],[1238,1006,292,306,-139,-131],[1530,1006,298,314,-142,-130],[0,1320,301,317,-144,-130],[301,1320,304,320,-145,-129],[605,1320,306,324,-147,-129],[911,1320,308,327,-148,-128],[1219,1320,312,332,-150,-126],[1531,1320,314,334,-151,-125],[0,1654,315,335,-152,-123],[315,1654,318,340,-153,-121],[633,1654,319,340,-154,-119],[952,1654,320,342,-155,-117],[1272,1654,319,343,-155,-116],[1591,1654,318,342,-155,-114],[0,1997,315,342,-155,-109],[315,1997,313,342,-154,-107],[628,1997,315,342,-154,-105],[943,1997,269,341,-150,-99],[1212,1997,266,341,-148,-95],[1478,1997,263,341,-146,-91],[1741,1997,260,339,-144,-86],[0,2339,184,336,-70,-80],[184,2339,182,218,-69,-78],[366,2339,181,221,-68,-77],0]},"lightning":{"n":"lightning.v2.webp","f":[[0,0,408,470,-204,-266],[408,0,404,468,-202,-266],[812,0,404,464,-202,-262],[1216,0,400,466,-200,-266],[1616,0,396,464,-198,-266],[0,470,390,461,-195,-266],[390,470,378,455,-189,-266],[768,470,368,450,-184,-266],[1136,470,358,445,-179,-266],[1494,470,334,433,-167,-266],[0,931,316,424,-158,-266],[316,931,294,413,-147,-266],[610,931,280,406,-140,-266],[890,931,266,395,-133,-266],[1156,931,263,393,-133,-266],[1419,931,262,403,-140,-266],[1681,931,273,410,-146,-262],[0,1355,284,249,-152,-89],[284,1355,295,259,-158,-88],[579,1355,314,278,-168,-85],[893,1355,321,285,-172,-82],0]},"comet":{"n":"comet.v2.webp","f":[[0,0,47,47,-167,-185],[47,0,48,48,-163,-181],[95,0,51,54,-160,-181],[146,0,62,67,-159,-180],[208,0,69,75,-159,-180],[277,0,77,83,-159,-180],[354,0,94,102,-159,-179],[448,0,105,113,-159,-179],[553,0,116,125,-159,-178],[669,0,129,139,-159,-178],[798,0,143,152,-159,-176],[941,0,177,185,-159,-171],[1118,0,197,208,-158,-170],[1315,0,442,442,-221,-221],[0,442,438,438,-219,-219],[438,442,438,438,-219,-219],[876,442,436,436,-218,-218],[1312,442,436,436,-218,-218],[0,880,432,432,-216,-216],[432,880,428,428,-214,-214],[860,880,426,426,-213,-213],[1286,880,424,424,-212,-212],[0,1312,414,414,-207,-207],[414,1312,408,408,-204,-204],[822,1312,398,398,-199,-199],[1220,1312,388,388,-194,-194],[1608,1312,372,372,-186,-186],[0,1726,327,343,-156,-156],[327,1726,327,337,-150,-141],[654,1726,335,349,-153,-143],[989,1726,355,372,-161,-147],[1344,1726,364,384,-165,-149],[0,2110,374,390,-169,-150],[374,2110,382,391,-172,-151],[756,2110,390,351,-175,-151],[1146,2110,367,366,-142,-151],[1513,2110,375,374,-146,-150],[0,2501,382,346,-149,-113],[382,2501,397,322,-155,-82],[779,2501,403,270,-158,-78],[1182,2501,410,275,-161,-74],[1592,2501,416,279,-164,-70],[0,2847,422,282,-167,-65],[422,2847,431,290,-171,-55],[853,2847,436,247,-173,-49],[1289,2847,440,252,-174,-44],[1729,2847,248,244,-176,-15],[0,3137,250,250,-178,-10],[250,3137,18,6,-179,234]],"sc":0.6},"galaxy":{"n":"galaxy.v2.webp","f":[[0,0,466,466,-233,-233],[466,0,466,466,-233,-233],[932,0,466,466,-233,-233],[1398,0,462,462,-231,-231],[0,466,462,462,-231,-231],[462,466,458,458,-229,-229],[920,466,456,456,-228,-228],[1376,466,456,456,-228,-228],[0,928,454,454,-227,-227],[454,928,450,450,-225,-225],[904,928,448,448,-224,-224],[1352,928,444,444,-222,-222],[0,1382,447,438,-228,-219],[447,1382,455,432,-239,-216],[902,1382,459,424,-247,-212],[1361,1382,461,412,-254,-206],[0,1820,488,394,-258,-197],[488,1820,513,366,-264,-183],[1001,1820,534,316,-269,-158],[0,2214,550,223,-272,-120],[550,2214,556,224,-270,-123],[1106,2214,555,231,-265,-140],[0,2445,552,246,-261,-157],[552,2445,545,261,-258,-174],[1097,2445,503,274,-249,-189],[0,2719,463,282,-233,-201],0],"fps":15,"x":1}}};
-const E3 = { refit() {} }; // sisa API mesin lama (dipanggil FXQ.set)
-const FXS = {};
-function fxLoad(k) {
-  const m = FXM.fx[k]; if (!m) return null;
-  if (FXS[k]) return FXS[k];
-  const s = FXS[k] = { st: 1, bmp: null, cbs: [] }, im = new Image();
-  im.decoding = 'async';
-  im.onload = async () => { try { s.bmp = window.createImageBitmap ? await createImageBitmap(im) : im; } catch (e) { s.bmp = im; } s.st = 2; s.cbs.splice(0).forEach(f => f()); };
-  im.onerror = () => { delete FXS[k]; s.cbs.length = 0; }; // boleh dicoba lagi nanti
-  im.src = '/fx/' + m.n;
-  return s;
-}
-const FXU = {}; // kotak gabungan semua frame per efek (px layar, relatif pusat tombol)
-function fxBox(k) {
-  if (FXU[k]) return FXU[k];
-  const sc = FXM.fx[k].sc || FXM.sc; let x0 = 1e9, y0 = 1e9, x1 = -1e9, y1 = -1e9;
-  for (const f of FXM.fx[k].f) if (f) { x0 = Math.min(x0, f[4] / sc); y0 = Math.min(y0, f[5] / sc); x1 = Math.max(x1, (f[4] + f[2]) / sc); y1 = Math.max(y1, (f[5] + f[3]) / sc); }
-  return FXU[k] = { x: Math.floor(x0), y: Math.floor(y0), w: Math.ceil(x1 - x0) + 1, h: Math.ceil(y1 - y0) + 1 };
-}
-/* Pemutar sprite v2: (1) kanvas digambar pada kerapatan piksel layar (maks 1.5) sehingga hanya ada SATU kali pembesaran, bukan dua;
-   (2) efek lembut/lambat (m.x = 1: gelembung, kelopak, galaksi, kembang api) di-crossfade antar-frame (mode 'lighter' = penjumlahan) supaya terasa 60 fps dari 15 fps; benda tegas yang cepat (koin, es, api, komet, petir) tidak, karena berbayang ganda;
-   (3) kualitas Rendah memakai mode lompat-frame lama; (4) bitmap efek yang tidak terpasang dilepas 15 detik setelah selesai (hemat RAM). */
-function fxRelease(k) {
-  if (k === ((me && me.fxa) || 'confetti')) return;
-  setTimeout(() => {
-    const s = FXS[k];
-    if (s && s.st === 2 && !(s.act > 0)) { try { s.bmp && s.bmp.close && s.bmp.close(); } catch (e) {} delete FXS[k]; }
-  }, 15000);
-}
-function fxStart(k, r) {
-  const m = FXM.fx[k], s = FXS[k], u = fxBox(k), [cx, cy] = cen(r), sc = m.sc || FXM.sc, fr = m.f, dt = 1000 / (m.fps || FXM.fps), n = fr.length;
-  const d = Math.max(1, Math.min(window.devicePixelRatio || 1, Q().dpr, 1.5)), smooth = !!m.x && !LITE(); // tekstur 0.6-0.75x resolusi layar: kerapatan >1.5 tidak menambah detail
-  const cv = document.createElement('canvas'); cv.width = Math.ceil(u.w * d); cv.height = Math.ceil(u.h * d);
-  cv.style.cssText = `position:fixed;left:${Math.round(cx + u.x)}px;top:${Math.round(cy + u.y)}px;width:${u.w}px;height:${u.h}px;pointer-events:none;z-index:98`;
-  document.body.appendChild(cv);
-  const g = cv.getContext('2d'); g.imageSmoothingEnabled = true; g.imageSmoothingQuality = 'high';
-  s.act = (s.act | 0) + 1;
-  const draw = (f, a) => {
-    if (!f || a < .004) return;
-    g.globalAlpha = a;
-    g.drawImage(s.bmp, f[0], f[1], f[2], f[3], (f[4] / sc - u.x) * d, (f[5] / sc - u.y) * d, f[2] / sc * d, f[3] / sc * d);
+/* Mesin 3D: tiap partikel punya posisi (x,y,z) dan rotasi, diproyeksikan dengan perspektif ke satu kanvas layar penuh,
+   lalu digambar dengan cahaya aditif ('lighter') supaya menyala dan menebal. z > 0 = menjauh, z < 0 = mendekat ke layar. */
+const E3 = (() => {
+  const ps = [], F = 640, spr = {}; let cv, cx, W = 0, H = 0, dpr = 1, last = 0, raf = 0, CAP = 1e9, CULL = 0;
+  const rgb = c => `rgb(${c[0] | 0},${c[1] | 0},${c[2] | 0})`, rs = c => `${c[0] | 0},${c[1] | 0},${c[2] | 0}`, q = v => Math.min(255, Math.round(v / 24) * 24);
+  const fit = () => { dpr = Math.min(devicePixelRatio || 1, Q().dpr); W = innerWidth; H = innerHeight; cv.width = W * dpr; cv.height = H * dpr; };
+  const sprite = c => { // bola cahaya: inti putih, tepi memudar
+    const k = q(c[0]) + ',' + q(c[1]) + ',' + q(c[2]);
+    if (!spr[k]) { const s = document.createElement('canvas'); s.width = s.height = 96; const g = s.getContext('2d'), r = g.createRadialGradient(48, 48, 0, 48, 48, 48);
+      r.addColorStop(0, 'rgba(255,255,255,1)'); r.addColorStop(.16, `rgba(${k},.95)`); r.addColorStop(.45, `rgba(${k},.38)`); r.addColorStop(1, `rgba(${k},0)`); g.fillStyle = r; g.fillRect(0, 0, 96, 96); spr[k] = s; }
+    return spr[k];
   };
-  let last = -1, lastA = -1; const t0 = performance.now();
-  const tick = now => {
-    const p = (now - t0) / dt, i = Math.floor(p);
-    if (i >= n) { cv.remove(); s.act--; if (!(s.act > 0)) fxRelease(k); return; }
-    const a = smooth ? p - i : 0;
-    if (i !== last || (smooth && Math.abs(a - lastA) > .03)) { // gambar ulang hanya bila tampilan benar-benar berubah
-      last = i; lastA = a;
-      g.globalCompositeOperation = 'source-over'; g.globalAlpha = 1; g.clearRect(0, 0, cv.width, cv.height);
-      if (smooth) { g.globalCompositeOperation = 'lighter'; draw(fr[i], 1 - a); if (i + 1 < n) draw(fr[i + 1], a); }
-      else draw(fr[i], 1);
+  const sph = {}, cin = {}, pet = {};
+  const sphereSprite = (c, glass) => { // bola: gradien dibuat sekali per warna, bukan tiap frame
+    const cq = [q(c[0]), q(c[1]), q(c[2])], k = (glass ? 'g' : 's') + cq;
+    if (!sph[k]) {
+      const s = document.createElement('canvas'); s.width = s.height = 96; const g = s.getContext('2d'), gr = g.createRadialGradient(31.2, 28.8, 1.9, 48, 48, 48);
+      if (glass) { gr.addColorStop(0, 'rgba(255,255,255,.85)'); gr.addColorStop(.25, `rgba(${rs(cq)},.16)`); gr.addColorStop(.85, `rgba(${rs(cq)},.3)`); gr.addColorStop(1, 'rgba(255,255,255,.7)'); }
+      else { gr.addColorStop(0, '#fff'); gr.addColorStop(.3, rgb(cq)); gr.addColorStop(1, rgb(cq.map(v => v * .25))); }
+      g.fillStyle = gr; g.beginPath(); g.arc(48, 48, 48, 0, 7); g.fill(); sph[k] = s;
     }
-    requestAnimationFrame(tick);
+    return sph[k];
   };
-  requestAnimationFrame(tick);
-}
-/* late = true: tunggu unduhan selesai lalu putar (pratinjau di Efek/Profil). late = false: jawaban benar, tidak boleh telat; kalau belum siap, konfeti DOM ringan sebagai cadangan. */
-function playFx(k, r, late) {
-  if (RM || !FXM.fx[k]) return;
-  const s = fxLoad(k);
-  if (s.st === 2) fxStart(k, r);
-  else if (late) s.cbs.push(() => fxStart(k, r));
-  else if (k === 'confetti') burst(...cen(r), 18);
-}
-const FX = {}; Object.keys(FXM.fx).forEach(k => { FX[k] = r => playFx(k, r, true); });
-function warmFx() { const k = (me && me.fxa) || 'confetti'; (window.requestIdleCallback || (f => setTimeout(f, 1500)))(() => fxLoad(k)); }
-function ansFx(el) { playFx((me && me.fxa) || 'confetti', el.getBoundingClientRect(), false); }
+  const coinFace = () => {
+    if (!cin.f) {
+      const s = document.createElement('canvas'); s.width = s.height = 96; const g = s.getContext('2d'), gr = g.createLinearGradient(0, 0, 96, 96);
+      gr.addColorStop(0, '#FFF6B0'); gr.addColorStop(.5, '#FFC400'); gr.addColorStop(1, '#D18A00');
+      g.fillStyle = gr; g.beginPath(); g.arc(48, 48, 48, 0, 7); g.fill();
+      g.strokeStyle = '#FFE98A'; g.lineWidth = 5.8; g.beginPath(); g.arc(48, 48, 33.6, 0, 7); g.stroke(); cin.f = s;
+    }
+    return cin.f;
+  };
+  const petalSprite = c => {
+    const cq = [q(c[0]), q(c[1]), q(c[2])], k = '' + cq;
+    if (!pet[k]) {
+      const s = document.createElement('canvas'); s.width = s.height = 96; const g = s.getContext('2d'); g.translate(48, 48);
+      const gr = g.createLinearGradient(0, -48, 0, 48); gr.addColorStop(0, '#fff'); gr.addColorStop(.4, rgb(cq)); gr.addColorStop(1, rgb(cq.map(v => v * .8)));
+      g.fillStyle = gr; g.beginPath(); g.moveTo(0, -48); g.bezierCurveTo(43.2, -24, 33.6, 28.8, 0, 48); g.bezierCurveTo(-33.6, 28.8, -43.2, -24, 0, -48); g.fill(); pet[k] = s;
+    }
+    return pet[k];
+  };
+  // kristal es: bipiramida segi enam dengan rotasi 3D dan pencahayaan per sisi
+  const SH = (() => { const v = [[0, -1.7, 0], [0, 1.7, 0]]; for (let i = 0; i < 6; i++) v.push([Math.cos(i * 1.0472) * .55, 0, Math.sin(i * 1.0472) * .55]); const f = []; for (let i = 0; i < 6; i++) { const a = 2 + i, b = 2 + (i + 1) % 6; f.push([0, a, b], [1, b, a]); } return { v, f }; })();
+  const shard = (p, sx, sy, r, c) => {
+    const cX = Math.cos(p.rx), sX = Math.sin(p.rx), cY = Math.cos(p.ry), sY = Math.sin(p.ry), cZ = Math.cos(p.rz), sZ = Math.sin(p.rz);
+    const P = SH.v.map(([x, y, z]) => { let t = y * cX - z * sX; z = y * sX + z * cX; y = t; t = x * cY + z * sY; z = -x * sY + z * cY; x = t; t = x * cZ - y * sZ; y = x * sZ + y * cZ; x = t; return [x, y, z]; });
+    const fs = SH.f.map(f => { const [A, B, C] = f.map(i => P[i]), nx = (B[1] - A[1]) * (C[2] - A[2]) - (B[2] - A[2]) * (C[1] - A[1]), ny = (B[2] - A[2]) * (C[0] - A[0]) - (B[0] - A[0]) * (C[2] - A[2]), nz = (B[0] - A[0]) * (C[1] - A[1]) - (B[1] - A[1]) * (C[0] - A[0]), L = Math.hypot(nx, ny, nz) || 1; return { f, z: (A[2] + B[2] + C[2]) / 3, l: Math.abs(-nx * .4 - ny * .6 - nz * .7) / L, nz }; }).sort((a, b) => b.z - a.z);
+    for (const o of fs) { if (CULL && o.nz > 0) continue; const k = .3 + .7 * o.l; cx.fillStyle = rgb([c[0] * k + 40 * o.l, c[1] * k + 30 * o.l, Math.min(255, c[2] * k + 50 * o.l)]); cx.strokeStyle = 'rgba(255,255,255,.6)'; cx.lineWidth = 1; cx.beginPath(); o.f.forEach((i, n) => cx[n ? 'lineTo' : 'moveTo'](sx + P[i][0] * r, sy + P[i][1] * r)); cx.closePath(); cx.fill(); if (!CULL) cx.stroke(); }
+  };
+  const draw = p => {
+    const u = p.t / p.max, s = Math.min(3.5, F / Math.max(90, F + p.z)), sx = p.ox + p.x * s, sy = p.oy + p.y * s;
+    const a = p.a * Math.min(1, p.ai ? u / p.ai : 1) * Math.pow(Math.max(0, 1 - u), p.ad);
+    if (a < .004) return;
+    let c = p.c;
+    if (p.ramp) { const n = p.ramp.length - 1, f = Math.min(n - .001, u * n), i = f | 0, m = f - i, A = p.ramp[i], B = p.ramp[i + 1]; c = [A[0] + (B[0] - A[0]) * m, A[1] + (B[1] - A[1]) * m, A[2] + (B[2] - A[2]) * m]; }
+    const r = Math.min(CAP, Math.max(.5, p.sz * s * (1 + p.gr * u))), L = 'lighter', O = 'source-over', al = Math.min(1, a);
+    cx.globalAlpha = al; cx.globalCompositeOperation = p.add ? L : O;
+    if (p.halo) { cx.globalCompositeOperation = L; cx.globalAlpha = al * .55; cx.drawImage(sprite(c), sx - r * 2.4, sy - r * 2.4, r * 4.8, r * 4.8); cx.globalCompositeOperation = p.add ? L : O; cx.globalAlpha = al; }
+    switch (p.k) {
+      case 'glow': cx.drawImage(sprite(c), sx - r, sy - r, r * 2, r * 2); break;
+      case 'spark': // goresan cahaya mengikuti arah gerak
+        cx.strokeStyle = rgb(c); cx.lineCap = 'round'; cx.lineWidth = Math.max(1, r * .6); cx.beginPath(); cx.moveTo(sx - p.vx * s * .05, sy - p.vy * s * .05); cx.lineTo(sx, sy); cx.stroke();
+        cx.drawImage(sprite(c), sx - r * 3, sy - r * 3, r * 6, r * 6); break;
+      case 'sphere': cx.drawImage(sphereSprite(c, p.glass), sx - r, sy - r, r * 2, r * 2); break;
+      case 'coin': { // koin berputar 3D: lebar mengecil saat menyamping, ada tebal sisi
+        const w = Math.max(.14, Math.abs(Math.cos(p.rx))) * r; cx.save(); cx.translate(sx, sy); cx.rotate(p.rz);
+        cx.fillStyle = '#A8730A'; cx.beginPath(); cx.ellipse(r * .1, r * .1, w, r, 0, 0, 7); cx.fill();
+        cx.drawImage(coinFace(), -w, -r, w * 2, r * 2); cx.restore(); break; }
+      case 'petal': {
+        cx.save(); cx.translate(sx, sy); cx.rotate(p.rz); cx.scale(Math.abs(Math.cos(p.rx)) * .8 + .2, 1);
+        cx.drawImage(petalSprite(c), -r, -r, r * 2, r * 2); cx.restore(); break; }
+      case 'star':
+        cx.save(); cx.translate(sx, sy); cx.rotate(p.rz); cx.scale(Math.abs(Math.cos(p.rx)) * .85 + .15, 1);
+        for (const [m, col] of [[1, rgb(c)], [.5, '#fff']]) { cx.fillStyle = col; cx.beginPath(); for (let i = 0; i < 8; i++) { const ra = (i % 2 ? .34 : 1) * r * m, an = i * .7854 - 1.5708; cx.lineTo(Math.cos(an) * ra, Math.sin(an) * ra); } cx.closePath(); cx.fill(); }
+        cx.restore(); break;
+      case 'shard': shard(p, sx, sy, r, c); break;
+      case 'ring': { // gelombang kejut pada bidang miring (tampak 3D)
+        const RR = p.r0 + (p.r1 - p.r0) * (1 - Math.pow(1 - u, 3)), w = p.lw * (1 - u * .7); cx.lineCap = 'round';
+        for (const [m, k] of [[2.6, .3], [1.3, .7], [.5, 1]]) { cx.globalAlpha = al * k; cx.strokeStyle = m < 1 ? '#fff' : rgb(c); cx.lineWidth = Math.max(1, w * m); cx.beginPath(); cx.ellipse(p.ox, p.oy, RR, RR * p.tilt, p.rz, 0, 7); cx.stroke(); }
+        break; }
+      case 'bolt': { // petir: titik 3D diproyeksikan, tebal makin besar saat mendekat; berkedip
+        const fk = u < .16 ? 1 : u < .24 ? .12 : u < .42 ? 1 : 1 - (u - .42) / .58, pts = p.pts.map(([x, y, z]) => { const k = Math.min(3.5, F / Math.max(90, F + z)); return [p.ox + x * k, p.oy + y * k]; });
+        cx.lineJoin = cx.lineCap = 'round';
+        for (const [w, k] of [[22, .16], [11, .34], [5, .75], [2.2, 1]]) { cx.globalAlpha = Math.min(1, fk * k); cx.strokeStyle = w < 3 ? '#fff' : rgb(c); cx.lineWidth = w * p.w; cx.beginPath(); pts.forEach((t, i) => cx[i ? 'lineTo' : 'moveTo'](t[0], t[1])); cx.stroke(); }
+        break; }
+      case 'flash': cx.fillStyle = rgb(c); cx.fillRect(0, 0, W, H); break;
+    }
+  };
+  const droppable = p => !p.end && p.k !== 'bolt' && p.k !== 'ring'; // yang punya aksi lanjutan (ledakan, tumbukan) dan inti petir tidak disentuh
+  const trim = lv => { // perangkat kewalahan: buang sebagian partikel terbesar
+    const c = ps.filter(droppable).sort((a, b) => (b.k === 'flash') - (a.k === 'flash') || b.sz - a.sz), kill = new Set(c.slice(0, Math.ceil(c.length * .35)));
+    if (lv > 1) c.forEach(p => { if (p.k === 'flash') kill.add(p); });
+    for (let i = ps.length - 1; i >= 0; i--) if (kill.has(ps[i])) ps.splice(i, 1);
+  };
+  let sess = null, shed = 0, slow = 0;
+  const govern = ms => {
+    if (!sess) sess = { ms: [], n: 0, peak: 0, shed: 0 };
+    sess.peak = Math.max(sess.peak, ps.length);
+    if (ms > 250) return; // tab disembunyikan atau jeda panjang, bukan beban efek
+    if (++sess.n > 3) sess.ms.push(ms); // 3 frame pertama diabaikan (pemanasan)
+    if (ms > 28) slow++; else slow = Math.max(0, slow - 1);
+    if (slow >= 3 && shed < 2) { shed++; sess.shed = shed; slow = 0; trim(shed); }
+  };
+  const endSess = () => { // efek selesai: nilai kelancarannya; kalau patah-patah, turunkan kualitas otomatis
+    const s = sess; sess = null; shed = 0; slow = 0;
+    if (!s || s.ms.length < 6) return;
+    const a = s.ms.slice().sort((x, y) => x - y), p75 = a[Math.floor(a.length * .75)], mean = a.reduce((t, x) => t + x, 0) / a.length;
+    const down = (p75 > 28 || s.shed > 0) && FXQ.down();
+    if (FXDBG) dbg(mean, p75, a[a.length - 1], s.peak, s.shed, down);
+    if (down) toast(`Efek disesuaikan ke kualitas <b>${QN[FXQ.level]}</b> agar lancar. Bisa diubah di Profil.`, '⚙️');
+  };
+  const warm = keys => { for (const k of keys) { try { sprite(k.split(',').map(Number)); } catch (e) {} } };
+  const frame = dt => {
+    const qq = Q(); CAP = qq.cap; CULL = qq.cull;
+    for (let i = ps.length - 1; i >= 0; i--) {
+      const p = ps[i]; p.t += dt; if (p.tick) p.tick(p, dt);
+      const d = Math.pow(p.dr, dt); p.vx *= d; p.vy *= d; p.vz *= d; p.vy += p.g * dt;
+      p.x += p.vx * dt; p.y += p.vy * dt; p.z += p.vz * dt; p.rx += p.wx * dt; p.ry += p.wy * dt; p.rz += p.wz * dt;
+      if (p.t >= p.max) { ps.splice(i, 1); if (p.end) p.end(p); }
+    }
+    cx.setTransform(dpr, 0, 0, dpr, 0, 0); cx.clearRect(0, 0, W, H);
+    ps.sort((a, b) => b.z - a.z); for (const p of ps) draw(p);
+    cx.globalAlpha = 1; cx.globalCompositeOperation = 'source-over';
+  };
+  const loop = now => { const ms = now - last; last = now; govern(ms); frame(Math.min(.033, ms / 1000)); if (!ps.length) endSess(); raf = ps.length ? requestAnimationFrame(loop) : 0; };
+  const add = p => {
+    if (shed && (p.k || 'glow') !== 'bolt' && (p.k || 'glow') !== 'ring' && !p.end && Math.random() < (shed > 1 ? .7 : .4)) return;
+    if (!cv) { cv = document.createElement('canvas'); cv.style.cssText = 'position:fixed;inset:0;width:100%;height:100%;pointer-events:none;z-index:98'; document.body.appendChild(cv); cx = cv.getContext('2d'); fit(); addEventListener('resize', fit); }
+    ps.push(Object.assign({ x: 0, y: 0, z: 0, vx: 0, vy: 0, vz: 0, g: 0, dr: 1, t: 0, max: 1, sz: 10, c: [255, 255, 255], k: 'glow', a: 1, ad: 1, ai: 0, add: 1, gr: 0, rx: 0, ry: 0, rz: 0, wx: 0, wy: 0, wz: 0, w: 1, glass: 0, halo: 0 }, p));
+    if (!raf) { last = performance.now(); raf = requestAnimationFrame(loop); }
+  };
+  return { add, step: frame, warm, refit: () => { if (cv) fit(); }, get n() { return ps.length; } };
+})();
+const dir = () => { const u = R(-1, 1), t = R(0, 6.283), r = Math.sqrt(1 - u * u); return [r * Math.cos(t), u, r * Math.sin(t)]; }; // arah acak pada bola
+const flash3 = (c, a, s) => { const f = Q().flash; if (f) E3.add({ ox: 0, oy: 0, k: 'flash', c, a: a * f, max: s, z: -9999, ad: 1.6 }); };
+const sparks = (ox, oy, n, c, v0, v1, o = {}) => { for (let i = 0; i < N(n); i++) { const [a, b, d] = dir(), v = R(v0, v1); E3.add(Object.assign({ ox, oy, k: 'spark', sz: R(1.6, 3.4), vx: a * v, vy: b * v, vz: d * v, dr: .22, max: R(.6, 1.2), c: Array.isArray(c[0]) ? pick(c) : c }, o)); } };
+
+const FX = {
+  confetti: r => burst(...cen(r), 18),
+  stars: (r, el) => {
+    const [ox, oy] = cen(r), CL = [[255, 214, 90], [255, 240, 160], [255, 180, 60]];
+    E3.add({ ox, oy, sz: 150, max: .5, c: [255, 210, 90], ad: 1.5 });
+    for (let i = 0; i < N(28); i++) { const [a, b, d] = dir(), v = R(300, 600); E3.add({ ox, oy, k: 'star', halo: 1, sz: R(11, 24), vx: a * v, vy: b * v - 60, vz: d * v, dr: .22, g: 140, max: R(1.1, 1.8), c: pick(CL), wx: R(-8, 8), wz: R(-5, 5), ad: .8 }); }
+    sparks(ox, oy, 40, [255, 235, 150], 140, 420);
+    glow(el, 'rgba(255,200,60,.95)');
+  },
+  bubbles: (r, el) => {
+    const [ox, oy] = cen(r);
+    E3.add({ ox, oy, sz: 170, max: .7, c: [110, 190, 255], ad: 1.5 });
+    for (let i = 0; i < N(26); i++) E3.add({ ox: ox + R(-r.width / 2, r.width / 2), oy: oy + R(-8, 12), z: R(-120, 200), k: 'sphere', glass: 1, add: 0, sz: R(13, 36), vy: R(-280, -120), vx: R(-40, 40), vz: R(-60, 60), dr: .55, g: -30, max: R(1.3, 2.1), c: [150, 215, 255], ad: .6, ai: .08, tick: p => { p.vx += Math.sin(p.t * 5 + p.sz) * 3; } });
+    glow(el, 'rgba(120,200,255,.95)');
+  },
+  petals: (r, el) => {
+    const [ox, oy] = cen(r), CL = [[255, 170, 200], [255, 205, 225], [255, 140, 175], [255, 235, 240]];
+    E3.add({ ox, oy, sz: 170, max: .7, c: [255, 150, 190], ad: 1.5 });
+    for (let i = 0; i < N(36); i++) { const a = R(-2.6, -.55), v = R(280, 600); E3.add({ ox: ox + R(-r.width / 3, r.width / 3), oy, z: R(-80, 160), k: 'petal', halo: 1, add: 0, sz: R(12, 24), vx: Math.cos(a) * v * .8, vy: Math.sin(a) * v, vz: R(-120, 120), dr: .35, g: 240, max: R(1.7, 2.5), c: pick(CL), wx: R(-7, 7), wz: R(-4, 4), ad: .7, tick: p => { p.vx += Math.sin(p.t * 4 + p.sz) * 14; } }); }
+    glow(el, 'rgba(255,150,190,.95)');
+  },
+  coins: (r, el) => {
+    const [ox, oy] = cen(r);
+    E3.add({ ox, oy, sz: 190, max: .6, c: [255, 200, 40], ad: 1.4 });
+    for (let i = 0; i < N(22); i++) { const a = R(-2.4, -.75), v = R(560, 940); E3.add({ ox, oy, z: R(-60, 120), k: 'coin', halo: 1, add: 0, sz: R(16, 28), vx: Math.cos(a) * v * .6, vy: Math.sin(a) * v, vz: R(-120, 120), dr: .75, g: 1150, max: R(1.5, 2.1), c: [255, 200, 40], wx: R(6, 14), wz: R(-2, 2), ad: .5, tick: p => { if (Math.random() < .1) E3.add({ ox: p.ox, oy: p.oy, x: p.x, y: p.y, z: p.z, k: 'spark', sz: 2, max: .4, c: [255, 240, 150], vx: R(-60, 60), vy: R(-60, 60) }); } }); }
+    glow(el, 'rgba(255,196,40,.95)');
+  },
+  fireworks: (r, el) => {
+    const [ox, oy] = cen(r), CL = [[255, 80, 80], [80, 200, 255], [255, 220, 70], [190, 110, 255], [90, 255, 150]];
+    glow(el, 'rgba(255,200,90,.9)');
+    [[-110, -150], [95, -215], [0, -120], [-45, -265]].forEach(([dx, dy], k) => setTimeout(() => {
+      const c = pick(CL), c2 = pick(CL);
+      const boom = (x, y, z) => {
+        E3.add({ ox, oy, x, y, z, sz: 230, max: .55, c, ad: 1.6 });
+        for (let i = 0; i < N(90); i++) { const [a, b, d] = dir(), v = R(170, 400); E3.add({ ox, oy, x, y, z, k: 'spark', sz: R(2, 4.2), vx: a * v, vy: b * v, vz: d * v, dr: .25, g: 250, max: R(.9, 1.6), c: i % 3 ? c : c2, ad: .9 }); }
+      };
+      E3.add({ ox, oy, k: 'spark', sz: 3, vx: dx * 3.5, vy: dy * 3.5, max: .28, c: [255, 230, 160], ad: 0, end: p => boom(p.x, p.y, p.z) });
+    }, k * 210));
+  },
+  fire: (r, el) => {
+    const [ox, oy] = cen(r), RAMP = [[255, 250, 200], [255, 190, 50], [255, 90, 10], [150, 20, 0]];
+    E3.add({ ox, oy, sz: 280, max: 1.2, c: [255, 110, 20], ad: 1.2 });
+    glow(el, 'rgba(255,110,10,.98)'); shake(5, 450);
+    let n = 0; const iv = setInterval(() => {
+      for (let i = 0; i < N(12); i++) E3.add({ ox: ox + R(-r.width / 2, r.width / 2), oy: oy + r.height / 2 - 6, z: R(-80, 120), ramp: RAMP, sz: R(28, 58), gr: .5, vy: R(-340, -170), vx: R(-40, 40), dr: .6, max: R(.55, 1), ad: 1.1, tick: p => { p.vx += Math.sin(p.t * 9 + p.sz) * 24; } });
+      for (let i = 0; i < N(3); i++) E3.add({ ox: ox + R(-r.width / 2, r.width / 2), oy: oy + r.height / 2, k: 'spark', sz: 2.2, c: [255, 170, 60], vy: R(-440, -230), vx: R(-90, 90), g: -40, dr: .5, max: R(.8, 1.4) });
+      if (++n > 16) clearInterval(iv);
+    }, 45);
+  },
+  ice: (r, el) => {
+    const [ox, oy] = cen(r), BL = [[130, 215, 255], [200, 240, 255], [90, 170, 255]];
+    E3.add({ ox, oy, sz: 240, max: .8, c: [120, 210, 255], ad: 1.4 });
+    E3.add({ ox, oy: oy + 16, k: 'ring', r0: 10, r1: 200, tilt: .34, lw: 13, c: [150, 225, 255], max: .9 });
+    E3.add({ ox, oy: oy + 16, k: 'ring', r0: 5, r1: 125, tilt: .34, lw: 7, c: [230, 250, 255], max: .7 });
+    for (let i = 0; i < N(18); i++) { const [a, b, d] = dir(), v = R(240, 520); E3.add({ ox, oy, k: 'shard', halo: 1, add: 0, sz: R(12, 24), vx: a * v, vy: b * v - 80, vz: d * v, dr: .2, g: 170, max: R(1.2, 1.9), c: pick(BL), wx: R(-6, 6), wy: R(-6, 6), wz: R(-6, 6), ad: .8 }); }
+    sparks(ox, oy, 50, [[220, 245, 255], [150, 220, 255]], 100, 340, { g: 90, max: R(.8, 1.5) });
+    flash3([120, 200, 255], .14, .4); glow(el, 'rgba(120,210,255,.98)');
+  },
+  lightning: (r, el) => {
+    const [ox, oy] = cen(r), B = [80, 140, 255];
+    const mk = (x0, y0, z0, x1, y1, z1, n, jit) => Array.from({ length: n + 1 }, (_, i) => { const t = i / n, e = i && i < n ? 1 : 0; return [x0 + (x1 - x0) * t + e * R(-jit, jit), y0 + (y1 - y0) * t + e * R(-jit * .4, jit * .4), z0 + (z1 - z0) * t]; });
+    const strike = (delay, pw) => setTimeout(() => {
+      for (let k = 0; k < 3; k++) {
+        const main = mk(R(-170, 170) * (k ? 1 : .35), -(oy + 60), 520, R(-12, 12), 0, -20, 14, 46);
+        E3.add({ ox, oy, k: 'bolt', pts: main, c: B, max: .55, ad: 0 });
+        for (let b = 0; b < 2; b++) { const m = main[3 + (R(0, 8) | 0)]; E3.add({ ox, oy, k: 'bolt', pts: mk(m[0], m[1], m[2], m[0] + R(-150, 150), m[1] + R(60, 190), m[2] - 60, 6, 26), c: B, max: .45, ad: 0, w: .6 }); }
+      }
+      flash3([150, 180, 255], .5 * pw, .35);
+      E3.add({ ox, oy: oy + 12, k: 'ring', r0: 10, r1: 170 * pw, tilt: .32, lw: 11, c: [140, 190, 255], max: .65 });
+      E3.add({ ox, oy, sz: 280 * pw, max: .55, c: [140, 180, 255], ad: 1.4 });
+      sparks(ox, oy, 36, [[255, 240, 150], [200, 225, 255], [255, 255, 255]], 180, 560, { g: 520, max: R(.4, .9) });
+      glow(el, 'rgba(130,170,255,.99)'); shake(9 * pw, 400);
+    }, delay);
+    strike(0, 1); strike(190, .75);
+  },
+  comet: (r, el) => {
+    const [ox, oy] = cen(r), FL = [[255, 255, 230], [255, 200, 90], [255, 110, 20], [120, 30, 0]], T = .55;
+    const impact = () => {
+      flash3([255, 190, 90], .55, .4); shake(13, 560); glow(el, 'rgba(255,150,50,.99)');
+      E3.add({ ox, oy, sz: 400, max: .75, c: [255, 150, 40], ad: 1.3, gr: .6 });
+      E3.add({ ox, oy, sz: 170, max: .38, c: [255, 255, 230], ad: 1.5 });
+      [[8, 240, 15, .75], [4, 155, 8, .55]].forEach(([r0, r1, lw, mx]) => E3.add({ ox, oy: oy + 14, k: 'ring', r0, r1, tilt: .34, lw, c: [255, 170, 70], max: mx }));
+      for (let i = 0; i < N(28); i++) { const [a, b, d] = dir(), v = R(240, 660); E3.add({ ox, oy, k: 'sphere', halo: 1, sz: R(5, 13), vx: a * v, vy: b * v - 120, vz: d * v, dr: .3, g: 540, max: R(.8, 1.5), c: [255, 140, 40], ad: .8 }); }
+      sparks(ox, oy, 60, [[255, 230, 150], [255, 160, 60]], 200, 700, { g: 300 });
+    };
+    E3.add({ ox, oy, x: -460, y: -520, z: 560, vx: 460 / T, vy: 520 / T, vz: -680 / T, k: 'sphere', halo: 1, sz: 30, c: [255, 190, 90], max: T, ad: 0, end: impact,
+      tick: p => { for (let i = 0; i < 3; i++) E3.add({ ox, oy, x: p.x + R(-8, 8), y: p.y + R(-8, 8), z: p.z, ramp: FL, sz: R(26, 48), gr: -.4, vx: R(-40, 40), vy: R(-40, 40), max: R(.35, .6), ad: 1.2 }); } });
+  },
+  galaxy: (r, el) => {
+    const [ox, oy] = cen(r), CL = [[190, 110, 255], [90, 220, 255], [255, 130, 220], [255, 255, 255], [140, 120, 255]];
+    flash3([157, 78, 221], .3, .5); glow(el, 'rgba(170,90,255,.98)'); shake(5, 450);
+    E3.add({ ox, oy, sz: 320, max: 1.4, c: [150, 70, 230], ad: 1.1 });
+    E3.add({ ox, oy, sz: 130, max: 1.1, c: [255, 255, 255], ad: 1.4 });
+    [[240, 12, [199, 125, 255]], [185, 9, [94, 231, 255]], [140, 7, [255, 130, 220]]].forEach(([r1, lw, c], k) => E3.add({ ox, oy, k: 'ring', r0: 6, r1, tilt: .42, rz: k * .6, lw, c, max: 1.1 + k * .15 }));
+    const M = N(44);
+    for (let a = 0; a < 3; a++) for (let i = 0; i < M; i++) { // lengan spiral: bintang mengorbit pada bidang miring
+      const rr = R(20, 210), th0 = a * 2.094 + rr * .018 + R(-.25, .25), om = 3.2 - rr * .008;
+      E3.add({ ox, oy, sz: R(5, 13), c: pick(CL), max: R(1.1, 1.8), ad: .9, ai: .08, tick: p => { const th = th0 + om * p.t, RR = rr * (1 + p.t * .5); p.x = Math.cos(th) * RR; p.y = Math.sin(th) * RR * .45; p.z = Math.sin(th) * RR * .6; } });
+    }
+    for (let i = 0; i < N(10); i++) E3.add({ ox, oy, k: 'star', halo: 1, sz: R(9, 18), c: pick(CL), max: R(1, 1.6), wx: R(-5, 5), wz: R(-3, 3), x: R(-150, 150), y: R(-70, 70), z: R(-100, 200), ad: .9, ai: .1 });
+  },
+};
+const WARM = {"fire":["144,24,0","168,24,0","168,48,0","192,48,0","216,48,0","216,72,0","240,72,0","240,96,0","255,120,24","255,144,24","255,144,48","255,168,48","255,168,72","255,192,48","255,192,72","255,192,96","255,216,120","255,216,144","255,216,96","255,240,144","255,240,168","255,240,192","255,96,0","255,96,24"],"comet":["120,24,0","120,48,0","144,48,0","168,48,0","168,72,0","192,72,0","192,72,24","216,72,24","216,96,24","240,120,24","240,96,24","255,120,24","255,120,48","255,144,48","255,168,48","255,168,72","255,192,72","255,192,96","255,216,120","255,216,144","255,216,168","255,216,96","255,240,144","255,240,168","255,240,192","255,240,216","255,255,240"]}; // warna sprite yang dipakai Api dan Komet, dibuat saat browser menganggur supaya jawaban benar pertama tidak tersendat
+function warmFx() { const k = WARM[me && me.fxa]; if (!k || RM) return; (window.requestIdleCallback || (f => setTimeout(f, 1500)))(() => E3.warm(k)); }
+function ansFx(el) { if (!RM) (FX[me.fxa] || FX.confetti)(el.getBoundingClientRect(), el); }
 
 /* ---------- Efek: tampilan ---------- */
 const SHOP = [
@@ -720,7 +878,7 @@ let shopTab = 'fx';
 async function vShop() {
   V.innerHTML = '<p class="muted">Memuat…</p>';
   let st; try { st = await api('shop'); } catch (e) { V.textContent = e.message; return; }
-  const sync = () => { me.spent = st.spent; me.bonus = st.bonus; me.fxa = st.equipped; me.fxn = st.equippedName; fxLoad(st.equipped || 'confetti'); };
+  const sync = () => { me.spent = st.spent; me.bonus = st.bonus; me.fxa = st.equipped; me.fxn = st.equippedName; };
   const play = k => { const s = $('#sg-' + k); if (s) (FX[k] || FX.confetti)(s.getBoundingClientRect(), s); };
   const draw = () => {
     sync(); const g = st.gold, nameTab = shopTab === 'nm', list = nameTab ? NSHOP : SHOP;
@@ -1471,7 +1629,7 @@ async function vProfile() {
     <div class="card"><h2>Efek foto profil</h2><p class="muted">Pilih efek bingkai yang ingin dipakai, lalu tekan Simpan. ${ADM() ? 'Sebagai admin, semua efek terbuka.' : 'Efek terbuka seiring pencapaianmu. Pilih Otomatis agar selalu memakai efek tertinggi.'}</p><div class="fxg" id="fxg">${fxGrid(dk(), pk)}</div><div class="row" style="margin-top:12px"><span></span><button class="btn" id="fxs">Simpan tampilan</button></div></div></section>
     <section class="pnl" data-p="acc"${ptab === 'acc' ? '' : ' hidden'}><div class="card"><h2>Nama pengguna</h2><input id="pu" maxlength="20" value="${esc(me.username)}" autocomplete="off">${ADM() ? `<label class="chk"><input type="checkbox" id="pbd"${me.board === false ? '' : ' checked'}> Tampilkan akunku di leaderboard</label>` : ''}<div class="err" id="err"></div><button class="btn" id="ps">Simpan</button></div>
     <div class="card"><h2>Ganti password</h2><input id="pwo" type="password" placeholder="Password lama" autocomplete="current-password"><input id="pwn" type="password" placeholder="Password baru (minimal 6 karakter)" autocomplete="new-password"><input id="pwn2" type="password" placeholder="Ulangi password baru" autocomplete="new-password"><div class="err" id="perr"></div><button class="btn" id="pws">Ganti password</button></div></section>
-    <section class="pnl" data-p="set"${ptab === 'set' ? '' : ' hidden'}><div class="card"><h2>Kualitas efek jawaban</h2><p class="muted">Efek jawaban benar diputar dari file sehingga selalu lancar. Pilihan ini mengatur animasi hiasan (bingkai foto, gaya nama) dan jumlah konfeti di halaman hasil. Pilih Rendah bila perangkatmu terasa berat.</p>
+    <section class="pnl" data-p="set"${ptab === 'set' ? '' : ' hidden'}><div class="card"><h2>Kualitas efek jawaban</h2><p class="muted">Kalau efek di menu Efek atau saat menjawab terasa patah-patah, pilih kualitas lebih rendah. Otomatis menyesuaikan sendiri dengan kemampuan perangkatmu.</p>
     <div class="tabs" id="fxq">${[['auto', 'Otomatis'], ['high', 'Tinggi'], ['mid', 'Sedang'], ['low', 'Rendah']].map(([k, t]) => `<button data-fq="${k}" class="${FXQ.mode === k ? 'on' : ''}">${t}</button>`).join('')}</div>
     <p class="muted" id="fxqn"></p><button class="btn ghost" id="fxt">Coba efek</button></div>
     <div class="card"><h2>Bantuan dan akun</h2><div class="slist"><button class="srow" id="pGuide"><span>📖</span><b>Panduan</b><small>Cara memakai Al-Miftah</small></button><button class="srow" id="pTheme"><span>🌓</span><b>Ganti tema</b><small>Terang atau gelap</small></button>${ADM() ? `<button class="srow adminlnk" data-v="admin"><span>🛠️</span><b>Panel Admin</b><small>${me.reports ? me.reports + ' laporan soal menunggu' : 'Kelola soal dan murid'}</small></button>` : ''}<a class="srow" href="/privasi.html" style="text-decoration:none;color:inherit"><span>🔒</span><b>Kebijakan privasi</b><small>Data apa yang kami simpan</small></a>${ADM() ? '' : `<button class="srow out" id="pDel"><span>🗑️</span><b>Hapus akun</b><small>Hapus akun dan semua datamu secara permanen</small></button>`}<button class="srow out" id="pOut"><span>🚪</span><b>Keluar</b><small>Akhiri sesi di perangkat ini</small></button></div></div></section>

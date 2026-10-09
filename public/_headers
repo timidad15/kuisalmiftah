@@ -13,13 +13,8 @@
 # Gambar di-cache 1 hari di browser.
 /*.png
   Cache-Control: public, max-age=86400
-/rank/*
+/*.webp
   Cache-Control: public, max-age=86400
-
-# Sprite efek jawaban benar: nama berkas memuat versi (mis. fire.v1.webp), jadi aman di-cache setahun.
-# Bila efek dirender ulang, ganti versinya (v2) di assemble.py, bukan menimpa berkas lama.
-/fx/*
-  Cache-Control: public, max-age=31536000, immutable
 
 # Service worker dan manifest harus selalu segar supaya pembaruan cepat sampai.
 /sw.js
