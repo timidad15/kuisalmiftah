@@ -10,9 +10,16 @@ VER = sys.argv[4] if len(sys.argv) > 4 else 'v1'
 OUT = sys.argv[5] if len(sys.argv) > 5 else '/home/claude/work/fx'
 AW = 2048                                                    # lebar atlas
 os.makedirs(OUT, exist_ok=True)
+# Profil per efek: (skala tekstur, fps sumber, crossfade 0/1). Crossfade antar-frame hanya aman untuk efek lembut/lambat
+# (gelembung, kelopak, galaksi, kembang api): efek benda tegas yang bergerak cepat (koin, es, api, komet, petir) jadi berbayang ganda.
+# Tinggi atlas harus < 4096 (batas tekstur banyak HP).
+PROFILE = {'bubbles': (0.75, 15, 1), 'petals': (0.75, 15, 1), 'galaxy': (0.75, 15, 1), 'fireworks': (0.75, 15, 1),
+           'coins': (0.6, 24, 0), 'comet': (0.6, 24, 0)}
+DEFAULT = (SC, 24, 0)
 KEYS = ['confetti', 'stars', 'bubbles', 'petals', 'coins', 'fireworks', 'fire', 'ice', 'lightning', 'comet', 'galaxy']
 meta, total = {}, 0
 for k in KEYS:
+    SC, FPS, XF = PROFILE.get(k, DEFAULT)
     _all = sorted(glob.glob(f'/home/claude/fxbake/frames/{k}_*.png'))
     fs = [_all[min(len(_all)-1, round(i*30/FPS))] for i in range(math.ceil(len(_all)*FPS/30))]
     crops = []   # (img, dx, dy) dx,dy = pojok kiri-atas relatif jangkar, dalam px tekstur
@@ -40,6 +47,9 @@ for k in KEYS:
     sheet.save(f'{OUT}/{name}', 'WEBP', quality=Q, alpha_quality=AQ, method=int(os.environ.get("WM","4")))
     sz = os.path.getsize(f'{OUT}/{name}'); total += sz
     meta[k] = {'n': name, 'f': fr}
+    if SC != DEFAULT[0]: meta[k]['sc'] = SC
+    if FPS != DEFAULT[1]: meta[k]['fps'] = FPS
+    if XF: meta[k]['x'] = 1   # crossfade antar-frame
     print(f'{k:10s} {len(fr):3d}f atlas {AW}x{H} -> {sz/1024:7.1f} KB')
 print('TOTAL', round(total / 1024), 'KB')
-json.dump({'fps': FPS, 'sc': SC, 'fx': meta}, open('/home/claude/fxbake/meta.json', 'w'), separators=(',', ':'))
+json.dump({'fps': DEFAULT[1], 'sc': DEFAULT[0], 'fx': meta}, open('/home/claude/fxbake/meta.json', 'w'), separators=(',', ':'))
