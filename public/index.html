@@ -407,6 +407,16 @@ select,textarea{font:inherit;color:var(--ink);background:var(--surface);border:1
 .htabs{max-width:560px}.sorof .lvls{grid-template-columns:repeat(3,1fr)}
 @media(max-width:560px){.sorof .lvls{grid-template-columns:repeat(2,1fr)}}
 @media(max-width:480px){.htabs button{padding:10px 6px;font-size:.84rem}}
+/* ===== Toko kitab ===== */
+.kt{border-top-color:var(--accent)}.kt h3{overflow-wrap:anywhere}.kt .acts{margin-top:auto}
+.kcov{display:block;width:100%;aspect-ratio:3/4;object-fit:cover;border-radius:14px;border:1px solid var(--line);background:var(--bg)}
+.kcov.none{display:grid;place-items:center;font-size:3rem}
+.kt .acts .btn{display:inline-flex;align-items:center;justify-content:center;text-decoration:none;text-align:center}
+.kmini{width:44px;aspect-ratio:3/4;object-fit:cover;border-radius:6px}.itm .kmini{margin-bottom:2px}
+.kadm{display:grid;grid-template-columns:110px 1fr;gap:14px}.kadm .kcov{font-size:2rem}
+@media(max-width:560px){.kadm{grid-template-columns:1fr}.kadm .kcov{max-width:140px}}
+.kadm label.f{display:block;margin:6px 0 2px;font-size:.85rem;color:var(--muted)}
+.kadm textarea{font:inherit;color:var(--ink);background:var(--surface);border:1px solid var(--line);border-radius:14px;padding:12px 16px;width:100%;margin-bottom:10px;resize:vertical;min-height:70px}
 </style>
 </head>
 <body>
@@ -415,7 +425,7 @@ select,textarea{font:inherit;color:var(--ink);background:var(--surface);border:1
   <aside class="side">
     <div class="brand"><img src="/logo.png" alt="Al-Miftah – Mudah Belajar Membaca Kitab"></div>
     <button class="nav" data-v="home">Beranda</button>
-    <button class="nav" data-v="daily">Harian</button><button class="nav" data-v="board">Leaderboard</button><button class="nav" data-v="shop">Efek</button><button class="nav" data-v="ach">Pencapaian</button>
+    <button class="nav" data-v="daily">Harian</button><button class="nav" data-v="board">Leaderboard</button><button class="nav" data-v="shop">Toko</button><button class="nav" data-v="ach">Pencapaian</button>
     <button class="nav" data-v="admin" id="navAdmin" hidden>Panel Admin</button>
     <div class="sp"></div>
     <button class="nav" data-v="profile" id="who"></button>
@@ -426,7 +436,7 @@ select,textarea{font:inherit;color:var(--ink);background:var(--surface);border:1
     <div class="scroll"><div class="wrap" id="view"></div><div class="credit">Powered by <b>Nabil Ghufron</b> 1447-1448 H</div></div>
   </main>
   <nav class="bnav" aria-label="Menu utama">
-    <button class="bn" data-v="home"><span>🏠</span>Beranda</button><button class="bn" data-v="daily"><span>🎯</span>Harian</button><button class="bn" data-v="board"><span>🏆</span>Peringkat</button><button class="bn" data-v="shop"><span>✨</span>Efek</button><button class="bn" data-v="ach"><span>🏅</span>Capaian</button><button class="bn" data-v="profile"><span>👤</span>Profil</button>
+    <button class="bn" data-v="home"><span>🏠</span>Beranda</button><button class="bn" data-v="daily"><span>🎯</span>Harian</button><button class="bn" data-v="board"><span>🏆</span>Peringkat</button><button class="bn" data-v="shop"><span>🛍️</span>Toko</button><button class="bn" data-v="ach"><span>🏅</span>Capaian</button><button class="bn" data-v="profile"><span>👤</span>Profil</button>
   </nav>
 </div>
 <script>
@@ -840,69 +850,34 @@ const FX = {
   },
 };
 const WARM = {"fire":["144,24,0","168,24,0","168,48,0","192,48,0","216,48,0","216,72,0","240,72,0","240,96,0","255,120,24","255,144,24","255,144,48","255,168,48","255,168,72","255,192,48","255,192,72","255,192,96","255,216,120","255,216,144","255,216,96","255,240,144","255,240,168","255,240,192","255,96,0","255,96,24"],"comet":["120,24,0","120,48,0","144,48,0","168,48,0","168,72,0","192,72,0","192,72,24","216,72,24","216,96,24","240,120,24","240,96,24","255,120,24","255,120,48","255,144,48","255,168,48","255,168,72","255,192,72","255,192,96","255,216,120","255,216,144","255,216,168","255,216,96","255,240,144","255,240,168","255,240,192","255,240,216","255,255,240"]}; // warna sprite yang dipakai Api dan Komet, dibuat saat browser menganggur supaya jawaban benar pertama tidak tersendat
-function warmFx() { const k = WARM[me && me.fxa]; if (!k || RM) return; (window.requestIdleCallback || (f => setTimeout(f, 1500)))(() => E3.warm(k)); }
-function ansFx(el) { if (!RM) (FX[me.fxa] || FX.confetti)(el.getBoundingClientRect(), el); }
+function warmFx() {} // efek jawaban selalu konfeti (tanpa 3D), tidak perlu pemanasan
+function ansFx(el) { if (!RM) FX.confetti(el.getBoundingClientRect(), el); }
 
-/* ---------- Efek: tampilan ---------- */
-const SHOP = [
-  ['confetti', 'Konfeti', '🎊', 'Umum', 'Bawaan untuk semua murid. Konfeti warna-warni.'],
-  ['stars', 'Bintang', '✨', 'Umum', 'Bintang emas memercik ke segala arah.'],
-  ['bubbles', 'Gelembung', '💦', 'Umum', 'Gelembung bening melayang naik dari jawabanmu.'],
-  ['petals', 'Kelopak Bunga', '🌸', 'Umum', 'Kelopak berjatuhan pelan sambil berputar.'],
-  ['coins', 'Hujan Koin', GL, 'Langka', 'Koin emas melambung, lalu berjatuhan.'],
-  ['fireworks', 'Kembang Api', '🎆', 'Langka', 'Tiga ledakan warna meletus di atas jawabanmu.'],
-  ['fire', 'Api', '🔥', 'Epik', 'Lidah api menyala dari jawaban yang benar.'],
-  ['ice', 'Salju Es', '❄️', 'Epik', 'Kristal es dan cincin beku menyebar.'],
-  ['lightning', 'Petir', '⚡', 'Legendaris', 'Tiga sambaran petir dari langit disertai kilat.'],
-  ['comet', 'Komet', '☄️', 'Legendaris', 'Komet jatuh dan menghantam jawabanmu.'],
-  ['galaxy', 'Galaksi', '🌌', 'Mitos', 'Cincin galaksi berputar dan bintang berpusar.'],
-];
-const NSHOP = [ // gaya nama: [kunci, nama, ikon(tak dipakai), tier, deskripsi]; harga ada di server
-  ['n_none', 'Polos', '', 'Umum', 'Warna teks bawaan, tanpa efek.'],
-  ['n_mint', 'Zamrud', '', 'Umum', 'Hijau zamrud yang segar dan tegas.'],
-  ['n_ocean', 'Samudra', '', 'Umum', 'Biru samudra yang cerah.'],
-  ['n_grape', 'Anggur', '', 'Langka', 'Gradien ungu ke merah muda.'],
-  ['n_sunset', 'Senja', '', 'Langka', 'Gradien jingga senja yang bergerak.'],
-  ['n_shimmer', 'Kilau Emas', '', 'Epik', 'Emas dengan kilau yang menyapu huruf.'],
-  ['n_neon', 'Neon', '', 'Epik', 'Papan neon menyala dan berdenyut.'],
-  ['n_blaze', 'Api', '', 'Legendaris', 'Huruf menyala seperti api.'],
-  ['n_frost', 'Es Kristal', '', 'Legendaris', 'Biru es berkilau dengan pendar dingin.'],
-  ['n_glitch', 'Glitch', '', 'Mitos', 'Huruf bergetar dengan bayangan RGB.'],
-  ['n_rainbow', 'Pelangi', '', 'Mitos', 'Seluruh warna pelangi mengalir di namamu.'],
-];
-const NSTYLE = new Set(NSHOP.map(x => x[0]).filter(k => k !== 'n_none'));
-const nc = k => NSTYLE.has(k) ? 'nfx ' + k : ''; // kelas CSS gaya nama (kosong bila tidak valid)
-const nm = (name, k) => { const c = nc(k); return c ? `<span class="${c}">${esc(name)}</span>` : esc(name); };
+/* ---------- Toko: kitab ---------- */
+const nc = () => '';              // gaya nama sudah dihapus: nama selalu polos
+const nm = name => esc(name);
 const TIER = { Umum: '#8A97A6', Langka: '#2BA3E6', Epik: '#A94BC0', Legendaris: '#E8960F', Mitos: '#EF3E7B' };
-let shopTab = 'fx';
+const kcover = k => k.cv ? `<img class="kcov" src="/api/kitab-cover?id=${k.id}&v=${k.cv}" alt="Sampul ${esc(k.title)}" loading="lazy" decoding="async">` : `<div class="kcov none" aria-hidden="true">📖</div>`;
 async function vShop() {
   V.innerHTML = '<p class="muted">Memuat…</p>';
   let st; try { st = await api('shop'); } catch (e) { V.textContent = e.message; return; }
-  const sync = () => { me.spent = st.spent; me.bonus = st.bonus; me.fxa = st.equipped; me.fxn = st.equippedName; };
-  const play = k => { const s = $('#sg-' + k); if (s) (FX[k] || FX.confetti)(s.getBoundingClientRect(), s); };
   const draw = () => {
-    sync(); const g = st.gold, nameTab = shopTab === 'nm', list = nameTab ? NSHOP : SHOP;
-    V.innerHTML = `<div class="shopbar"><h1>Efek</h1><span class="gold" style="font-size:1.15rem">${GL} ${g}</span></div>
-      <div class="tabs"><button data-st="fx" class="${nameTab ? '' : 'on'}">🎆 Efek Jawaban</button><button data-st="nm" class="${nameTab ? 'on' : ''}">✒️ Gaya Nama</button></div>
-      <p class="muted shopnote">${nameTab ? 'Gaya nama mengubah tampilan namamu di leaderboard, profil, dan menu. ' : 'Gold bertambah bersama XP di tiap level. Pakai untuk efek yang muncul saat jawabanmu benar. '}${!st.admin && me.pays ? `Bonus harian rank ${RANKS[rkOf(totalXp())][1]}: +${me.pays[rkOf(totalXp())]} Gold. ` : ''}Membeli tidak mengurangi XP atau rank.${st.admin ? ' Admin: semua item terbuka.' : ''}</p>
-      <div class="shopg">${list.map(([k, nm_, ic, tr, ds]) => {
-        const free = k === 'confetti' || k === 'n_none', own = free || st.owned.includes(k), pr = st.prices[k] || 0;
-        const eq = nameTab ? (st.equippedName || 'n_none') === k : (st.equipped || 'confetti') === k;
-        const stage = nameTab ? `<div class="stage nm"><b class="${nc(k)}">${esc(me.username)}</b></div>` : `<div class="stage" id="sg-${k}"><span>${ic}</span></div>`;
-        return `<div class="si${eq ? ' eq' : ''}${tr === 'Legendaris' || tr === 'Mitos' ? ' hi' : ''}" style="--tc:${TIER[tr]}"><span class="tg">${tr}</span>${stage}<h3>${nm_}</h3><p>${ds}</p>
-          <div class="acts">${nameTab ? '' : `<button class="btn ghost" data-try="${k}">Coba</button>`}${own
-            ? `<button class="btn" data-eq="${k}"${eq ? ' disabled' : ''}>${eq ? '✓ Terpasang' : 'Pasang'}</button>`
-            : `<button class="btn" data-buy="${k}"${g < pr ? ' disabled' : ''}>${g < pr ? 'Kurang ' + (pr - g) + ' ' + GL : GL + ' ' + pr}</button>`}</div></div>`;
-      }).join('')}</div>`;
-    V.querySelectorAll('[data-st]').forEach(b => b.onclick = () => { shopTab = b.dataset.st; draw(); });
-    V.querySelectorAll('[data-try]').forEach(b => b.onclick = () => play(b.dataset.try));
-    V.querySelectorAll('[data-eq]').forEach(b => b.onclick = async () => {
-      try { st = await api('shop/equip', { item: b.dataset.eq }); draw(); renderChip(); toast(b.dataset.eq.startsWith('n_') ? 'Gaya nama terpasang' : 'Efek terpasang', '✨'); } catch (e) { toast(e.message, '⚠️'); }
-    });
+    me.spent = st.spent; me.bonus = st.bonus;
+    const g = st.gold;
+    V.innerHTML = `<div class="shopbar"><h1>Toko</h1><span class="gold" style="font-size:1.15rem">${GL} ${g}</span></div>
+      <p class="muted shopnote">Gold bertambah bersama XP di tiap level. Pakai untuk membeli kitab; setelah dibeli, tombol download terbuka. ${!st.admin && me.pays ? `Bonus harian rank ${RANKS[rkOf(totalXp())][1]}: +${me.pays[rkOf(totalXp())]} Gold. ` : ''}Membeli tidak mengurangi XP atau rank.${st.admin ? ' Admin: semua kitab terbuka.' : ''}</p>
+      ${st.items.length ? `<div class="shopg">${st.items.map(k => {
+        const pr = k.price;
+        return `<div class="si kt${k.owned ? ' eq' : ''}">${kcover(k)}<h3>${esc(k.title)}</h3>${k.desc ? `<p>${esc(k.desc)}</p>` : ''}
+          <div class="acts">${k.owned
+            ? `<a class="btn" href="${esc(k.url)}" target="_blank" rel="noopener noreferrer">⬇️ Download</a>`
+            : `<button class="btn" data-buy="${k.id}"${g < pr ? ' disabled' : ''}>${g < pr ? 'Kurang ' + (pr - g) + ' ' + GL : (pr ? GL + ' ' + pr : 'Gratis · Ambil')}</button>`}</div></div>`;
+      }).join('')}</div>` : '<div class="card"><p class="muted" style="margin:0">Belum ada kitab yang dijual. Nantikan ya!</p></div>'}`;
     V.querySelectorAll('[data-buy]').forEach(b => b.onclick = async () => {
-      const k = b.dataset.buy, it = SHOP.find(x => x[0] === k) || NSHOP.find(x => x[0] === k);
-      if (!confirm(`Beli ${k.startsWith('n_') ? 'gaya nama' : 'efek'} "${it[1]}" seharga ${st.prices[k]} Gold?`)) return;
-      try { st = await api('shop/buy', { item: k }); draw(); toast('Berhasil dibeli: ' + it[1], '🛍️'); noteAch(st.ach, true); if (!k.startsWith('n_')) play(k); } catch (e) { toast(e.message, '⚠️'); }
+      const k = st.items.find(x => x.id === +b.dataset.buy); if (!k) return;
+      if (!confirm(`Beli kitab "${k.title}" seharga ${k.price} Gold?`)) return;
+      b.disabled = true;
+      try { st = await api('shop/buy', { id: k.id }); draw(); toast('Berhasil dibeli: ' + k.title, '🛍️'); noteAch(st.ach, true); } catch (e) { toast(e.message, '⚠️'); b.disabled = false; }
     });
   };
   draw();
@@ -953,7 +928,7 @@ async function vDaily() {
     const rc = w.getBoundingClientRect();
     if (r.prize >= 1000) { FX.fireworks(rc); setTimeout(() => FX.galaxy(rc, w), 300); flash('rgba(245,197,24,.3)'); }
     else if (r.prize >= 500) FX.fireworks(rc); else if (r.prize >= d.rare) FX.stars(rc); else burst(...cen(rc), 18);
-    $('.spin .row').innerHTML = `<button class="btn ghost" id="shp">Ke Efek</button><button class="btn" id="spn">${sp.n > 1 || sp.more ? 'Lanjut' : 'Selesai'}</button>`;
+    $('.spin .row').innerHTML = `<button class="btn ghost" id="shp">Ke Toko</button><button class="btn" id="spn">${sp.n > 1 || sp.more ? 'Lanjut' : 'Selesai'}</button>`;
     $('#shp').onclick = () => go('shop'); $('#spn').onclick = () => vDaily();
   };
   $('#spin').onclick = async () => {
@@ -1513,7 +1488,7 @@ const fxGrid = (k, pk) => {
 const STG = [['Tathbiq 1', '#1A7A3C', '📘'], ['Tathbiq 2', '#1573C4', '📗'], ['Tathbiq 3', '#7B2FA0', '📙'], ['Tathbiq 4', '#D9730D', '📕'], ['Tathbiq 5', '#C0392B', '📒'], ['Tathbiq 6', '#B3245B', '📚'], ['Takhossus', '#F2B705', '👑']];
 const stg = n => STG[Math.min(Math.ceil(n / 10), 7) - 1];
 const stgStyle = n => `background:${stg(n)[1]};color:${Math.ceil(n / 10) > 6 ? '#1a1a1a' : '#fff'}`;
-const renderChip = () => { $('#who').innerHTML = av(myAv(), '', myFx()) + '<span>' + nm(me.username, me.fxn) + '</span>'; };
+const renderChip = () => { $('#who').innerHTML = av(myAv(), '', myFx()) + '<span>' + nm(me.username) + '</span>'; };
 function toast(msg, ico = '🔔') {
   const t = document.createElement('div'); t.className = 'toast'; t.innerHTML = `<span>${ico}</span><div>${msg}</div>`;
   $('#toasts').appendChild(t); setTimeout(() => t.remove(), 5200);
@@ -1534,10 +1509,10 @@ const GUIDE = {
     <li>Di <b>Profil</b> kamu bisa mengganti username, foto (emoji atau foto pribadi dari galeri yang otomatis dikompres), dan password (pilihan yang tersedia) serta melihat pencapaian. Lupa password? Minta admin mengatur ulang.</li>
     <li><b>Efek foto profil:</b> tiap pencapaian (khatam jilid dan tahap Tathbiq) menambah efek pada fotomu di sidebar, profil, dan leaderboard: dari cincin sederhana, cincin berputar bercahaya, titik cahaya mengorbit, sampai mahkota emas di tahap Takhossus. Di <b>Profil</b> kamu bebas memilih efek yang sudah terbuka (atau Otomatis, atau tanpa efek).</li>
     <li><b>Pencapaian rank:</b> Bronze, Silver, Gold, Platinum, Diamond, dan Legend diraih dari total XP. Tiga teratas di leaderboard mendapat bingkai khusus: api 🔥 (juara 1), petir ⚡ (juara 2), dan percikan aura ✨ (juara 3).</li>
-    <li><b>Gold dan Efek:</b> tiap rekor baru memberi Gold sebanyak XP-nya.@@GOLDINFO@@ Belanjakan di menu <b>Efek</b> untuk efek yang muncul saat jawabanmu benar, dari yang sederhana sampai petir dan galaksi. Efek bisa dicoba dulu, dan membeli tidak mengurangi XP atau rankmu.</li>
+    <li><b>Gold dan Toko:</b> tiap rekor baru memberi Gold sebanyak XP-nya.@@GOLDINFO@@ Belanjakan di menu <b>Toko</b> untuk membeli kitab. Setelah dibeli, link download kitabnya terbuka, dan membeli tidak mengurangi XP atau rankmu.</li>
     <li><b>Tantangan Harian:</b> ada empat event, masing-masing sekali sehari dan tidak bisa diulang: <b>Kuis Harian</b> (soal acak semua jilid), <b>Cepat Tepat</b> (tiap soal berbatas waktu), <b>Sorof Harian</b> (soal Sorof acak), dan <b>Lisan Harian</b> (beberapa lafadz acak). Nilai di atas batas lulus tiap event (diatur admin, awalnya 80) memberi satu kali spin hadiah Gold, sampai 1000! Jangan tutup halaman sebelum selesai, karena kesempatan hari itu langsung terpakai.</li>
     <li><b>Kuis Lisan:</b> latihan praktek lafadz. Kamu diberi satu lafadz Arab lalu menjawab pertanyaan berurutan (kalimat apa, tandanya, mu'rab atau mabni, i'rab, dan alasannya) dengan tulisanmu sendiri, boleh bahasa Indonesia atau Arab. Jawaban dinilai dari maksudnya, jadi tidak harus sama persis dengan kunci. XP dihitung seperti kuis tulis: 100/200/300 XP (Mudah/Sedang/Sulit) dikali persen langkah yang benar dalam satu sesi, dan hanya rekor terbaik tiap jilid dan level yang dihitung. Selesaikan sampai halaman hasil agar XP tercatat.</li>
-    <li><b>Pencapaian dan lencana:</b> menu <b>Pencapaian</b> berisi puluhan target, dari streak harian, nilai sempurna, jawaban beruntun, sampai koleksi Efek. Tiap pencapaian memberi Gold sekali, ada juga yang tersembunyi. Di <b>Profil</b> kamu bisa memasang sampai 3 lencana yang tampil di leaderboard dan profilmu. Hari Jumat tidak memutus streak.</li></ul>`,
+    <li><b>Pencapaian dan lencana:</b> menu <b>Pencapaian</b> berisi puluhan target, dari streak harian, nilai sempurna, jawaban beruntun, sampai hadiah spin. Tiap pencapaian memberi Gold sekali, ada juga yang tersembunyi. Di <b>Profil</b> kamu bisa memasang sampai 3 lencana yang tampil di leaderboard dan profilmu. Hari Jumat tidak memutus streak.</li></ul>`,
   tat: `<ul class="gl"><li><b>Syarat:</b> Mode Tathbiq terbuka setelah semua quest Jilid 1–4 selesai (minimal 60% benar di tiap level).</li>
     <li><b>Mode Tathbiq:</b> soal acak dari semua jilid, tanpa pengulangan, dengan <b>3 nyawa</b>. Salah 3 kali, permainan selesai.</li>
     <li>Tiap 10 soal naik tahap: Tathbiq 1 (soal 1–10), Tathbiq 2 (11–20), … Tathbiq 6 (51–60), lalu <b>Takhossus</b> (soal 61 dan seterusnya).</li>
@@ -1557,7 +1532,7 @@ function openGuide() {
 function openWelcome(thenGuide) {
   const m = document.createElement('div'); m.className = 'modal';
   m.innerHTML = `<div class="box"><h2>Selamat datang, ${esc(me.username)}! 🎉</h2><p class="muted">Akunmu sudah jadi. Ada beberapa hal penting yang perlu kamu ketahui:</p>
-    <ul class="gl">${me.starter ? `<li><b>Gold awal ${me.starter} ${GL}!</b> Murid baru mendapat Gold untuk dibelanjakan di menu <b>Efek</b>. Setiap hari kamu juga mendapat Gold bonus sesuai rank (${payText()}), otomatis saat kamu membuka aplikasi.</li>` : ''}<li><b>Akunmu tersimpan.</b> Setelah mendaftar, kamu bisa masuk lagi kapan saja dengan akun yang kamu daftarkan. Semua pencapaianmu (XP, rank, jilid yang selesai, dan efek foto) tersimpan di server, jadi tidak hilang walau kamu menutup halaman atau pindah perangkat.</li>
+    <ul class="gl">${me.starter ? `<li><b>Gold awal ${me.starter} ${GL}!</b> Murid baru mendapat Gold untuk dibelanjakan di menu <b>Toko</b>. Setiap hari kamu juga mendapat Gold bonus sesuai rank (${payText()}), otomatis saat kamu membuka aplikasi.</li>` : ''}<li><b>Akunmu tersimpan.</b> Setelah mendaftar, kamu bisa masuk lagi kapan saja dengan akun yang kamu daftarkan. Semua pencapaianmu (XP, rank, jilid yang selesai, dan efek foto) tersimpan di server, jadi tidak hilang walau kamu menutup halaman atau pindah perangkat.</li>
     <li><b>Jaga passwordmu.</b> Jangan beritahukan ke siapa pun, termasuk teman. Admin tidak bisa melihat passwordmu; kalau lupa, admin hanya bisa mengaturnya ulang.</li>
     <li><b>Password bisa diganti</b> kapan saja lewat menu <b>Profil</b>.</li>
     <li><b>Username bisa diubah nanti.</b> Buka menu <b>Profil</b>, lalu ubah username (3–20 karakter: huruf, angka, atau _). Username tampil di leaderboard, jadi pilih nama yang sopan.</li>
@@ -1616,7 +1591,7 @@ async function vProfile() {
   const xp = Object.values(me.best).reduce((a, b) => a + b, 0), ri = RANKS.reduce((a, r, n) => xp >= r[0] ? n : a, 0);
   let cur = me.avatar || 'a1', pk = me.fxp == null ? null : me.fxp, ph = me.photo || null, usePh = !!(ph && me.usePhoto);
   const dk = () => usePh && ph ? pkey(me.username, ph) : cur; // kunci avatar yang sedang dipilih (foto atau emoji)
-  V.innerHTML = `<div class="card prof"><div id="pav">${av(dk(), 'lg', fxOf(pk))}</div><div><h1>${nm(me.username, me.fxn)}</h1><div id="mybdg">${bdgChips(me.bd)}</div><span class="tag" style="background:${RANKS[ri][3]};color:${RANKS[ri][2]}">${RI(ri, 20)}${RANKS[ri][1]}</span>
+  V.innerHTML = `<div class="card prof"><div id="pav">${av(dk(), 'lg', fxOf(pk))}</div><div><h1>${nm(me.username)}</h1><div id="mybdg">${bdgChips(me.bd)}</div><span class="tag" style="background:${RANKS[ri][3]};color:${RANKS[ri][2]}">${RI(ri, 20)}${RANKS[ri][1]}</span>
     <p class="muted">${xp} XP · Rekor Tathbiq ${me.tathRaw || 0} XP</p></div></div>
     <div class="tabs ptabs" id="ptabs">${[['look', '🎨 Tampilan'], ['acc', '👤 Akun'], ['set', '⚙️ Setelan'], ['win', '🏅 Prestasi']].map(([k, t]) => `<button data-pt="${k}" class="${ptab === k ? 'on' : ''}">${t}</button>`).join('')}</div>
     <section class="pnl" data-p="look"${ptab === 'look' ? '' : ' hidden'}><div class="card"><h2>Foto pribadi</h2><div class="phrow"><div id="phprev"></div><div><p class="muted" id="phinfo" style="margin:0 0 10px"></p>
@@ -1629,7 +1604,7 @@ async function vProfile() {
     <div class="card"><h2>Efek foto profil</h2><p class="muted">Pilih efek bingkai yang ingin dipakai, lalu tekan Simpan. ${ADM() ? 'Sebagai admin, semua efek terbuka.' : 'Efek terbuka seiring pencapaianmu. Pilih Otomatis agar selalu memakai efek tertinggi.'}</p><div class="fxg" id="fxg">${fxGrid(dk(), pk)}</div><div class="row" style="margin-top:12px"><span></span><button class="btn" id="fxs">Simpan tampilan</button></div></div></section>
     <section class="pnl" data-p="acc"${ptab === 'acc' ? '' : ' hidden'}><div class="card"><h2>Nama pengguna</h2><input id="pu" maxlength="20" value="${esc(me.username)}" autocomplete="off">${ADM() ? `<label class="chk"><input type="checkbox" id="pbd"${me.board === false ? '' : ' checked'}> Tampilkan akunku di leaderboard</label>` : ''}<div class="err" id="err"></div><button class="btn" id="ps">Simpan</button></div>
     <div class="card"><h2>Ganti password</h2><input id="pwo" type="password" placeholder="Password lama" autocomplete="current-password"><input id="pwn" type="password" placeholder="Password baru (minimal 6 karakter)" autocomplete="new-password"><input id="pwn2" type="password" placeholder="Ulangi password baru" autocomplete="new-password"><div class="err" id="perr"></div><button class="btn" id="pws">Ganti password</button></div></section>
-    <section class="pnl" data-p="set"${ptab === 'set' ? '' : ' hidden'}><div class="card"><h2>Kualitas efek jawaban</h2><p class="muted">Kalau efek di menu Efek atau saat menjawab terasa patah-patah, pilih kualitas lebih rendah. Otomatis menyesuaikan sendiri dengan kemampuan perangkatmu.</p>
+    <section class="pnl" data-p="set"${ptab === 'set' ? '' : ' hidden'}><div class="card"><h2>Kualitas efek jawaban</h2><p class="muted">Kalau efek konfeti saat menjawab terasa patah-patah, pilih kualitas lebih rendah. Otomatis menyesuaikan sendiri dengan kemampuan perangkatmu.</p>
     <div class="tabs" id="fxq">${[['auto', 'Otomatis'], ['high', 'Tinggi'], ['mid', 'Sedang'], ['low', 'Rendah']].map(([k, t]) => `<button data-fq="${k}" class="${FXQ.mode === k ? 'on' : ''}">${t}</button>`).join('')}</div>
     <p class="muted" id="fxqn"></p><button class="btn ghost" id="fxt">Coba efek</button></div>
     <div class="card"><h2>Bantuan dan akun</h2><div class="slist"><button class="srow" id="pGuide"><span>📖</span><b>Panduan</b><small>Cara memakai Al-Miftah</small></button><button class="srow" id="pTheme"><span>🌓</span><b>Ganti tema</b><small>Terang atau gelap</small></button>${ADM() ? `<button class="srow adminlnk" data-v="admin"><span>🛠️</span><b>Panel Admin</b><small>${me.reports ? me.reports + ' laporan soal menunggu' : 'Kelola soal dan murid'}</small></button>` : ''}<a class="srow" href="/privasi.html" style="text-decoration:none;color:inherit"><span>🔒</span><b>Kebijakan privasi</b><small>Data apa yang kami simpan</small></a>${ADM() ? '' : `<button class="srow out" id="pDel"><span>🗑️</span><b>Hapus akun</b><small>Hapus akun dan semua datamu secara permanen</small></button>`}<button class="srow out" id="pOut"><span>🚪</span><b>Keluar</b><small>Akhiri sesi di perangkat ini</small></button></div></div></section>
@@ -1677,7 +1652,7 @@ async function vProfile() {
   };
   const qn = () => { $('#fxqn').textContent = 'Sekarang: ' + QN[FXQ.level] + (FXQ.mode === 'auto' ? ' (otomatis)' : ''); };
   V.querySelectorAll('[data-fq]').forEach(b => b.onclick = () => { FXQ.set(b.dataset.fq); V.querySelectorAll('[data-fq]').forEach(x => x.classList.toggle('on', x === b)); qn(); });
-  $('#fxt').onclick = e => { if (!RM) (FX[me.fxa] || FX.confetti)(e.currentTarget.getBoundingClientRect(), e.currentTarget); }; qn();
+  $('#fxt').onclick = e => { if (!RM) FX.confetti(e.currentTarget.getBoundingClientRect(), e.currentTarget); }; qn();
   $('#ps').onclick = save; $('#fxs').onclick = save;
   $('#pws').onclick = async () => {
     const o = $('#pwo').value, n = $('#pwn').value, err = $('#perr');
@@ -1810,7 +1785,7 @@ function openPlayerReport(un) {
 }
 async function openPlayer(un, rk) {
   let d; try { d = await api('player?u=' + encodeURIComponent(un)); } catch (e) { toast(e.message, '⚠️'); return; }
-  const ri = d.admin ? RANKS.length - 1 : rkOf(d.total), ts = d.tstage, done = d.ach, nj = done.filter(Boolean).length, own = new Set(d.owned);
+  const ri = d.admin ? RANKS.length - 1 : rkOf(d.total), ts = d.tstage, done = d.ach, nj = done.filter(Boolean).length;
   const m = document.createElement('div'); m.className = 'modal';
   m.innerHTML = `<div class="box pbox"><div class="pl"><div>${av(d.ph ? pkey(d.username, d.ph) : d.avatar, 'lg', d.fx)}</div><div><h2>${nm(d.username, d.nm)}</h2>
       <span class="tag" style="background:${RANKS[ri][3]};color:${RANKS[ri][2]}">${RI(ri, 20)}${RANKS[ri][1]}</span>${d.admin ? ' <span class="tag">🛡️ Admin</span>' : ''}${bdgChips(d.bd)}
@@ -1819,17 +1794,14 @@ async function openPlayer(un, rk) {
     <h3>Pencapaian jilid</h3><div class="ach">${[1, 2, 3, 4].map(j => `<div class="ac${done[j - 1] ? ' on' : ''}" style="--c:${JC[j][0]}"><span>${done[j - 1] ? '🏅' : '🔒'}</span><b>Jilid ${j}</b></div>`).join('')}</div>
     <h3>Tahap Tathbiq</h3><div class="ach">${STG.map((x, i) => `<div class="ac${i < ts ? ' on' : ''}" style="--c:${x[1]}"><span>${i < ts ? x[2] : '🔒'}</span><b>${x[0]}</b></div>`).join('')}</div>
     <h3>Rank liga</h3><div class="ach">${RANKS.map((r, n) => `<div class="ac${n <= ri ? ' on' : ''}" style="--c:${r[3]}"><span>${RI(n, 44)}</span><b>${r[1]}</b><small>${r[0]} XP</small></div>`).join('')}</div>
-    <h3>Koleksi item (${SHOP.filter(x => x[0] === 'confetti' || own.has(x[0])).length}/${SHOP.length})</h3><p class="muted" style="margin:0 0 8px;font-size:.85rem">Ketuk item yang dimiliki untuk melihat efeknya.</p>
-    <div class="itg">${SHOP.map(([k, nm, ic, tr]) => { const has = k === 'confetti' || own.has(k), eq = (d.equipped || 'confetti') === k; return `<button class="itm${has ? ' own' : ''}${has && eq ? ' eq' : ''}" style="--tc:${TIER[tr]}" data-k="${k}"${has ? '' : ' disabled'}><span>${has ? ic : '🔒'}</span><b>${nm}</b><small>${tr}</small></button>`; }).join('')}</div>
-    <h3>Gaya nama (${NSHOP.filter(x => x[0] !== 'n_none' && own.has(x[0])).length}/${NSHOP.length - 1})</h3>
-    <div class="itg">${NSHOP.filter(x => x[0] !== 'n_none').map(([k, nm_, , tr]) => { const has = own.has(k), eq = d.nm === k; return `<div class="itm${has ? ' own' : ''}${has && eq ? ' eq' : ''}" style="--tc:${TIER[tr]}"><span>${has ? `<b class="${nc(k)}" style="font-size:1.05rem">Aa</b>` : '🔒'}</span><b>${nm_}</b><small>${tr}</small></div>`; }).join('')}</div>
+    <h3>Koleksi kitab (${(d.kitab || []).length})</h3>
+    <div class="itg">${(d.kitab || []).length ? d.kitab.map(k => `<div class="itm own" style="--tc:var(--accent)">${k.v ? `<img class="kmini" src="/api/kitab-cover?id=${k.id}&v=${k.v}" alt="" loading="lazy">` : '<span>📖</span>'}<b>${esc(k.t)}</b></div>`).join('') : '<p class="muted" style="grid-column:1/-1;margin:0;font-size:.85rem">Belum memiliki kitab.</p>'}</div>
     <div class="row" style="margin-top:16px">${d.username.toLowerCase() === me.username.toLowerCase() ? '<span></span>' : '<button class="btn ghost" id="plr">🚩 Laporkan</button>'}<button class="btn" id="plx">Tutup</button></div></div>`;
   document.body.appendChild(m);
   const close = () => { m.remove(); removeEventListener('keydown', esc2); }, esc2 = e => { if (e.key === 'Escape') close(); };
   addEventListener('keydown', esc2);
   m.querySelector('#plx').onclick = close; m.onclick = e => { if (e.target === m) close(); };
   const plr = m.querySelector('#plr'); if (plr) plr.onclick = () => openPlayerReport(d.username);
-  m.querySelectorAll('.itm.own[data-k]').forEach(b => b.onclick = () => { if (!RM) (FX[b.dataset.k] || FX.confetti)(b.getBoundingClientRect(), b); });
 }
 
 /* ---------- Admin ---------- */
@@ -1848,6 +1820,7 @@ const ADM_G = () => [
   ['stat', '📊 Ringkasan', [['stat', '', adminStats]]],
   ['bank', '📚 Bank soal', [['soal', '📝 Tulis', adminSoal], ['oral', '🗣️ Lisan', adminOral], ['sorof', '🧩 Sorof', adminSorof]]],
   ['usr', '👥 Murid' + (me.reports ? ' 🚩' + me.reports : ''), [['user', '👥 Murid', adminUsers], ['lap', '🚩 Laporan' + (me.reports ? ' (' + me.reports + ')' : ''), adminReports]]],
+  ['shop', '🛍️ Toko', [['kitab', '', adminShop]]],
   ['sys', '⚙️ Sistem', [['ev', '📅 Event harian', adminEvents], ['groq', '🤖 Groq', adminGroq]]]
 ];
 function vAdmin() {
@@ -2260,6 +2233,75 @@ async function adminEvents(box) {
     try { await api('admin/events', { cfg }); toast('Pengaturan event harian disimpan', '✅'); adminEvents(box); }
     catch (x) { $('#eve').textContent = x.message; b.disabled = false; }
   };
+}
+
+/* ---------- Admin: toko kitab ---------- */
+async function compressCover(file) {
+  if (!/^image\//.test(file.type)) throw new Error('Pilih file gambar (JPG, PNG, atau WebP)');
+  if (file.size > 20 * 1048576) throw new Error('Gambar terlalu besar (maksimal 20 MB)');
+  let img; try { img = await loadImg(file); } catch (e) { throw new Error('Gambar tidak bisa dibaca. Coba format JPG, PNG, atau WebP.'); }
+  const W = img.naturalWidth || img.width, H = img.naturalHeight || img.height;
+  if (Math.min(W, H) < 64) throw new Error('Gambar terlalu kecil (minimal 64 px)');
+  const type = document.createElement('canvas').toDataURL('image/webp').startsWith('data:image/webp') ? 'image/webp' : 'image/jpeg', LIM = 55000;
+  const blobAt = (c, q) => new Promise(ok => c.toBlob(ok, type, q));
+  let best = null;
+  for (const mh of [480, 400, 320, 260, 200]) { // tinggi maksimal; proporsi asli dipertahankan
+    const sc = Math.min(1, mh / H, (mh * 0.8) / W), w = Math.max(1, Math.round(W * sc)), h = Math.max(1, Math.round(H * sc));
+    const c = document.createElement('canvas'); c.width = w; c.height = h;
+    const g = c.getContext('2d'); g.imageSmoothingEnabled = true; g.imageSmoothingQuality = 'high'; g.fillStyle = '#fff'; g.fillRect(0, 0, w, h); g.drawImage(img, 0, 0, w, h);
+    for (const q of [.85, .75, .65, .55, .45]) { const b = await blobAt(c, q); if (b && b.size <= LIM) { best = { b, w, h }; break; } }
+    if (best) break;
+  }
+  if (img.close) img.close();
+  if (!best) throw new Error('Gambar tidak bisa dikompres cukup kecil. Coba gambar lain.');
+  const b64 = await new Promise((ok, no) => { const r = new FileReader(); r.onload = () => ok(String(r.result).split(',')[1]); r.onerror = no; r.readAsDataURL(best.b); });
+  return { b64, bytes: best.b.size, url: URL.createObjectURL(best.b) };
+}
+async function adminShop(box) {
+  box.innerHTML = '<p class="muted">Memuat…</p>';
+  let d; try { d = await api('admin/kitab'); } catch (e) { box.textContent = e.message; return; }
+  if (!$('#ab')) return;
+  box.innerHTML = `<p class="muted">Atur kitab yang dijual di menu <b>Toko</b>: judul, foto sampul, harga (Gold), dan link download. Link hanya terlihat oleh murid yang sudah membeli. Kitab yang sudah dibeli tidak bisa dihapus, cukup dinonaktifkan; pembeli lama tetap bisa mengunduh.</p><div id="kn"></div><div id="kl"></div>`;
+  const editor = (k, isNew) => {
+    const c = document.createElement('div'); c.className = 'card';
+    let cover = null, rmCover = false; // cover: { b64, url } bila foto baru dipilih
+    c.innerHTML = `<div class="meta"><b>${isNew ? '➕ Tambah kitab baru' : esc(k.title)}</b>${isNew ? '' : `<span class="chip">${k.sold} terjual</span>`}</div>
+      <div class="kadm"><div><div class="kcpv"></div><input type="file" accept="image/*" class="kf" hidden><button type="button" class="btn ghost kpick" style="width:100%;margin-top:8px;padding:8px">🖼️ Pilih foto</button>${isNew ? '' : '<button type="button" class="btn ghost krm" style="width:100%;margin-top:6px;padding:8px">Hapus foto</button>'}</div>
+      <div><label class="f">Judul kitab</label><input data-f="title" maxlength="100" value="${esc(k.title)}">
+      <label class="f">Deskripsi (opsional)</label><textarea data-f="desc" maxlength="600">${esc(k.desc)}</textarea>
+      <label class="f">Harga (Gold, 0 = gratis)</label><input type="number" data-f="price" min="0" max="1000000" value="${k.price}">
+      <label class="f">Link download (https://…)</label><input type="url" data-f="url" maxlength="600" value="${esc(k.url)}" placeholder="https://drive.google.com/…">
+      <label class="f">Urutan tampil (angka kecil tampil lebih dulu)</label><input type="number" data-f="ord" value="${k.ord}">
+      <label class="chk"><input type="checkbox" data-f="active"${k.active ? ' checked' : ''}> Tampil di toko</label></div></div>
+      <div class="err ke"></div><div class="row"><span>${isNew ? '' : '<button class="btn ghost del kdel">Hapus kitab</button>'}</span><button class="btn ksave">${isNew ? 'Tambahkan' : 'Simpan'}</button></div>`;
+    const pv = c.querySelector('.kcpv'), err = c.querySelector('.ke'), f = n => c.querySelector(`[data-f=${n}]`);
+    const paint = () => { pv.innerHTML = cover ? `<img class="kcov" src="${cover.url}" alt="">` : (rmCover || !k.cv) ? '<div class="kcov none">📖</div>' : `<img class="kcov" src="/api/kitab-cover?id=${k.id}&v=${k.cv}" alt="">`; };
+    paint();
+    const fi = c.querySelector('.kf');
+    c.querySelector('.kpick').onclick = () => fi.click();
+    fi.onchange = async () => {
+      const file = fi.files[0]; fi.value = ''; if (!file) return; err.textContent = '';
+      try { if (cover) URL.revokeObjectURL(cover.url); cover = await compressCover(file); rmCover = false; paint(); } catch (x) { err.textContent = x.message; }
+    };
+    const rm = c.querySelector('.krm'); if (rm) rm.onclick = () => { if (cover) URL.revokeObjectURL(cover.url); cover = null; rmCover = true; paint(); };
+    c.querySelector('.ksave').onclick = async e => {
+      const b = e.currentTarget; b.disabled = true; err.textContent = '';
+      try {
+        const r = await api('admin/kitab-save', { id: isNew ? null : k.id, title: f('title').value, desc: f('desc').value, price: f('price').value, url: f('url').value, ord: f('ord').value, active: f('active').checked, cover: cover ? cover.b64 : undefined, removeCover: rmCover && !cover });
+        toast(isNew ? 'Kitab ditambahkan' : 'Kitab disimpan', '✅'); adminShop(box); return r;
+      } catch (x) { err.textContent = x.message; b.disabled = false; }
+    };
+    const del = c.querySelector('.kdel');
+    if (del) del.onclick = async () => {
+      if (!confirm(`Hapus kitab "${k.title}"?`)) return;
+      try { await api('admin/kitab-delete', { id: k.id }); toast('Kitab dihapus', '🗑️'); adminShop(box); } catch (x) { err.textContent = x.message; }
+    };
+    return c;
+  };
+  $('#kn').appendChild(editor({ title: '', desc: '', price: 100, url: '', ord: 0, active: true, cv: 0, sold: 0 }, true));
+  const kl = $('#kl');
+  if (!d.list.length) kl.innerHTML = '<p class="muted">Belum ada kitab. Tambahkan yang pertama di atas.</p>';
+  d.list.forEach(k => kl.appendChild(editor(k, false)));
 }
 
 /* ---------- Admin: detail statistik satu murid ---------- */
