@@ -18,7 +18,8 @@ const SHOP = { stars: 100, bubbles: 200, petals: 300, coins: 450, fireworks: 600
 // Efek (toko): gaya nama di leaderboard (kunci diawali n_). Disimpan di purchases seperti efek jawaban; yang terpasang ada di users.fxn.
 const NSHOP = { n_mint: 100, n_ocean: 150, n_grape: 300, n_sunset: 400, n_shimmer: 600, n_neon: 800, n_blaze: 1100, n_frost: 1300, n_glitch: 2000, n_rainbow: 2500 };
 // Hewan pendamping (toko): kunci diawali p_. 'p_kucing' gratis untuk semua murid (tidak ada di PRICES); yang terpasang ada di users.pet (null = p_kucing).
-const PSHOP = { p_semut: 150, p_lebah: 400, p_hudhud: 700, p_unta: 1200, p_gajah: 1800, p_paus: 3000 }, PET0 = 'p_kucing';
+const PET_PRICE = 1500, PET0 = 'p_kucing';
+const PSHOP = Object.fromEntries(['p_semut', 'p_lebah', 'p_hudhud', 'p_unta', 'p_gajah', 'p_paus'].map(k => [k, PET_PRICE]));
 const PRICES = { ...SHOP, ...NSHOP, ...PSHOP };
 // Kuis harian: 10 soal acak semua jilid; nilai >= DAILY_PASS memberi 1 spin. Hadiah = [gold, bobot]. Spin ke-PITY sejak hadiah >= RARE terakhir dijamin langka.
 const DAILY_N = 10, DAILY_PASS = 80, RARE = 500, PITY = 10;
