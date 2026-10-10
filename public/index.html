@@ -409,22 +409,22 @@ select,textarea{font:inherit;color:var(--ink);background:var(--surface);border:1
 @media(max-width:480px){.htabs button{padding:10px 6px;font-size:.84rem}}
 
 /* ===== Hewan pendamping ===== */
-.ar{font-weight:600;color:var(--muted);font-size:.9em;margin-inline-start:6px;unicode-bidi:isolate}
+.parab{font-weight:600;color:var(--muted);font-size:.9em;margin-inline-start:6px;unicode-bidi:isolate}
 .petrow{display:flex;align-items:center;gap:12px;margin:0 0 18px}
 .petbtn{flex:none;width:76px;height:76px;padding:0;border-radius:50%;display:grid;place-items:center;cursor:pointer;border:1px solid var(--line);background:radial-gradient(circle at 50% 60%,color-mix(in srgb,var(--accent) 22%,transparent),transparent 70%),var(--surface)}
 .petbtn svg{width:64px;height:64px;display:block}
 .pbub{min-width:0;padding:10px 14px;line-height:1.4;background:var(--surface);border:1px solid var(--line);border-radius:16px 16px 16px 4px}
 .pbub b{display:block;font-size:.95rem}.pbub #petln{display:block;color:var(--muted);font-size:.9rem}
-.petbtn.hop svg,.si .stage.pt.hop svg{animation:phop .6s}
-.si .stage.pt svg{width:84px;height:84px;display:block;filter:drop-shadow(0 6px 8px rgba(0,0,0,.18))}
+.petbtn.hop svg,.si .stage.pimg.hop svg{animation:phop .6s}
+.si .stage.pimg svg{width:84px;height:84px;display:block;filter:drop-shadow(0 6px 8px rgba(0,0,0,.18))}
 @keyframes phop{0%{transform:translateY(0)}30%{transform:translateY(-14px) rotate(-6deg)}60%{transform:translateY(0)}80%{transform:translateY(-4px)}100%{transform:none}}
 @keyframes pshk{0%,100%{transform:rotate(0)}25%{transform:rotate(-12deg)}75%{transform:rotate(12deg)}}
 /* wajah hewan di setiap balasan jawaban (.fb) */
 .fb::before{content:'';float:left;width:40px;height:40px;margin:-6px 12px -6px -6px;background:var(--pet-idle) center/contain no-repeat}
 .fb.ok::before{background-image:var(--pet-ok);animation:phop .6s}.fb.no::before{background-image:var(--pet-no);animation:pshk .5s}
 .fb::after{content:'';display:block;clear:both}
-@media(max-width:560px){.si .stage.pt svg{width:62px;height:62px}.petbtn{width:64px;height:64px}.petbtn svg{width:54px;height:54px}}
-@media(prefers-reduced-motion:reduce){.fb::before,.petbtn.hop svg,.si .stage.pt.hop svg{animation:none!important}}
+@media(max-width:560px){.si .stage.pimg svg{width:62px;height:62px}.petbtn{width:64px;height:64px}.petbtn svg{width:54px;height:54px}}
+@media(prefers-reduced-motion:reduce){.fb::before,.petbtn.hop svg,.si .stage.pimg.hop svg{animation:none!important}}
 </style>
 </head>
 <body>
@@ -574,6 +574,21 @@ const QT = {
 const QN = { high: 'Tinggi', mid: 'Sedang', low: 'Rendah' };
 const qGet = k => { try { return localStorage.getItem(k); } catch (e) { return null; } };
 const qSet = (k, v) => { try { localStorage.setItem(k, v); } catch (e) {} };
+
+// Waktu relatif untuk data dari server: "5 menit lalu", "kemarin", dan seterusnya
+function ago(t) {
+  const ms = t ? Date.now() - new Date(t).getTime() : NaN;
+  if (isNaN(ms)) return 'belum pernah';
+  const m = Math.floor(ms / 60000);
+  if (m < 1) return 'baru saja';
+  if (m < 60) return m + ' menit lalu';
+  const h = Math.floor(m / 60);
+  if (h < 24) return h + ' jam lalu';
+  const d = Math.floor(h / 24);
+  if (d === 1) return 'kemarin';
+  if (d < 30) return d + ' hari lalu';
+  return new Date(t).toLocaleDateString('id-ID', { day: 'numeric', month: 'short', year: 'numeric' });
+}
 
 /* ---------- Suara dan getaran: dibuat dengan Web Audio (tanpa file audio). Bisa dimatikan di Profil > Pengaturan. ---------- */
 const SFX = (() => {
@@ -1052,8 +1067,8 @@ async function vShop() {
       <div class="shopg">${list.map(([k, nm_, ic, tr, ds]) => {
         const free = k === 'confetti' || k === 'n_none' || k === PET0, own = free || st.owned.includes(k), pr = st.prices[k] || 0;
         const eq = petTab ? myPetOf(st.equippedPet) === k : nameTab ? (st.equippedName || 'n_none') === k : (st.equipped || 'confetti') === k;
-        const stage = petTab ? `<div class="stage pt" id="sg-${k}">${petSvg(k, 'idle')}</div>` : nameTab ? `<div class="stage nm"><b class="${nc(k)}">${esc(me.username)}</b></div>` : `<div class="stage" id="sg-${k}"><span>${ic}</span></div>`;
-        return `<div class="si${eq ? ' eq' : ''}${tr === 'Legendaris' || tr === 'Mitos' ? ' hi' : ''}" style="--tc:${TIER[tr]}"><span class="tg">${tr}</span>${stage}<h3>${nm_}${petTab ? ` <span class="ar" dir="rtl">${ic}</span>` : ''}</h3><p>${ds}</p>
+        const stage = petTab ? `<div class="stage pimg" id="sg-${k}">${petSvg(k, 'idle')}</div>` : nameTab ? `<div class="stage nm"><b class="${nc(k)}">${esc(me.username)}</b></div>` : `<div class="stage" id="sg-${k}"><span>${ic}</span></div>`;
+        return `<div class="si${eq ? ' eq' : ''}${tr === 'Legendaris' || tr === 'Mitos' ? ' hi' : ''}" style="--tc:${TIER[tr]}"><span class="tg">${tr}</span>${stage}<h3>${nm_}${petTab ? ` <span class="parab" dir="rtl">${ic}</span>` : ''}</h3><p>${ds}</p>
           <div class="acts">${nameTab ? '' : `<button class="btn ghost" data-try="${k}">Coba</button>`}${own
             ? `<button class="btn" data-eq="${k}"${eq ? ' disabled' : ''}>${eq ? '✓ Terpasang' : 'Pasang'}</button>`
             : `<button class="btn" data-buy="${k}"${g < pr ? ' disabled' : ''}>${g < pr ? 'Kurang ' + (pr - g) + ' ' + GL : GL + ' ' + pr}</button>`}</div></div>`;
@@ -1350,7 +1365,7 @@ function vHome() {
   const frac = nx ? (tot - rk[0]) / (nx[0] - rk[0]) : 1, p = Math.min(1, (ri + frac) / (RANKS.length - 1));
   const pid = myPet(), PP = PETS.find(x => x[0] === pid); let pli = Math.floor(Math.random() * PP[5].length);
   V.innerHTML = `<h1 class="hello">Assalamu'alaikum, ${esc(me.username)}</h1>
-    <div class="petrow"><button class="petbtn" id="pethome" aria-label="Sentuh hewan pendampingmu">${petSvg(pid, 'idle')}</button><div class="pbub"><b>${PP[1]} <span class="ar" dir="rtl">${PP[2]}</span></b><span id="petln">${PP[5][pli]}</span></div></div>
+    <div class="petrow"><button class="petbtn" id="pethome" aria-label="Sentuh hewan pendampingmu">${petSvg(pid, 'idle')}</button><div class="pbub"><b>${PP[1]} <span class="parab" dir="rtl">${PP[2]}</span></b><span id="petln">${PP[5][pli]}</span></div></div>
     <div class="card hero" style="--rc:${rk[3]}">
       <div class="top2"><div class="who"><span class="medal">${RI(ri, 72)}</span><div><small>Tingkat saat ini</small><b>${rk[1]}</b></div></div>
         <div class="xpb"><h1><span id="tx">0</span> <small>XP</small></h1><span class="gold">${GL} ${gold()}</span></div></div>
@@ -2609,7 +2624,7 @@ function adminUsers() {
     try {
       const d = await api('admin/users?q=' + encodeURIComponent($('#uq').value.trim()));
       if (my !== seq || !$('#ul')) return;
-      $('#ul').innerHTML = (d.users.length ? d.users.map(x => `<div class="urow"><div><b>${esc(x.username)}</b>${x.role === 'admin' ? ' <span class="chip">admin</span>' : ''}<div class="muted" style="margin:0;font-size:.85rem">${x.xp} XP · ${x.attempts} percobaan · aktif ${ago(x.last)}</div></div><div style="display:flex;gap:8px;flex-wrap:wrap"><button class="btn ghost" style="padding:8px 16px" data-d="${x.id}">Detail</button>${x.role === 'admin' ? '' : `<button class="btn ghost" style="padding:8px 16px" data-rp="${x.id}" data-n="${esc(x.username)}">Reset password</button><button class="btn ghost del" data-id="${x.id}" data-n="${esc(x.username)}">Hapus</button>`}</div></div>`).join('') : 'Tidak ada murid ditemukan.') +
+      $('#ul').innerHTML = (d.users.length ? d.users.map(x => `<div class="urow"><div><b>${esc(x.username)}</b>${x.role === 'admin' ? ' <span class="chip">admin</span>' : ''}<div class="muted" style="margin:0;font-size:.85rem">${x.xp} XP · ${x.attempts} percobaan · ${x.last ? 'aktif ' + ago(x.last) : 'belum pernah main'}</div></div><div style="display:flex;gap:8px;flex-wrap:wrap"><button class="btn ghost" style="padding:8px 16px" data-d="${x.id}">Detail</button>${x.role === 'admin' ? '' : `<button class="btn ghost" style="padding:8px 16px" data-rp="${x.id}" data-n="${esc(x.username)}">Reset password</button><button class="btn ghost del" data-id="${x.id}" data-n="${esc(x.username)}">Hapus</button>`}</div></div>`).join('') : 'Tidak ada murid ditemukan.') +
         (d.total > d.users.length ? `<p class="muted">Menampilkan ${d.users.length} dari ${d.total}. Gunakan pencarian.</p>` : '');
       $('#ul').querySelectorAll('[data-d]').forEach(b => b.onclick = () => userDetail(+b.dataset.d));
       $('#ul').querySelectorAll('[data-rp]').forEach(b => b.onclick = async () => {
