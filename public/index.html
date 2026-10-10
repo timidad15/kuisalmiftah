@@ -407,6 +407,24 @@ select,textarea{font:inherit;color:var(--ink);background:var(--surface);border:1
 .htabs{max-width:560px}.sorof .lvls{grid-template-columns:repeat(3,1fr)}
 @media(max-width:560px){.sorof .lvls{grid-template-columns:repeat(2,1fr)}}
 @media(max-width:480px){.htabs button{padding:10px 6px;font-size:.84rem}}
+
+/* ===== Hewan pendamping ===== */
+.ar{font-weight:600;color:var(--muted);font-size:.9em;margin-inline-start:6px;unicode-bidi:isolate}
+.petrow{display:flex;align-items:center;gap:12px;margin:0 0 18px}
+.petbtn{flex:none;width:76px;height:76px;padding:0;border-radius:50%;display:grid;place-items:center;cursor:pointer;border:1px solid var(--line);background:radial-gradient(circle at 50% 60%,color-mix(in srgb,var(--accent) 22%,transparent),transparent 70%),var(--surface)}
+.petbtn svg{width:64px;height:64px;display:block}
+.pbub{min-width:0;padding:10px 14px;line-height:1.4;background:var(--surface);border:1px solid var(--line);border-radius:16px 16px 16px 4px}
+.pbub b{display:block;font-size:.95rem}.pbub #petln{display:block;color:var(--muted);font-size:.9rem}
+.petbtn.hop svg,.si .stage.pt.hop svg{animation:phop .6s}
+.si .stage.pt svg{width:84px;height:84px;display:block;filter:drop-shadow(0 6px 8px rgba(0,0,0,.18))}
+@keyframes phop{0%{transform:translateY(0)}30%{transform:translateY(-14px) rotate(-6deg)}60%{transform:translateY(0)}80%{transform:translateY(-4px)}100%{transform:none}}
+@keyframes pshk{0%,100%{transform:rotate(0)}25%{transform:rotate(-12deg)}75%{transform:rotate(12deg)}}
+/* wajah hewan di setiap balasan jawaban (.fb) */
+.fb::before{content:'';float:left;width:40px;height:40px;margin:-6px 12px -6px -6px;background:var(--pet-idle) center/contain no-repeat}
+.fb.ok::before{background-image:var(--pet-ok);animation:phop .6s}.fb.no::before{background-image:var(--pet-no);animation:pshk .5s}
+.fb::after{content:'';display:block;clear:both}
+@media(max-width:560px){.si .stage.pt svg{width:62px;height:62px}.petbtn{width:64px;height:64px}.petbtn svg{width:54px;height:54px}}
+@media(prefers-reduced-motion:reduce){.fb::before,.petbtn.hop svg,.si .stage.pt.hop svg{animation:none!important}}
 </style>
 </head>
 <body>
@@ -571,9 +589,15 @@ const SFX = (() => {
     g.gain.setValueAtTime(0.0001, t); g.gain.exponentialRampToValueAtTime(v, t + 0.015); g.gain.exponentialRampToValueAtTime(0.0001, t + d);
     o.connect(g); g.connect(c.destination); o.start(t); o.stop(t + d + 0.03);
   };
+  const sw = (c, f0, f1, t0, d, type = 'sine', v = 0.16) => { // nada yang meluncur dari f0 ke f1
+    const o = c.createOscillator(), g = c.createGain(), t = c.currentTime + t0;
+    o.type = type; o.frequency.setValueAtTime(f0, t); o.frequency.exponentialRampToValueAtTime(f1, t + d);
+    g.gain.setValueAtTime(0.0001, t); g.gain.exponentialRampToValueAtTime(v, t + 0.02); g.gain.exponentialRampToValueAtTime(0.0001, t + d);
+    o.connect(g); g.connect(c.destination); o.start(t); o.stop(t + d + 0.03);
+  };
   const vib = pat => { if (st.hap && navigator.vibrate) { try { navigator.vibrate(pat); } catch (e) {} } };
   return {
-    st,
+    st, petId: null,
     set(k, v) { st[k] = !!v; qSet(k, v ? '1' : '0'); },
     ok() { // jawaban benar: dua nada naik; makin tinggi nadanya tiap benar beruntun (reset bila salah atau jeda > 20 detik)
       const now = Date.now(); run = now - last > 20000 ? 1 : run + 1; last = now;
@@ -591,6 +615,19 @@ const SFX = (() => {
       vib([20, 40, 20, 40, 90]);
       const c = ctx(); if (!c) return;
       [523.25, 659.25, 783.99, 1046.5].forEach((f, i) => tone(c, f, i * 0.09, i === 3 ? 0.55 : 0.18, 'sine', 0.15));
+      setTimeout(() => SFX.pet(), 600); // hewan pendamping ikut bersuara
+    },
+    pet(id) { // suara khas tiap hewan: disentuh di Beranda, dicoba di toko, dan setelah hasil bagus
+      const c = ctx(); if (!c) return;
+      switch (id || st.petId) {
+        case 'p_semut': [0, 0.07, 0.14].forEach((t, i) => tone(c, i === 1 ? 2400 : 1800, t, 0.05, 'sine', 0.09)); break;
+        case 'p_lebah': sw(c, 190, 235, 0, 0.25, 'sawtooth', 0.06); sw(c, 235, 180, 0.25, 0.25, 'sawtooth', 0.06); break;
+        case 'p_hudhud': [0, 0.2, 0.4].forEach(t => tone(c, 420, t, 0.15, 'sine', 0.2)); break;
+        case 'p_unta': sw(c, 150, 90, 0, 0.55, 'triangle', 0.22); break;
+        case 'p_gajah': sw(c, 280, 520, 0, 0.25, 'sawtooth', 0.07); sw(c, 520, 380, 0.25, 0.35, 'sawtooth', 0.07); break;
+        case 'p_paus': sw(c, 180, 420, 0, 0.5, 'sine', 0.22); sw(c, 420, 230, 0.5, 0.6, 'sine', 0.22); break;
+        default: sw(c, 600, 950, 0, 0.14, 'triangle', 0.18); sw(c, 950, 520, 0.14, 0.3, 'triangle', 0.18); // kucing
+      }
     },
   };
 })();
@@ -912,22 +949,111 @@ const NSTYLE = new Set(NSHOP.map(x => x[0]).filter(k => k !== 'n_none'));
 const nc = k => NSTYLE.has(k) ? 'nfx ' + k : ''; // kelas CSS gaya nama (kosong bila tidak valid)
 const nm = (name, k) => { const c = nc(k); return c ? `<span class="${c}">${esc(name)}</span>` : esc(name); };
 const TIER = { Umum: '#8A97A6', Langka: '#2BA3E6', Epik: '#A94BC0', Legendaris: '#E8960F', Mitos: '#EF3E7B' };
+/* ---------- Hewan pendamping ---------- */
+const PET0 = 'p_kucing'; // gratis untuk semua murid; yang lain dibeli di toko (harga ada di server)
+// [kunci, nama, nama Arab, tingkat, kisah, [tiga sapaan di Beranda]]
+const PETS = [
+  ['p_kucing', 'Kucing', 'قطة', 'Umum', 'Dalam hadis, kucing termasuk hewan yang biasa berkeliling di sekitar kita, sehingga tidak najis.',
+    ['Meong! Ayo belajar sebentar, aku temani.', 'Kucing dalam bahasa Arab: قطة (qitthah).', 'Satu soal lagi? Aku siap menemanimu.']],
+  ['p_semut', 'Semut', 'نملة', 'Umum', 'Nabi Sulaiman mendengar seekor semut menyeru kaumnya masuk ke sarang (QS An-Naml: 18).',
+    ['Tik tik! Pelan-pelan tapi rajin, seperti semut.', 'Semut dalam bahasa Arab: نملة (namlah). Ada surah An-Naml.', 'Kecil tidak masalah, yang penting terus melangkah.']],
+  ['p_lebah', 'Lebah', 'نحلة', 'Langka', 'Allah mengilhamkan kepada lebah untuk membuat sarang (QS An-Nahl: 68).',
+    ['Bzzz! Madu ilmu dikumpulkan sedikit demi sedikit.', 'Lebah dalam bahasa Arab: نحلة (nahlah). Ada surah An-Nahl.', 'Ayo kumpulkan XP hari ini!']],
+  ['p_hudhud', 'Hud-hud', 'هدهد', 'Langka', 'Hud-hud membawa kabar negeri Saba kepada Nabi Sulaiman (QS An-Naml: 20-22).',
+    ['Hu-hu-hu! Aku bawa kabar baik: waktunya belajar.', 'Burung ini dalam bahasa Arab: هدهد (hudhud).', 'Aku pernah membawa kabar penting kepada Nabi Sulaiman.']],
+  ['p_unta', 'Unta', 'ناقة', 'Epik', 'Unta betina mukjizat Nabi Shalih (QS Al-A\'raf: 73).',
+    ['Perjalanan jauh dimulai dari satu langkah. Ayo belajar.', 'Unta betina: ناقة (naqah), unta jantan: جمل (jamal).', 'Sabar dan tekun, seperti unta di padang pasir.']],
+  ['p_gajah', 'Gajah', 'فيل', 'Epik', 'Tahun Gajah: pasukan bergajah Abrahah yang gagal menyerang Ka\'bah (QS Al-Fil).',
+    ['Pelan tapi pasti. Aku tak pernah lupa pelajaran!', 'Gajah dalam bahasa Arab: فيل (fil). Ada surah Al-Fil.', 'Ayo, kita selesaikan tantangan hari ini.']],
+  ['p_paus', 'Paus', 'حوت', 'Mitos', 'Nabi Yunus ditelan ikan besar, lalu berdoa dan diselamatkan (QS Ash-Shaffat: 139-148).',
+    ['Wuush! Ayo menyelam ke dalam pelajaran hari ini.', 'Ikan besar dalam bahasa Arab: حوت (hut). Nabi Yunus pernah berada di perutnya.', 'Sabar dan berdoa, seperti Nabi Yunus.']],
+];
+const PK = '#2b2b2b';
+// Wajah bersama: m = 'idle' | 'ok' | 'no'. my = jarak mulut dari mata, mo = gambar mulut atau tidak.
+const pFace = (m, x, y, g = 9, s = 1, my = 6, mo = true) => {
+  const eye = cx => m === 'ok'
+    ? `<path d="M${cx - 3.6 * s} ${y + s}q${3.6 * s} ${-5 * s} ${7.2 * s} 0" fill="none" stroke="${PK}" stroke-width="${2.2 * s}" stroke-linecap="round"/>`
+    : `<circle cx="${cx}" cy="${y}" r="${3.3 * s}" fill="${PK}"/><circle cx="${cx + 1.1 * s}" cy="${y - 1.2 * s}" r="${1.1 * s}" fill="#fff"/>`;
+  const mp = m === 'ok' ? `M${x - 4.5 * s} ${y + my * s}q${4.5 * s} ${5.5 * s} ${9 * s} 0`
+    : m === 'no' ? `M${x - 3.5 * s} ${y + (my + 4) * s}q${3.5 * s} ${-4.5 * s} ${7 * s} 0`
+    : `M${x - 3 * s} ${y + (my + 1) * s}q${3 * s} ${3 * s} ${6 * s} 0`;
+  const sad = m === 'no'
+    ? `<path d="M${x - g - 4 * s} ${y - 3 * s}l${7 * s} ${-2 * s}M${x + g + 4 * s} ${y - 3 * s}l${-7 * s} ${-2 * s}" stroke="${PK}" stroke-width="${1.6 * s}" stroke-linecap="round" fill="none"/><path d="M${x + g + 3 * s} ${y + 4 * s}q${2 * s} ${3 * s} 0 ${5 * s}q${-2 * s} ${-2 * s} 0 ${-5 * s}z" fill="#7CC4F5"/>`
+    : '';
+  const ch = m === 'no' ? '' : `<circle cx="${x - g - 5 * s}" cy="${y + 5 * s}" r="${3 * s}" fill="#FF8FA3" opacity=".5"/><circle cx="${x + g + 5 * s}" cy="${y + 5 * s}" r="${3 * s}" fill="#FF8FA3" opacity=".5"/>`;
+  return ch + eye(x - g) + eye(x + g) + (mo ? `<path d="${mp}" fill="none" stroke="${PK}" stroke-width="${2 * s}" stroke-linecap="round"/>` : '') + sad;
+};
+
+const PET_ART = {
+  p_kucing: m => `<path d="M72 90c16 0 20-16 12-28" fill="none" stroke="#E0832A" stroke-width="7" stroke-linecap="round"/>
+    <ellipse cx="50" cy="86" rx="26" ry="15" fill="#F4A340"/><ellipse cx="38" cy="95" rx="8" ry="5" fill="#FFF1DC"/><ellipse cx="62" cy="95" rx="8" ry="5" fill="#FFF1DC"/>
+    <path d="M22 44L20 12L47 27z" fill="#F4A340"/><path d="M78 44L80 12L53 27z" fill="#F4A340"/><path d="M26 36L25 20L40 29z" fill="#FFC1A0"/><path d="M74 36L75 20L60 29z" fill="#FFC1A0"/>
+    <ellipse cx="50" cy="52" rx="30" ry="27" fill="#F4A340"/><path d="M50 26v9M40 28l2 8M60 28l-2 8" stroke="#E0832A" stroke-width="3" stroke-linecap="round" fill="none"/>
+    <ellipse cx="50" cy="62" rx="13" ry="9" fill="#FFF1DC"/><path d="M46.5 55h7l-3.5 4z" fill="#E8668A"/>
+    <path d="M19 56h13M20 64l12-3M81 56H68M80 64l-12-3" stroke="#7a5230" stroke-width="1.3" stroke-linecap="round" fill="none"/>${pFace(m, 50, 46, 12, 1, 9)}`,
+
+  p_semut: m => `<path d="M40 24q-8-14-17-12M60 24q8-14 17-12" fill="none" stroke="#7A2E1F" stroke-width="3" stroke-linecap="round"/><circle cx="23" cy="12" r="3.2" fill="#7A2E1F"/><circle cx="77" cy="12" r="3.2" fill="#7A2E1F"/>
+    <path d="M40 68l-17 4M40 72l-16 12M60 68l17 4M60 72l16 12M44 78l-8 14M56 78l8 14" stroke="#7A2E1F" stroke-width="3" stroke-linecap="round" fill="none"/>
+    <ellipse cx="50" cy="87" rx="15" ry="11" fill="#B5472F"/><circle cx="50" cy="68" r="12" fill="#C9553A"/><circle cx="50" cy="40" r="25" fill="#D9694D"/>
+    <ellipse cx="42" cy="28" rx="7" ry="4" fill="#fff" opacity=".25" transform="rotate(-25 42 28)"/>${pFace(m, 50, 40, 10, 1.1, 8)}`,
+
+  p_lebah: m => `<ellipse cx="30" cy="34" rx="13" ry="20" transform="rotate(-28 30 34)" fill="#D6ECFF" stroke="#9CC9EE" stroke-width="2"/><ellipse cx="70" cy="34" rx="13" ry="20" transform="rotate(28 70 34)" fill="#D6ECFF" stroke="#9CC9EE" stroke-width="2"/>
+    <path d="M42 32q-3-12-10-15M58 32q3-12 10-15" fill="none" stroke="${PK}" stroke-width="2.6" stroke-linecap="round"/><circle cx="32" cy="17" r="3" fill="${PK}"/><circle cx="68" cy="17" r="3" fill="${PK}"/>
+    <clipPath id="cpb"><ellipse cx="50" cy="60" rx="31" ry="27"/></clipPath><ellipse cx="50" cy="60" rx="31" ry="27" fill="#FFC93C"/>
+    <g clip-path="url(#cpb)"><rect x="0" y="71" width="100" height="6" fill="#3a2a1a"/><rect x="0" y="81" width="100" height="6" fill="#3a2a1a"/></g>
+    <ellipse cx="38" cy="45" rx="8" ry="4" fill="#fff" opacity=".35" transform="rotate(-20 38 45)"/>${pFace(m, 50, 56, 11, 1.1, 7)}`,
+
+  p_hudhud: m => `<g>${[-50, -25, 0, 25, 50].map(a => `<ellipse cx="46" cy="12" rx="4.6" ry="11" fill="#E3A06B" transform="rotate(${a} 46 38)"/><ellipse cx="46" cy="5.5" rx="4.2" ry="4.2" fill="${PK}" transform="rotate(${a} 46 38)"/>`).join('')}</g>
+    <ellipse cx="50" cy="80" rx="30" ry="18" fill="#E3A06B"/>
+    <clipPath id="cph"><ellipse cx="66" cy="80" rx="17" ry="14" transform="rotate(-15 66 80)"/></clipPath><ellipse cx="66" cy="80" rx="17" ry="14" transform="rotate(-15 66 80)" fill="${PK}"/>
+    <g clip-path="url(#cph)"><rect x="40" y="73" width="50" height="4" fill="#fff"/><rect x="40" y="81" width="50" height="4" fill="#fff"/><rect x="40" y="89" width="50" height="4" fill="#fff"/></g>
+    <circle cx="46" cy="50" r="23" fill="#E3A06B"/><path d="M66 52q20 2 30 16q-20-5-30-8z" fill="#3b2a22"/>${pFace(m, 44, 48, 9, 1, 7)}`,
+
+  p_unta: m => `<path d="M38 74v20M47 74v20M72 74v20M81 74v20" stroke="#C48A3F" stroke-width="8" stroke-linecap="round" fill="none"/>
+    <path d="M88 62q6 6 3 16" stroke="#C48A3F" stroke-width="4" stroke-linecap="round" fill="none"/>
+    <circle cx="52" cy="54" r="13" fill="#D9A45B"/><circle cx="72" cy="56" r="12" fill="#D9A45B"/><ellipse cx="58" cy="68" rx="32" ry="15" fill="#D9A45B"/>
+    <path d="M36 56L29 38" stroke="#D9A45B" stroke-width="15" stroke-linecap="round" fill="none"/>
+    <ellipse cx="13" cy="21" rx="5" ry="8" transform="rotate(-20 13 21)" fill="#D9A45B"/><ellipse cx="41" cy="21" rx="5" ry="8" transform="rotate(20 41 21)" fill="#D9A45B"/>
+    <ellipse cx="27" cy="30" rx="18" ry="16" fill="#D9A45B"/><path d="M20 15q7-7 14 0q-7 3-14 0z" fill="#8A5A24"/>
+    <ellipse cx="27" cy="40" rx="11" ry="8" fill="#F0CC91"/><circle cx="23" cy="38" r="1.4" fill="#8A5A24"/><circle cx="31" cy="38" r="1.4" fill="#8A5A24"/>${pFace(m, 27, 29, 8, .85, 13)}`,
+
+  p_gajah: m => `<circle cx="19" cy="46" r="17" fill="#8FA9C4"/><circle cx="19" cy="46" r="10" fill="#F4B6C2"/><circle cx="81" cy="46" r="17" fill="#8FA9C4"/><circle cx="81" cy="46" r="10" fill="#F4B6C2"/>
+    <ellipse cx="50" cy="48" rx="28" ry="27" fill="#9BB1C8"/>
+    <path d="M36 64q-8 10-2 20M64 64q8 10 2 20" stroke="#FFF9EC" stroke-width="5.5" stroke-linecap="round" fill="none"/>
+    <path d="M50 56v24q0 12 12 11" fill="none" stroke="#9BB1C8" stroke-width="17" stroke-linecap="round"/><path d="M44 66h12M44 74h12" stroke="#8299B3" stroke-width="1.6" stroke-linecap="round"/>
+    ${pFace(m, 50, 40, 13, 1, 0, false)}`,
+
+  p_paus: m => `<path d="M46 22q-5-11-14-9M46 22q5-11 14-9" fill="none" stroke="#7CC4F5" stroke-width="3" stroke-linecap="round"/><circle cx="31" cy="11" r="2.4" fill="#7CC4F5"/><circle cx="61" cy="11" r="2.4" fill="#7CC4F5"/>
+    <path d="M84 62q12-6 14-24q-11 3-20 14z M84 66q12 4 13 22q-10-5-18-14z" fill="#3F7FC4"/>
+    <path d="M8 60c0-22 20-34 42-34 26 0 38 15 38 32 0 18-18 28-42 28-22 0-38-10-38-26z" fill="#4A8FD6"/>
+    <path d="M12 66c10 14 34 20 54 17 12-2 20-7 22-15-12 8-46 11-76-2z" fill="#DCEEFF"/>${pFace(m, 34, 54, 9, 1, 8)}`,
+};
+
+const petSvg = (id, m = 'idle', px) => `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100"${px ? ` width="${px}" height="${px}"` : ''}>${(PET_ART[id] || PET_ART.p_kucing)(m)}</svg>`;
+const myPetOf = x => PETS.some(q => q[0] === x) ? x : PET0, myPet = () => myPetOf(me && me.pet);
+const petUrl = (id, m) => 'url("data:image/svg+xml,' + encodeURIComponent(petSvg(id, m)) + '")';
+let petOn = null;
+function applyPet() { // wajah hewan di balasan jawaban (.fb) lewat variabel CSS, jadi semua jenis kuis ikut tanpa mengubah kodenya
+  const id = myPet(); SFX.petId = id; if (petOn === id) return; petOn = id;
+  const st = document.documentElement.style; ['idle', 'ok', 'no'].forEach(m => st.setProperty('--pet-' + m, petUrl(id, m)));
+}
+function petHop(el) { if (!el || RM) return; el.classList.remove('hop'); void el.offsetWidth; el.classList.add('hop'); }
 let shopTab = 'fx';
 async function vShop() {
   V.innerHTML = '<p class="muted">Memuat…</p>';
   let st; try { st = await api('shop'); } catch (e) { V.textContent = e.message; return; }
-  const sync = () => { me.spent = st.spent; me.bonus = st.bonus; me.fxa = st.equipped; me.fxn = st.equippedName; };
-  const play = k => { const s = $('#sg-' + k); if (s) (FX[k] || FX.confetti)(s.getBoundingClientRect(), s); };
+  const sync = () => { me.spent = st.spent; me.bonus = st.bonus; me.fxa = st.equipped; me.fxn = st.equippedName; me.pet = st.equippedPet; };
+  const play = k => { if (k.startsWith('p_')) { petHop($('#sg-' + k)); SFX.pet(k); return; } const s = $('#sg-' + k); if (s) (FX[k] || FX.confetti)(s.getBoundingClientRect(), s); };
   const draw = () => {
-    sync(); const g = st.gold, nameTab = shopTab === 'nm', list = nameTab ? NSHOP : SHOP;
+    sync(); const g = st.gold, nameTab = shopTab === 'nm', petTab = shopTab === 'pt', list = petTab ? PETS : nameTab ? NSHOP : SHOP;
     V.innerHTML = `<div class="shopbar"><h1>Efek</h1><span class="gold" style="font-size:1.15rem">${GL} ${g}</span></div>
-      <div class="tabs"><button data-st="fx" class="${nameTab ? '' : 'on'}">🎆 Efek Jawaban</button><button data-st="nm" class="${nameTab ? 'on' : ''}">✒️ Gaya Nama</button></div>
-      <p class="muted shopnote">${nameTab ? 'Gaya nama mengubah tampilan namamu di leaderboard, profil, dan menu. ' : 'Gold bertambah bersama XP di tiap level. Pakai untuk efek yang muncul saat jawabanmu benar. '}${!st.admin && me.pays ? `Bonus harian rank ${RANKS[rkOf(totalXp())][1]}: +${me.pays[rkOf(totalXp())]} Gold. ` : ''}Membeli tidak mengurangi XP atau rank.${st.admin ? ' Admin: semua item terbuka.' : ''}</p>
+      <div class="tabs"><button data-st="fx" class="${shopTab === 'fx' ? 'on' : ''}">🎆 Efek Jawaban</button><button data-st="nm" class="${nameTab ? 'on' : ''}">✒️ Gaya Nama</button><button data-st="pt" class="${petTab ? 'on' : ''}">🐾 Hewan</button></div>
+      <p class="muted shopnote">${petTab ? 'Hewan pendamping menemanimu di Beranda dan ikut bereaksi saat kamu menjawab. Sentuh hewannya untuk mendengar suaranya, dan pilih satu untuk dipakai. ' : nameTab ? 'Gaya nama mengubah tampilan namamu di leaderboard, profil, dan menu. ' : 'Gold bertambah bersama XP di tiap level. Pakai untuk efek yang muncul saat jawabanmu benar. '}${!st.admin && me.pays ? `Bonus harian rank ${RANKS[rkOf(totalXp())][1]}: +${me.pays[rkOf(totalXp())]} Gold. ` : ''}Membeli tidak mengurangi XP atau rank.${st.admin ? ' Admin: semua item terbuka.' : ''}</p>
       <div class="shopg">${list.map(([k, nm_, ic, tr, ds]) => {
-        const free = k === 'confetti' || k === 'n_none', own = free || st.owned.includes(k), pr = st.prices[k] || 0;
-        const eq = nameTab ? (st.equippedName || 'n_none') === k : (st.equipped || 'confetti') === k;
-        const stage = nameTab ? `<div class="stage nm"><b class="${nc(k)}">${esc(me.username)}</b></div>` : `<div class="stage" id="sg-${k}"><span>${ic}</span></div>`;
-        return `<div class="si${eq ? ' eq' : ''}${tr === 'Legendaris' || tr === 'Mitos' ? ' hi' : ''}" style="--tc:${TIER[tr]}"><span class="tg">${tr}</span>${stage}<h3>${nm_}</h3><p>${ds}</p>
+        const free = k === 'confetti' || k === 'n_none' || k === PET0, own = free || st.owned.includes(k), pr = st.prices[k] || 0;
+        const eq = petTab ? myPetOf(st.equippedPet) === k : nameTab ? (st.equippedName || 'n_none') === k : (st.equipped || 'confetti') === k;
+        const stage = petTab ? `<div class="stage pt" id="sg-${k}">${petSvg(k, 'idle')}</div>` : nameTab ? `<div class="stage nm"><b class="${nc(k)}">${esc(me.username)}</b></div>` : `<div class="stage" id="sg-${k}"><span>${ic}</span></div>`;
+        return `<div class="si${eq ? ' eq' : ''}${tr === 'Legendaris' || tr === 'Mitos' ? ' hi' : ''}" style="--tc:${TIER[tr]}"><span class="tg">${tr}</span>${stage}<h3>${nm_}${petTab ? ` <span class="ar" dir="rtl">${ic}</span>` : ''}</h3><p>${ds}</p>
           <div class="acts">${nameTab ? '' : `<button class="btn ghost" data-try="${k}">Coba</button>`}${own
             ? `<button class="btn" data-eq="${k}"${eq ? ' disabled' : ''}>${eq ? '✓ Terpasang' : 'Pasang'}</button>`
             : `<button class="btn" data-buy="${k}"${g < pr ? ' disabled' : ''}>${g < pr ? 'Kurang ' + (pr - g) + ' ' + GL : GL + ' ' + pr}</button>`}</div></div>`;
@@ -935,11 +1061,11 @@ async function vShop() {
     V.querySelectorAll('[data-st]').forEach(b => b.onclick = () => { shopTab = b.dataset.st; draw(); });
     V.querySelectorAll('[data-try]').forEach(b => b.onclick = () => play(b.dataset.try));
     V.querySelectorAll('[data-eq]').forEach(b => b.onclick = async () => {
-      try { st = await api('shop/equip', { item: b.dataset.eq }); draw(); renderChip(); toast(b.dataset.eq.startsWith('n_') ? 'Gaya nama terpasang' : 'Efek terpasang', '✨'); } catch (e) { toast(e.message, '⚠️'); }
+      try { st = await api('shop/equip', { item: b.dataset.eq }); draw(); renderChip(); const e = b.dataset.eq; if (e.startsWith('p_')) SFX.pet(e); toast(e.startsWith('p_') ? 'Hewan terpasang' : e.startsWith('n_') ? 'Gaya nama terpasang' : 'Efek terpasang', '✨'); } catch (e) { toast(e.message, '⚠️'); }
     });
     V.querySelectorAll('[data-buy]').forEach(b => b.onclick = async () => {
-      const k = b.dataset.buy, it = SHOP.find(x => x[0] === k) || NSHOP.find(x => x[0] === k);
-      if (!confirm(`Beli ${k.startsWith('n_') ? 'gaya nama' : 'efek'} "${it[1]}" seharga ${st.prices[k]} Gold?`)) return;
+      const k = b.dataset.buy, it = SHOP.find(x => x[0] === k) || NSHOP.find(x => x[0] === k) || PETS.find(x => x[0] === k);
+      if (!confirm(`Beli ${k.startsWith('p_') ? 'hewan' : k.startsWith('n_') ? 'gaya nama' : 'efek'} "${it[1]}" seharga ${st.prices[k]} Gold?`)) return;
       try { st = await api('shop/buy', { item: k }); draw(); toast('Berhasil dibeli: ' + it[1], '🛍️'); noteAch(st.ach, true); if (!k.startsWith('n_')) play(k); } catch (e) { toast(e.message, '⚠️'); }
     });
   };
@@ -1222,7 +1348,9 @@ function vHome() {
   const tot = Object.values(me.best).reduce((a, b) => a + b, 0), tat = TAT();
   const ri = RANKS.reduce((a, r, n) => tot >= r[0] ? n : a, 0), nx = RANKS[ri + 1], rk = RANKS[ri];
   const frac = nx ? (tot - rk[0]) / (nx[0] - rk[0]) : 1, p = Math.min(1, (ri + frac) / (RANKS.length - 1));
+  const pid = myPet(), PP = PETS.find(x => x[0] === pid); let pli = Math.floor(Math.random() * PP[5].length);
   V.innerHTML = `<h1 class="hello">Assalamu'alaikum, ${esc(me.username)}</h1>
+    <div class="petrow"><button class="petbtn" id="pethome" aria-label="Sentuh hewan pendampingmu">${petSvg(pid, 'idle')}</button><div class="pbub"><b>${PP[1]} <span class="ar" dir="rtl">${PP[2]}</span></b><span id="petln">${PP[5][pli]}</span></div></div>
     <div class="card hero" style="--rc:${rk[3]}">
       <div class="top2"><div class="who"><span class="medal">${RI(ri, 72)}</span><div><small>Tingkat saat ini</small><b>${rk[1]}</b></div></div>
         <div class="xpb"><h1><span id="tx">0</span> <small>XP</small></h1><span class="gold">${GL} ${gold()}</span></div></div>
@@ -1237,6 +1365,7 @@ function vHome() {
     <div class="sec"><h2>Latihan</h2><span>Pilih jenis kuis, lalu jilid dan levelnya</span></div>
     <div class="tabs htabs"><button data-ht="tulis">✍️ Kuis Tulis</button><button data-ht="lisan">🗣️ Kuis Lisan</button><button data-ht="sorof">🧩 Kuis Sorof</button></div>
     <div id="hpane"></div>`;
+  $('#pethome').onclick = e => { pli = (pli + 1) % PP[5].length; $('#petln').textContent = PP[5][pli]; petHop(e.currentTarget); SFX.pet(pid); };
   // Tab Kuis Tulis: quest per jilid (XP) + Mode Tathbiq sebagai puncaknya
   const paneTulis = () => `<p class="muted hnote">Soal pilihan ganda. Minimal ${PASS()}% benar di tiap level agar quest selesai; selesaikan semua jilid untuk membuka Mode Tathbiq.</p>
     <div class="grid jgrid">` + [1, 2, 3, 4].map((j, n) => `<div class="card jc" style="--i:${n};${jst(j)}"><div class="jh"><span class="tag">Jilid ${j}</span><span class="jst">${JD(j) ? (JP(j) ? '💯 Sempurna' : '🏅 Selesai') : JN(j) + '/3 level selesai'}</span></div><div class="lvls">` +
@@ -1551,7 +1680,7 @@ const fxGrid = (k, pk) => {
 const STG = [['Tathbiq 1', '#1A7A3C', '📘'], ['Tathbiq 2', '#1573C4', '📗'], ['Tathbiq 3', '#7B2FA0', '📙'], ['Tathbiq 4', '#D9730D', '📕'], ['Tathbiq 5', '#C0392B', '📒'], ['Tathbiq 6', '#B3245B', '📚'], ['Takhossus', '#F2B705', '👑']];
 const stg = n => STG[Math.min(Math.ceil(n / 10), 7) - 1];
 const stgStyle = n => `background:${stg(n)[1]};color:${Math.ceil(n / 10) > 6 ? '#1a1a1a' : '#fff'}`;
-const renderChip = () => { $('#who').innerHTML = av(myAv(), '', myFx()) + '<span>' + nm(me.username, me.fxn) + '</span>'; };
+const renderChip = () => { applyPet(); $('#who').innerHTML = av(myAv(), '', myFx()) + '<span>' + nm(me.username, me.fxn) + '</span>'; };
 function toast(msg, ico = '🔔') {
   const t = document.createElement('div'); t.className = 'toast'; t.innerHTML = `<span>${ico}</span><div>${msg}</div>`;
   $('#toasts').appendChild(t); setTimeout(() => t.remove(), 5200);
