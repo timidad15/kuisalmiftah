@@ -17,7 +17,9 @@ const wibDay = () => new Date(Date.now() + 7 * 36e5).toISOString().slice(0, 10);
 const SHOP = { stars: 100, bubbles: 200, petals: 300, coins: 450, fireworks: 600, fire: 900, ice: 1100, lightning: 1500, comet: 2000, galaxy: 2800 };
 // Efek (toko): gaya nama di leaderboard (kunci diawali n_). Disimpan di purchases seperti efek jawaban; yang terpasang ada di users.fxn.
 const NSHOP = { n_mint: 100, n_ocean: 150, n_grape: 300, n_sunset: 400, n_shimmer: 600, n_neon: 800, n_blaze: 1100, n_frost: 1300, n_glitch: 2000, n_rainbow: 2500 };
-const PRICES = { ...SHOP, ...NSHOP };
+// Hewan pendamping (toko): kunci diawali p_. 'p_kucing' gratis untuk semua murid (tidak ada di PRICES); yang terpasang ada di users.pet (null = p_kucing).
+const PSHOP = { p_semut: 150, p_lebah: 400, p_hudhud: 700, p_unta: 1200, p_gajah: 1800, p_paus: 3000 }, PET0 = 'p_kucing';
+const PRICES = { ...SHOP, ...NSHOP, ...PSHOP };
 // Kuis harian: 10 soal acak semua jilid; nilai >= DAILY_PASS memberi 1 spin. Hadiah = [gold, bobot]. Spin ke-PITY sejak hadiah >= RARE terakhir dijamin langka.
 const DAILY_N = 10, DAILY_PASS = 80, RARE = 500, PITY = 10;
 const PRIZES = [[150, 30], [200, 25], [300, 20], [500, 13], [750, 7], [1000, 5]]; // hadiah minimal 150 gold; rata-rata sekitar 322 gold per spin
@@ -556,7 +558,7 @@ export async function onRequest({ request, env, params, waitUntil }) {
       } catch (e) { got = 0; }
       // satu round trip untuk tiga query
       const [[usr], best, [t], [sp], [bn], [rq], [ag], un, [tr]] = await sql.transaction([
-        sql`select username, role, avatar, fx, fxa, fxn, on_board, photo_v, use_photo, badges from users where id = ${uid}`,
+        sql`select username, role, avatar, fx, fxa, fxn, pet, on_board, photo_v, use_photo, badges from users where id = ${uid}`,
         bestOf(uid),
         sql`select least(ceil(coalesce(max(n), 0) / 10.0), 7)::int as s from endless_runs where user_id = ${uid}`,
         sql`select coalesce(sum(price), 0)::int s from purchases where user_id = ${uid}`,
@@ -568,7 +570,7 @@ export async function onRequest({ request, env, params, waitUntil }) {
       if (!usr) return bad('Silakan masuk dulu', 401);
       const ach = jilidDone(best);
       const xpTot = best.reduce((a, r) => a + r.xp, 0), ri = Math.max(0, RANK_MIN.filter(m => m <= xpTot).length - 1);
-      return J({ rankGot: got, rankPay: usr.role === 'admin' ? 0 : RANK_PAY[ri], pays: RANK_PAY, starter: STARTER_GOLD, reports: rq.n, username: usr.username, role: usr.role, avatar: usr.avatar, photo: usr.photo_v, usePhoto: usr.use_photo, fxp: usr.fx, fxa: usr.fxa, fxn: usr.fxn, board: usr.on_board, spent: sp.s, bonus: bn.s + ag.s, bd: badgeInfo(usr.badges), unseen: un.map(r => ACHBY[r.key]).filter(Boolean).map(achMini), rate: GOLD_RATE, tcap: TCAP, tathRaw: tr.s, tstage: t.s, pass: PASS_PCT, ach, tathbiq: usr.role === 'admin' || ach.every(Boolean), best: Object.fromEntries(best.map(r => [r.jilid + ':' + r.level, r.xp])) });
+      return J({ rankGot: got, rankPay: usr.role === 'admin' ? 0 : RANK_PAY[ri], pays: RANK_PAY, starter: STARTER_GOLD, reports: rq.n, username: usr.username, role: usr.role, avatar: usr.avatar, photo: usr.photo_v, usePhoto: usr.use_photo, fxp: usr.fx, fxa: usr.fxa, fxn: usr.fxn, pet: usr.pet, board: usr.on_board, spent: sp.s, bonus: bn.s + ag.s, bd: badgeInfo(usr.badges), unseen: un.map(r => ACHBY[r.key]).filter(Boolean).map(achMini), rate: GOLD_RATE, tcap: TCAP, tathRaw: tr.s, tstage: t.s, pass: PASS_PCT, ach, tathbiq: usr.role === 'admin' || ach.every(Boolean), best: Object.fromEntries(best.map(r => [r.jilid + ':' + r.level, r.xp])) });
     }
 
     if (route === 'GET quiz') {
@@ -793,9 +795,9 @@ export async function onRequest({ request, env, params, waitUntil }) {
 
     // ---------- Efek ----------
     const shopState = async () => {
-      const [best, own, [u], [bn], [ag]] = await sql.transaction([bestOf(uid), sql`select item, price from purchases where user_id = ${uid}`, sql`select fxa, fxn, role from users where id = ${uid}`, sql`select gold_total_bonus(${uid}::int) s`, sql`select coalesce(sum(gold), 0)::int s from user_achievements where user_id = ${uid}`]);
+      const [best, own, [u], [bn], [ag]] = await sql.transaction([bestOf(uid), sql`select item, price from purchases where user_id = ${uid}`, sql`select fxa, fxn, pet, role from users where id = ${uid}`, sql`select gold_total_bonus(${uid}::int) s`, sql`select coalesce(sum(gold), 0)::int s from user_achievements where user_id = ${uid}`]);
       const earned = Math.floor(best.reduce((a, r) => a + r.xp, 0) * GOLD_RATE), spent = own.reduce((a, r) => a + r.price, 0), admin = !!u && u.role === 'admin';
-      return { gold: Math.max(0, earned + bn.s + ag.s - spent), earned, bonus: bn.s + ag.s, spent, admin, owned: admin ? Object.keys(PRICES) : own.map(r => r.item), equipped: u ? u.fxa : null, equippedName: u ? u.fxn : null, prices: PRICES };
+      return { gold: Math.max(0, earned + bn.s + ag.s - spent), earned, bonus: bn.s + ag.s, spent, admin, owned: admin ? Object.keys(PRICES) : own.map(r => r.item), equipped: u ? u.fxa : null, equippedName: u ? u.fxn : null, equippedPet: u ? u.pet : null, prices: PRICES };
     };
     if (route === 'GET shop') return J(await shopState());
     if (route === 'POST shop/buy') {
@@ -820,6 +822,13 @@ export async function onRequest({ request, env, params, waitUntil }) {
       if (item === 'n_none') { // lepas gaya nama
         await sql`update users set fxn = null where id = ${uid}`; LB.clear();
         return J(await shopState());
+      }
+      if (item.startsWith('p_')) { // hewan pendamping -> users.pet (p_kucing gratis untuk semua)
+        if (item !== PET0 && !Object.hasOwn(PRICES, item)) return bad('Item tidak ditemukan', 404);
+        const st = await shopState();
+        if (item !== PET0 && !st.owned.includes(item)) return bad('Beli dulu hewan ini', 403);
+        await sql`update users set pet = ${item} where id = ${uid}`;
+        return J({ ...st, equippedPet: item });
       }
       if (item !== 'confetti' && !Object.hasOwn(PRICES, item)) return bad('Item tidak ditemukan', 404);
       const st = await shopState();
