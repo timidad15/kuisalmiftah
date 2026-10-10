@@ -415,16 +415,122 @@ select,textarea{font:inherit;color:var(--ink);background:var(--surface);border:1
 .petbtn svg{width:64px;height:64px;display:block}
 .pbub{min-width:0;padding:10px 14px;line-height:1.4;background:var(--surface);border:1px solid var(--line);border-radius:16px 16px 16px 4px}
 .pbub b{display:block;font-size:.95rem}.pbub #petln{display:block;color:var(--muted);font-size:.9rem}
-.petbtn.hop svg,.si .stage.pimg.hop svg{animation:phop .6s}
-.si .stage.pimg svg{width:84px;height:84px;display:block;filter:drop-shadow(0 6px 8px rgba(0,0,0,.18))}
-@keyframes phop{0%{transform:translateY(0)}30%{transform:translateY(-14px) rotate(-6deg)}60%{transform:translateY(0)}80%{transform:translateY(-4px)}100%{transform:none}}
-@keyframes pshk{0%,100%{transform:rotate(0)}25%{transform:rotate(-12deg)}75%{transform:rotate(12deg)}}
-/* wajah hewan di setiap balasan jawaban (.fb) */
+.si .stage.pimg{position:relative}
+.si .stage.pimg::after{content:'';position:absolute;bottom:7px;left:50%;width:46px;height:8px;margin-left:-23px;border-radius:50%;background:radial-gradient(closest-side,rgba(0,0,0,.3),transparent)}
+.si .stage.pimg svg{position:relative;z-index:1;width:84px;height:84px;display:block}
+@media(max-width:560px){.si .stage.pimg svg{width:62px;height:62px}.petbtn{width:64px;height:64px}.petbtn svg{width:54px;height:54px}}
+
+/* --- Animasi hidup: hanya transform dan opacity (tanpa filter), tanpa JS per frame ---
+   .live = sedang terlihat (maks. 4 sekaligus, diatur petLive). .act = reaksi sesaat saat disentuh. */
+.pa{overflow:visible}
+.pa *{transform-box:view-box}
+.pa .bl{transform-box:fill-box;transform-origin:center}
+.pa.act{transform-origin:50% 100%}.pa-lebah.act{transform-origin:50% 60%}
+.pa-kucing .k-tail{transform-origin:72px 90px}.pa-kucing .k-body{transform-origin:50px 100px}.pa-kucing .k-head{transform-origin:50px 80px}.pa-kucing .k-earl{transform-origin:34px 40px}.pa-kucing .k-earr{transform-origin:66px 40px}
+.pa-semut .s-antl{transform-origin:40px 24px}.pa-semut .s-antr{transform-origin:60px 24px}.pa-semut .s-legl{transform-origin:42px 72px}.pa-semut .s-legr{transform-origin:58px 72px}.pa-semut .s-head,.pa-semut .s-body{transform-origin:50px 62px}
+.pa-lebah .l-all{transform-origin:50px 60px}.pa-lebah .l-wingl{transform-origin:40px 46px}.pa-lebah .l-wingr{transform-origin:60px 46px}.pa-lebah .l-antl{transform-origin:42px 32px}.pa-lebah .l-antr{transform-origin:58px 32px}
+.pa-hudhud .h-head{transform-origin:46px 72px}.pa-hudhud .h-crest{transform-origin:46px 38px}.pa-hudhud .h-wing{transform-origin:56px 74px}
+.pa-unta .u-neck{transform-origin:36px 60px}.pa-unta .u-tail{transform-origin:88px 62px}.pa-unta .u-body{transform-origin:58px 84px}
+.pa-gajah .g-trunk{transform-origin:50px 58px}.pa-gajah .g-earl{transform-origin:35px 46px}.pa-gajah .g-earr{transform-origin:65px 46px}
+.pa-paus .w-all{transform-origin:50px 60px}.pa-paus .w-tail{transform-origin:82px 62px}.pa-paus .w-spout{transform-origin:46px 24px}
+
+/* napas dan kedip (semua hewan; jeda panjang di antara kedipan supaya hemat) */
+.pa.live .bl{animation:pa-blink 5s infinite}
+.pa-semut.live .bl{animation-duration:6.3s;animation-delay:-1.7s}.pa-lebah.live .bl{animation-duration:4.2s;animation-delay:-.9s}.pa-hudhud.live .bl{animation-duration:5.6s;animation-delay:-3s}
+.pa-unta.live .bl{animation-duration:6.8s;animation-delay:-2.4s}.pa-gajah.live .bl{animation-duration:5.9s;animation-delay:-4s}.pa-paus.live .bl{animation-duration:6.1s;animation-delay:-1s}
+@keyframes pa-blink{0%,93%,100%{transform:scaleY(1)}96.5%{transform:scaleY(.08)}}
+@keyframes pa-ant{from{transform:rotate(-9deg)}to{transform:rotate(9deg)}}
+@keyframes pa-br{from{transform:scaleY(1)}to{transform:scaleY(1.035)}}
+
+/* kucing: ekor mengibas, bernapas, kepala miring, telinga berkedut */
+.pa-kucing.live .k-tail{animation:pa-sw 3s ease-in-out infinite alternate}
+.pa-kucing.live .k-body{animation:pa-br 3.4s ease-in-out infinite alternate}
+.pa-kucing.live .k-head{animation:pa-tilt 5.2s ease-in-out infinite alternate}
+.pa-kucing.live .k-earl{animation:pa-twl 7s infinite}.pa-kucing.live .k-earr{animation:pa-twr 7s infinite -3.5s}
+@keyframes pa-sw{from{transform:rotate(-7deg)}to{transform:rotate(11deg)}}
+@keyframes pa-tilt{from{transform:rotate(-2deg)}to{transform:rotate(2.4deg)}}
+@keyframes pa-twl{0%,86%,100%{transform:rotate(0)}90%{transform:rotate(-10deg)}94%{transform:rotate(2deg)}}
+@keyframes pa-twr{0%,86%,100%{transform:rotate(0)}90%{transform:rotate(10deg)}94%{transform:rotate(-2deg)}}
+/* semut: sungut bergoyang, kaki bergerak patah-patah (steps = hanya 4 gambar/detik), kepala mengangguk */
+.pa-semut.live .s-antl{animation:pa-ant 1.9s ease-in-out infinite alternate}
+.pa-semut.live .s-antr{animation:pa-ant 1.9s ease-in-out infinite alternate-reverse -.6s}
+.pa-semut.live .s-legl{animation:pa-leg .5s steps(1,end) infinite}.pa-semut.live .s-legr{animation:pa-leg .5s steps(1,end) infinite -.25s}
+.pa-semut.live .s-head{animation:pa-hb 3.6s ease-in-out infinite alternate}.pa-semut.live .s-body{animation:pa-ab 2.8s ease-in-out infinite alternate}
+@keyframes pa-leg{0%{transform:rotate(-4deg)}50%{transform:rotate(4deg)}}
+@keyframes pa-hb{from{transform:rotate(-3deg)}to{transform:rotate(3.5deg)}}
+@keyframes pa-ab{from{transform:rotate(2.5deg)}to{transform:rotate(-2.5deg)}}
+/* lebah: melayang, sayap mengepak cepat (steps = 10 gambar/detik), sungut bergoyang */
+.pa-lebah.live .l-all{animation:pa-hov 2.4s ease-in-out infinite alternate}
+.pa-lebah.live .l-wingl{animation:pa-fl .2s steps(1,end) infinite}.pa-lebah.live .l-wingr{animation:pa-fr .2s steps(1,end) infinite}
+.pa-lebah.live .l-antl{animation:pa-ant 1.4s ease-in-out infinite alternate}.pa-lebah.live .l-antr{animation:pa-ant 1.4s ease-in-out infinite alternate-reverse}
+@keyframes pa-hov{from{transform:translateY(1.5px) rotate(-1.5deg)}to{transform:translateY(-3px) rotate(1.5deg)}}
+@keyframes pa-fl{0%{transform:rotate(-12deg)}50%{transform:rotate(7deg)}}
+@keyframes pa-fr{0%{transform:rotate(12deg)}50%{transform:rotate(-7deg)}}
+/* hud-hud: mematuk dua kali, jambul mengembang, sayap bergetar halus */
+.pa-hudhud.live .h-head{animation:pa-peck 5s infinite}.pa-hudhud.live .h-crest{animation:pa-cr 6s infinite}.pa-hudhud.live .h-wing{animation:pa-ruf 4s ease-in-out infinite alternate}
+@keyframes pa-peck{0%,66%,100%{transform:rotate(0)}72%{transform:rotate(9deg)}78%{transform:rotate(-1deg)}84%{transform:rotate(8deg)}90%{transform:rotate(0)}}
+@keyframes pa-cr{0%,58%,100%{transform:scale(1)}64%,74%{transform:scale(1.08,1.12)}82%{transform:scale(1)}}
+@keyframes pa-ruf{from{transform:rotate(-2.5deg)}to{transform:rotate(2.5deg)}}
+/* unta: leher berayun pelan, ekor mengibas, punuk naik turun */
+.pa-unta.live .u-neck{animation:pa-nk 4.6s ease-in-out infinite alternate}.pa-unta.live .u-tail{animation:pa-ts 2.2s ease-in-out infinite alternate}.pa-unta.live .u-body{animation:pa-br 3.8s ease-in-out infinite alternate}
+@keyframes pa-nk{from{transform:rotate(-3.5deg)}to{transform:rotate(3deg)}}
+@keyframes pa-ts{from{transform:rotate(-6deg)}to{transform:rotate(14deg)}}
+/* gajah: belalai berayun, telinga mengepak dua kali */
+.pa-gajah.live .g-trunk{animation:pa-tr 3.2s ease-in-out infinite alternate}.pa-gajah.live .g-earl{animation:pa-el 5s infinite}.pa-gajah.live .g-earr{animation:pa-er 5s infinite}
+@keyframes pa-tr{from{transform:rotate(-8deg)}to{transform:rotate(8deg)}}
+@keyframes pa-el{0%,68%,100%{transform:rotate(0)}74%,86%{transform:rotate(11deg)}80%,92%{transform:rotate(0)}}
+@keyframes pa-er{0%,68%,100%{transform:rotate(0)}74%,86%{transform:rotate(-11deg)}80%,92%{transform:rotate(0)}}
+/* paus: mengapung, sirip ekor melambai, semburan air muncul sesekali */
+.pa-paus.live .w-all{animation:pa-fl2 3.4s ease-in-out infinite alternate}.pa-paus.live .w-tail{animation:pa-tl 2.4s ease-in-out infinite alternate}.pa-paus.live .w-spout{animation:pa-sp 4.6s ease-out infinite}
+@keyframes pa-fl2{from{transform:translateY(2px) rotate(-1.2deg)}to{transform:translateY(-3px) rotate(1.4deg)}}
+@keyframes pa-tl{from{transform:rotate(-6deg)}to{transform:rotate(9deg)}}
+@keyframes pa-sp{0%,52%{opacity:0;transform:scale(.5) translateY(5px)}62%{opacity:1;transform:scale(1) translateY(0)}84%{opacity:.9;transform:scale(1.05)}94%,100%{opacity:0;transform:scale(1.1) translateY(-3px)}}
+
+/* reaksi saat disentuh: tiap hewan berbeda */
+.pa-kucing.act{animation:pa-jump .75s ease-out}.pa-kucing.act .k-tail{animation:pa-flick .75s ease-in-out}
+.pa-semut.act{animation:pa-scur .8s ease-in-out}
+.pa-lebah.act{animation:pa-loop .95s ease-in-out}
+.pa-hudhud.act .h-head{animation:pa-peck3 .9s ease-in-out}.pa-hudhud.act .h-crest{animation:pa-fan .9s ease-out}
+.pa-unta.act .u-neck{animation:pa-toss .9s ease-in-out}
+.pa-gajah.act .g-trunk{animation:pa-tw .9s ease-in-out}.pa-gajah.act .g-earl{animation:pa-el2 .9s ease-in-out}.pa-gajah.act .g-earr{animation:pa-er2 .9s ease-in-out}
+.pa-paus.act{animation:pa-leap .95s ease-in-out}.pa-paus.act .w-spout{animation:pa-spb .95s ease-out}
+@keyframes pa-jump{0%{transform:scale(1.06,.92)}25%{transform:translateY(-16px) scale(.96,1.06)}55%{transform:scale(1.06,.92)}75%{transform:translateY(-4px)}100%{transform:none}}
+@keyframes pa-flick{0%,100%{transform:rotate(0)}30%{transform:rotate(30deg)}60%{transform:rotate(-14deg)}}
+@keyframes pa-scur{0%,100%{transform:none}15%{transform:translateX(-10px) rotate(-7deg)}35%{transform:translateX(10px) rotate(7deg)}55%{transform:translateX(-7px) rotate(-5deg)}75%{transform:translateX(6px) rotate(4deg)}}
+@keyframes pa-loop{0%{transform:none}25%{transform:translate(14px,-12px) rotate(90deg)}50%{transform:translate(0,-22px) rotate(180deg)}75%{transform:translate(-14px,-12px) rotate(270deg)}100%{transform:rotate(360deg)}}
+@keyframes pa-peck3{0%,100%{transform:rotate(0)}15%,45%,75%{transform:rotate(11deg)}30%,60%{transform:rotate(-2deg)}}
+@keyframes pa-fan{0%,100%{transform:scale(1)}25%,70%{transform:scale(1.28,1.38)}}
+@keyframes pa-toss{0%,100%{transform:rotate(0)}30%{transform:rotate(-16deg)}60%{transform:rotate(7deg)}80%{transform:rotate(-3deg)}}
+@keyframes pa-tw{0%,100%{transform:rotate(0)}25%{transform:rotate(-28deg)}55%{transform:rotate(26deg)}80%{transform:rotate(-12deg)}}
+@keyframes pa-el2{0%,40%,80%,100%{transform:rotate(0)}20%,60%{transform:rotate(16deg)}}
+@keyframes pa-er2{0%,40%,80%,100%{transform:rotate(0)}20%,60%{transform:rotate(-16deg)}}
+@keyframes pa-leap{0%,100%{transform:none}35%{transform:translateY(-22px) rotate(-14deg)}65%{transform:translateY(-6px) rotate(8deg)}}
+@keyframes pa-spb{0%{opacity:0;transform:scale(.4)}30%{opacity:1;transform:scale(1.25)}100%{opacity:0;transform:scale(1.4) translateY(-6px)}}
+
+/* hemat daya: jeda saat tab disembunyikan, mati total di mode hemat dan saat "kurangi gerakan" */
+.pa-off .pa,.pa-off .pa *{animation-play-state:paused!important}
+.lite .pa.live:not(.act),.lite .pa.live:not(.act) *{animation:none!important}
+@media(prefers-reduced-motion:reduce){.pa,.pa *{animation:none!important}}
+
+/* wajah hewan di setiap balasan jawaban (.fb): gambar statis, gerakannya beda tiap hewan */
 .fb::before{content:'';float:left;width:40px;height:40px;margin:-6px 12px -6px -6px;background:var(--pet-idle) center/contain no-repeat}
 .fb.ok::before{background-image:var(--pet-ok);animation:phop .6s}.fb.no::before{background-image:var(--pet-no);animation:pshk .5s}
 .fb::after{content:'';display:block;clear:both}
-@media(max-width:560px){.si .stage.pimg svg{width:62px;height:62px}.petbtn{width:64px;height:64px}.petbtn svg{width:54px;height:54px}}
-@media(prefers-reduced-motion:reduce){.fb::before,.petbtn.hop svg,.si .stage.pimg.hop svg{animation:none!important}}
+@keyframes phop{0%{transform:translateY(0)}30%{transform:translateY(-12px) rotate(-6deg)}60%{transform:translateY(0)}80%{transform:translateY(-4px)}100%{transform:none}}
+@keyframes pshk{0%,100%{transform:rotate(0)}25%{transform:rotate(-12deg)}75%{transform:rotate(12deg)}}
+@keyframes pf-ant{0%,100%{transform:none}15%{transform:translateX(-5px) rotate(-10deg)}35%{transform:translateX(5px) rotate(10deg)}55%{transform:translateX(-4px) rotate(-7deg)}75%{transform:translateX(3px) rotate(5deg)}}
+@keyframes pf-bee{0%,100%{transform:none}25%{transform:translate(6px,-9px) rotate(12deg)}50%{transform:translate(-6px,-13px) rotate(-12deg)}75%{transform:translate(5px,-5px) rotate(8deg)}}
+@keyframes pf-hud{0%,40%,80%,100%{transform:none}20%,60%{transform:translateY(-6px) scale(1.1)}}
+@keyframes pf-cam{0%,100%{transform:none}30%{transform:rotate(-12deg)}60%{transform:rotate(7deg)}}
+@keyframes pf-ele{0%,100%{transform:none}25%{transform:rotate(-14deg) scale(1.1)}55%{transform:rotate(12deg) scale(1.1)}80%{transform:rotate(-5deg)}}
+@keyframes pf-wha{0%,100%{transform:none}35%{transform:translateY(-13px) rotate(-16deg)}70%{transform:translateY(-3px) rotate(8deg)}}
+@keyframes pf-droop{0%{transform:none}30%,100%{transform:translateY(4px) scale(.94) rotate(-6deg)}}
+@keyframes pf-sink{0%{transform:none}30%,100%{transform:translateY(6px) rotate(10deg)}}
+html[data-pet=p_semut] .fb.ok::before{animation-name:pf-ant}html[data-pet=p_lebah] .fb.ok::before{animation-name:pf-bee}html[data-pet=p_hudhud] .fb.ok::before{animation-name:pf-hud}
+html[data-pet=p_unta] .fb.ok::before{animation-name:pf-cam}html[data-pet=p_gajah] .fb.ok::before{animation-name:pf-ele}html[data-pet=p_paus] .fb.ok::before{animation-name:pf-wha}
+html[data-pet=p_unta] .fb.no::before,html[data-pet=p_gajah] .fb.no::before{animation:pf-droop .6s forwards}
+html[data-pet=p_lebah] .fb.no::before,html[data-pet=p_paus] .fb.no::before{animation:pf-sink .6s forwards}
+@media(prefers-reduced-motion:reduce){.fb::before{animation:none!important}}
 </style>
 </head>
 <body>
@@ -985,10 +1091,11 @@ const PETS = [
 ];
 const PK = '#2b2b2b';
 // Wajah bersama: m = 'idle' | 'ok' | 'no'. my = jarak mulut dari mata, mo = gambar mulut atau tidak.
+// Mata dibungkus <g class="bl"> supaya bisa berkedip lewat CSS.
 const pFace = (m, x, y, g = 9, s = 1, my = 6, mo = true) => {
-  const eye = cx => m === 'ok'
+  const eye = cx => '<g class="bl">' + (m === 'ok'
     ? `<path d="M${cx - 3.6 * s} ${y + s}q${3.6 * s} ${-5 * s} ${7.2 * s} 0" fill="none" stroke="${PK}" stroke-width="${2.2 * s}" stroke-linecap="round"/>`
-    : `<circle cx="${cx}" cy="${y}" r="${3.3 * s}" fill="${PK}"/><circle cx="${cx + 1.1 * s}" cy="${y - 1.2 * s}" r="${1.1 * s}" fill="#fff"/>`;
+    : `<circle cx="${cx}" cy="${y}" r="${3.3 * s}" fill="${PK}"/><circle cx="${cx + 1.1 * s}" cy="${y - 1.2 * s}" r="${1.1 * s}" fill="#fff"/>`) + '</g>';
   const mp = m === 'ok' ? `M${x - 4.5 * s} ${y + my * s}q${4.5 * s} ${5.5 * s} ${9 * s} 0`
     : m === 'no' ? `M${x - 3.5 * s} ${y + (my + 4) * s}q${3.5 * s} ${-4.5 * s} ${7 * s} 0`
     : `M${x - 3 * s} ${y + (my + 1) * s}q${3 * s} ${3 * s} ${6 * s} 0`;
@@ -999,66 +1106,88 @@ const pFace = (m, x, y, g = 9, s = 1, my = 6, mo = true) => {
   return ch + eye(x - g) + eye(x + g) + (mo ? `<path d="${mp}" fill="none" stroke="${PK}" stroke-width="${2 * s}" stroke-linecap="round"/>` : '') + sad;
 };
 
+// Kelas k-/s-/l-/h-/u-/g-/w- menandai bagian yang digerakkan CSS (lihat blok "Hewan pendamping" di stylesheet).
 const PET_ART = {
-  p_kucing: m => `<path d="M72 90c16 0 20-16 12-28" fill="none" stroke="#E0832A" stroke-width="7" stroke-linecap="round"/>
-    <ellipse cx="50" cy="86" rx="26" ry="15" fill="#F4A340"/><ellipse cx="38" cy="95" rx="8" ry="5" fill="#FFF1DC"/><ellipse cx="62" cy="95" rx="8" ry="5" fill="#FFF1DC"/>
-    <path d="M22 44L20 12L47 27z" fill="#F4A340"/><path d="M78 44L80 12L53 27z" fill="#F4A340"/><path d="M26 36L25 20L40 29z" fill="#FFC1A0"/><path d="M74 36L75 20L60 29z" fill="#FFC1A0"/>
+  p_kucing: m => `<g class="k-tail"><path d="M72 90c16 0 20-16 12-28" fill="none" stroke="#E0832A" stroke-width="7" stroke-linecap="round"/></g>
+    <g class="k-body"><ellipse cx="50" cy="86" rx="26" ry="15" fill="#F4A340"/><ellipse cx="38" cy="95" rx="8" ry="5" fill="#FFF1DC"/><ellipse cx="62" cy="95" rx="8" ry="5" fill="#FFF1DC"/></g>
+    <g class="k-head"><g class="k-earl"><path d="M22 44L20 12L47 27z" fill="#F4A340"/><path d="M26 36L25 20L40 29z" fill="#FFC1A0"/></g><g class="k-earr"><path d="M78 44L80 12L53 27z" fill="#F4A340"/><path d="M74 36L75 20L60 29z" fill="#FFC1A0"/></g>
     <ellipse cx="50" cy="52" rx="30" ry="27" fill="#F4A340"/><path d="M50 26v9M40 28l2 8M60 28l-2 8" stroke="#E0832A" stroke-width="3" stroke-linecap="round" fill="none"/>
     <ellipse cx="50" cy="62" rx="13" ry="9" fill="#FFF1DC"/><path d="M46.5 55h7l-3.5 4z" fill="#E8668A"/>
-    <path d="M19 56h13M20 64l12-3M81 56H68M80 64l-12-3" stroke="#7a5230" stroke-width="1.3" stroke-linecap="round" fill="none"/>${pFace(m, 50, 46, 12, 1, 9)}`,
+    <path d="M19 56h13M20 64l12-3M81 56H68M80 64l-12-3" stroke="#7a5230" stroke-width="1.3" stroke-linecap="round" fill="none"/>${pFace(m, 50, 46, 12, 1, 9)}</g>`,
 
-  p_semut: m => `<path d="M40 24q-8-14-17-12M60 24q8-14 17-12" fill="none" stroke="#7A2E1F" stroke-width="3" stroke-linecap="round"/><circle cx="23" cy="12" r="3.2" fill="#7A2E1F"/><circle cx="77" cy="12" r="3.2" fill="#7A2E1F"/>
-    <path d="M40 68l-17 4M40 72l-16 12M60 68l17 4M60 72l16 12M44 78l-8 14M56 78l8 14" stroke="#7A2E1F" stroke-width="3" stroke-linecap="round" fill="none"/>
-    <ellipse cx="50" cy="87" rx="15" ry="11" fill="#B5472F"/><circle cx="50" cy="68" r="12" fill="#C9553A"/><circle cx="50" cy="40" r="25" fill="#D9694D"/>
-    <ellipse cx="42" cy="28" rx="7" ry="4" fill="#fff" opacity=".25" transform="rotate(-25 42 28)"/>${pFace(m, 50, 40, 10, 1.1, 8)}`,
+  p_semut: m => `<g class="s-antl"><path d="M40 24q-8-14-17-12" fill="none" stroke="#7A2E1F" stroke-width="3" stroke-linecap="round"/><circle cx="23" cy="12" r="3.2" fill="#7A2E1F"/></g><g class="s-antr"><path d="M60 24q8-14 17-12" fill="none" stroke="#7A2E1F" stroke-width="3" stroke-linecap="round"/><circle cx="77" cy="12" r="3.2" fill="#7A2E1F"/></g>
+    <g class="s-legl"><path d="M40 68l-17 4M40 72l-16 12M44 78l-8 14" stroke="#7A2E1F" stroke-width="3" stroke-linecap="round" fill="none"/></g><g class="s-legr"><path d="M60 68l17 4M60 72l16 12M56 78l8 14" stroke="#7A2E1F" stroke-width="3" stroke-linecap="round" fill="none"/></g>
+    <g class="s-body"><ellipse cx="50" cy="87" rx="15" ry="11" fill="#B5472F"/><circle cx="50" cy="68" r="12" fill="#C9553A"/></g>
+    <g class="s-head"><circle cx="50" cy="40" r="25" fill="#D9694D"/><ellipse cx="42" cy="28" rx="7" ry="4" fill="#fff" opacity=".25" transform="rotate(-25 42 28)"/>${pFace(m, 50, 40, 10, 1.1, 8)}</g>`,
 
-  p_lebah: m => `<ellipse cx="30" cy="34" rx="13" ry="20" transform="rotate(-28 30 34)" fill="#D6ECFF" stroke="#9CC9EE" stroke-width="2"/><ellipse cx="70" cy="34" rx="13" ry="20" transform="rotate(28 70 34)" fill="#D6ECFF" stroke="#9CC9EE" stroke-width="2"/>
-    <path d="M42 32q-3-12-10-15M58 32q3-12 10-15" fill="none" stroke="${PK}" stroke-width="2.6" stroke-linecap="round"/><circle cx="32" cy="17" r="3" fill="${PK}"/><circle cx="68" cy="17" r="3" fill="${PK}"/>
+  p_lebah: m => `<g class="l-all"><g class="l-wingl"><ellipse cx="30" cy="34" rx="13" ry="20" transform="rotate(-28 30 34)" fill="#D6ECFF" stroke="#9CC9EE" stroke-width="2"/></g><g class="l-wingr"><ellipse cx="70" cy="34" rx="13" ry="20" transform="rotate(28 70 34)" fill="#D6ECFF" stroke="#9CC9EE" stroke-width="2"/></g>
+    <g class="l-antl"><path d="M42 32q-3-12-10-15" fill="none" stroke="${PK}" stroke-width="2.6" stroke-linecap="round"/><circle cx="32" cy="17" r="3" fill="${PK}"/></g><g class="l-antr"><path d="M58 32q3-12 10-15" fill="none" stroke="${PK}" stroke-width="2.6" stroke-linecap="round"/><circle cx="68" cy="17" r="3" fill="${PK}"/></g>
     <clipPath id="cpb"><ellipse cx="50" cy="60" rx="31" ry="27"/></clipPath><ellipse cx="50" cy="60" rx="31" ry="27" fill="#FFC93C"/>
     <g clip-path="url(#cpb)"><rect x="0" y="71" width="100" height="6" fill="#3a2a1a"/><rect x="0" y="81" width="100" height="6" fill="#3a2a1a"/></g>
-    <ellipse cx="38" cy="45" rx="8" ry="4" fill="#fff" opacity=".35" transform="rotate(-20 38 45)"/>${pFace(m, 50, 56, 11, 1.1, 7)}`,
+    <ellipse cx="38" cy="45" rx="8" ry="4" fill="#fff" opacity=".35" transform="rotate(-20 38 45)"/>${pFace(m, 50, 56, 11, 1.1, 7)}</g>`,
 
-  p_hudhud: m => `<g>${[-50, -25, 0, 25, 50].map(a => `<ellipse cx="46" cy="12" rx="4.6" ry="11" fill="#E3A06B" transform="rotate(${a} 46 38)"/><ellipse cx="46" cy="5.5" rx="4.2" ry="4.2" fill="${PK}" transform="rotate(${a} 46 38)"/>`).join('')}</g>
-    <ellipse cx="50" cy="80" rx="30" ry="18" fill="#E3A06B"/>
-    <clipPath id="cph"><ellipse cx="66" cy="80" rx="17" ry="14" transform="rotate(-15 66 80)"/></clipPath><ellipse cx="66" cy="80" rx="17" ry="14" transform="rotate(-15 66 80)" fill="${PK}"/>
-    <g clip-path="url(#cph)"><rect x="40" y="73" width="50" height="4" fill="#fff"/><rect x="40" y="81" width="50" height="4" fill="#fff"/><rect x="40" y="89" width="50" height="4" fill="#fff"/></g>
-    <circle cx="46" cy="50" r="23" fill="#E3A06B"/><path d="M66 52q20 2 30 16q-20-5-30-8z" fill="#3b2a22"/>${pFace(m, 44, 48, 9, 1, 7)}`,
+  p_hudhud: m => `<ellipse cx="50" cy="80" rx="30" ry="18" fill="#E3A06B"/>
+    <g class="h-wing"><clipPath id="cph"><ellipse cx="66" cy="80" rx="17" ry="14" transform="rotate(-15 66 80)"/></clipPath><ellipse cx="66" cy="80" rx="17" ry="14" transform="rotate(-15 66 80)" fill="${PK}"/>
+    <g clip-path="url(#cph)"><rect x="40" y="73" width="50" height="4" fill="#fff"/><rect x="40" y="81" width="50" height="4" fill="#fff"/><rect x="40" y="89" width="50" height="4" fill="#fff"/></g></g>
+    <g class="h-head"><g class="h-crest">${[-50, -25, 0, 25, 50].map(a => `<ellipse cx="46" cy="12" rx="4.6" ry="11" fill="#E3A06B" transform="rotate(${a} 46 38)"/><ellipse cx="46" cy="5.5" rx="4.2" ry="4.2" fill="${PK}" transform="rotate(${a} 46 38)"/>`).join('')}</g>
+    <circle cx="46" cy="50" r="23" fill="#E3A06B"/><path d="M66 52q20 2 30 16q-20-5-30-8z" fill="#3b2a22"/>${pFace(m, 44, 48, 9, 1, 7)}</g>`,
 
   p_unta: m => `<path d="M38 74v20M47 74v20M72 74v20M81 74v20" stroke="#C48A3F" stroke-width="8" stroke-linecap="round" fill="none"/>
-    <path d="M88 62q6 6 3 16" stroke="#C48A3F" stroke-width="4" stroke-linecap="round" fill="none"/>
-    <circle cx="52" cy="54" r="13" fill="#D9A45B"/><circle cx="72" cy="56" r="12" fill="#D9A45B"/><ellipse cx="58" cy="68" rx="32" ry="15" fill="#D9A45B"/>
-    <path d="M36 56L29 38" stroke="#D9A45B" stroke-width="15" stroke-linecap="round" fill="none"/>
+    <g class="u-tail"><path d="M88 62q6 6 3 16" stroke="#C48A3F" stroke-width="4" stroke-linecap="round" fill="none"/></g>
+    <g class="u-body"><circle cx="52" cy="54" r="13" fill="#D9A45B"/><circle cx="72" cy="56" r="12" fill="#D9A45B"/><ellipse cx="58" cy="68" rx="32" ry="15" fill="#D9A45B"/></g>
+    <g class="u-neck"><path d="M36 56L29 38" stroke="#D9A45B" stroke-width="15" stroke-linecap="round" fill="none"/>
     <ellipse cx="13" cy="21" rx="5" ry="8" transform="rotate(-20 13 21)" fill="#D9A45B"/><ellipse cx="41" cy="21" rx="5" ry="8" transform="rotate(20 41 21)" fill="#D9A45B"/>
     <ellipse cx="27" cy="30" rx="18" ry="16" fill="#D9A45B"/><path d="M20 15q7-7 14 0q-7 3-14 0z" fill="#8A5A24"/>
-    <ellipse cx="27" cy="40" rx="11" ry="8" fill="#F0CC91"/><circle cx="23" cy="38" r="1.4" fill="#8A5A24"/><circle cx="31" cy="38" r="1.4" fill="#8A5A24"/>${pFace(m, 27, 29, 8, .85, 13)}`,
+    <ellipse cx="27" cy="40" rx="11" ry="8" fill="#F0CC91"/><circle cx="23" cy="38" r="1.4" fill="#8A5A24"/><circle cx="31" cy="38" r="1.4" fill="#8A5A24"/>${pFace(m, 27, 29, 8, .85, 13)}</g>`,
 
-  p_gajah: m => `<circle cx="19" cy="46" r="17" fill="#8FA9C4"/><circle cx="19" cy="46" r="10" fill="#F4B6C2"/><circle cx="81" cy="46" r="17" fill="#8FA9C4"/><circle cx="81" cy="46" r="10" fill="#F4B6C2"/>
+  p_gajah: m => `<g class="g-earl"><circle cx="19" cy="46" r="17" fill="#8FA9C4"/><circle cx="19" cy="46" r="10" fill="#F4B6C2"/></g><g class="g-earr"><circle cx="81" cy="46" r="17" fill="#8FA9C4"/><circle cx="81" cy="46" r="10" fill="#F4B6C2"/></g>
     <ellipse cx="50" cy="48" rx="28" ry="27" fill="#9BB1C8"/>
     <path d="M36 64q-8 10-2 20M64 64q8 10 2 20" stroke="#FFF9EC" stroke-width="5.5" stroke-linecap="round" fill="none"/>
-    <path d="M50 56v24q0 12 12 11" fill="none" stroke="#9BB1C8" stroke-width="17" stroke-linecap="round"/><path d="M44 66h12M44 74h12" stroke="#8299B3" stroke-width="1.6" stroke-linecap="round"/>
+    <g class="g-trunk"><path d="M50 56v24q0 12 12 11" fill="none" stroke="#9BB1C8" stroke-width="17" stroke-linecap="round"/><path d="M44 66h12M44 74h12" stroke="#8299B3" stroke-width="1.6" stroke-linecap="round"/></g>
     ${pFace(m, 50, 40, 13, 1, 0, false)}`,
 
-  p_paus: m => `<path d="M46 22q-5-11-14-9M46 22q5-11 14-9" fill="none" stroke="#7CC4F5" stroke-width="3" stroke-linecap="round"/><circle cx="31" cy="11" r="2.4" fill="#7CC4F5"/><circle cx="61" cy="11" r="2.4" fill="#7CC4F5"/>
-    <path d="M84 62q12-6 14-24q-11 3-20 14z M84 66q12 4 13 22q-10-5-18-14z" fill="#3F7FC4"/>
+  p_paus: m => `<g class="w-all"><g class="w-spout"><path d="M46 22q-5-11-14-9M46 22q5-11 14-9" fill="none" stroke="#7CC4F5" stroke-width="3" stroke-linecap="round"/><circle cx="31" cy="11" r="2.4" fill="#7CC4F5"/><circle cx="61" cy="11" r="2.4" fill="#7CC4F5"/></g>
+    <g class="w-tail"><path d="M84 62q12-6 14-24q-11 3-20 14z M84 66q12 4 13 22q-10-5-18-14z" fill="#3F7FC4"/></g>
     <path d="M8 60c0-22 20-34 42-34 26 0 38 15 38 32 0 18-18 28-42 28-22 0-38-10-38-26z" fill="#4A8FD6"/>
-    <path d="M12 66c10 14 34 20 54 17 12-2 20-7 22-15-12 8-46 11-76-2z" fill="#DCEEFF"/>${pFace(m, 34, 54, 9, 1, 8)}`,
+    <path d="M12 66c10 14 34 20 54 17 12-2 20-7 22-15-12 8-46 11-76-2z" fill="#DCEEFF"/>${pFace(m, 34, 54, 9, 1, 8)}</g>`,
 };
 
-const petSvg = (id, m = 'idle', px) => `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100"${px ? ` width="${px}" height="${px}"` : ''}>${(PET_ART[id] || PET_ART.p_kucing)(m)}</svg>`;
+// live = true untuk hewan yang tampil di layar (diberi kelas agar bisa dianimasikan); gambar statis (.fb) tanpa kelas.
+const petSvg = (id, m = 'idle', px, live) => `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100"${px ? ` width="${px}" height="${px}"` : ''}${live ? ` class="pa pa-${(id || 'p_kucing').slice(2)}" aria-hidden="true"` : ''}>${(PET_ART[id] || PET_ART.p_kucing)(m)}</svg>`;
 const myPetOf = x => PETS.some(q => q[0] === x) ? x : PET0, myPet = () => myPetOf(me && me.pet);
 const petUrl = (id, m) => 'url("data:image/svg+xml,' + encodeURIComponent(petSvg(id, m)) + '")';
 let petOn = null;
 function applyPet() { // wajah hewan di balasan jawaban (.fb) lewat variabel CSS, jadi semua jenis kuis ikut tanpa mengubah kodenya
-  const id = myPet(); SFX.petId = id; if (petOn === id) return; petOn = id;
+  const id = myPet(); SFX.petId = id; if (petOn === id) return; petOn = id; document.documentElement.dataset.pet = id;
   const st = document.documentElement.style; ['idle', 'ok', 'no'].forEach(m => st.setProperty('--pet-' + m, petUrl(id, m)));
 }
-function petHop(el) { if (!el || RM) return; el.classList.remove('hop'); void el.offsetWidth; el.classList.add('hop'); }
+// Reaksi saat disentuh: tiap hewan punya gerakan sendiri (lihat CSS .pa-xxx.act)
+function petAct(el) {
+  const sv = el && el.querySelector('svg.pa'); if (!sv || RM) return;
+  sv.classList.remove('act'); void sv.getBoundingClientRect(); sv.classList.add('act');
+  clearTimeout(sv._pt); sv._pt = setTimeout(() => sv.classList.remove('act'), 1000);
+}
+// Animasi hidup hanya jalan untuk hewan yang sedang terlihat di layar, paling banyak PET_LIVE_MAX sekaligus.
+// Selebihnya diam, jadi biaya tetap kecil di perangkat lemah (tanpa library, tanpa kerja JS per frame).
+const PET_LIVE_MAX = 4; let petIO = null; const petSeen = new Set();
+function petLive(root) {
+  if (petIO) petIO.disconnect(); petSeen.clear();
+  const els = [...root.querySelectorAll('svg.pa')]; if (!els.length) return;
+  if (!('IntersectionObserver' in window)) { els.slice(0, PET_LIVE_MAX).forEach(e => e.classList.add('live')); return; }
+  petIO = new IntersectionObserver(es => {
+    es.forEach(x => x.isIntersecting ? petSeen.add(x.target) : petSeen.delete(x.target));
+    let n = 0; els.forEach(e => { const on = petSeen.has(e) && n < PET_LIVE_MAX; if (on) n++; e.classList.toggle('live', on); });
+  }, { threshold: 0.5 });
+  els.forEach(e => petIO.observe(e));
+}
+// Tab disembunyikan atau jendela diminimalkan: semua animasi hewan dijeda
+document.addEventListener('visibilitychange', () => document.documentElement.classList.toggle('pa-off', document.hidden));
 let shopTab = 'fx';
 async function vShop() {
   V.innerHTML = '<p class="muted">Memuat…</p>';
   let st; try { st = await api('shop'); } catch (e) { V.textContent = e.message; return; }
   const sync = () => { me.spent = st.spent; me.bonus = st.bonus; me.fxa = st.equipped; me.fxn = st.equippedName; me.pet = st.equippedPet; };
-  const play = k => { if (k.startsWith('p_')) { petHop($('#sg-' + k)); SFX.pet(k); return; } const s = $('#sg-' + k); if (s) (FX[k] || FX.confetti)(s.getBoundingClientRect(), s); };
+  const play = k => { if (k.startsWith('p_')) { petAct($('#sg-' + k)); SFX.pet(k); return; } const s = $('#sg-' + k); if (s) (FX[k] || FX.confetti)(s.getBoundingClientRect(), s); };
   const draw = () => {
     sync(); const g = st.gold, nameTab = shopTab === 'nm', petTab = shopTab === 'pt', list = petTab ? PETS : nameTab ? NSHOP : SHOP;
     V.innerHTML = `<div class="shopbar"><h1>Efek</h1><span class="gold" style="font-size:1.15rem">${GL} ${g}</span></div>
@@ -1067,16 +1196,17 @@ async function vShop() {
       <div class="shopg">${list.map(([k, nm_, ic, tr, ds]) => {
         const free = k === 'confetti' || k === 'n_none' || k === PET0, own = free || st.owned.includes(k), pr = st.prices[k] || 0;
         const eq = petTab ? myPetOf(st.equippedPet) === k : nameTab ? (st.equippedName || 'n_none') === k : (st.equipped || 'confetti') === k;
-        const stage = petTab ? `<div class="stage pimg" id="sg-${k}">${petSvg(k, 'idle')}</div>` : nameTab ? `<div class="stage nm"><b class="${nc(k)}">${esc(me.username)}</b></div>` : `<div class="stage" id="sg-${k}"><span>${ic}</span></div>`;
+        const stage = petTab ? `<div class="stage pimg" id="sg-${k}">${petSvg(k, 'idle', 0, true)}</div>` : nameTab ? `<div class="stage nm"><b class="${nc(k)}">${esc(me.username)}</b></div>` : `<div class="stage" id="sg-${k}"><span>${ic}</span></div>`;
         return `<div class="si${eq ? ' eq' : ''}${tr === 'Legendaris' || tr === 'Mitos' ? ' hi' : ''}" style="--tc:${TIER[tr]}"><span class="tg">${tr}</span>${stage}<h3>${nm_}${petTab ? ` <span class="parab" dir="rtl">${ic}</span>` : ''}</h3><p>${ds}</p>
           <div class="acts">${nameTab ? '' : `<button class="btn ghost" data-try="${k}">Coba</button>`}${own
             ? `<button class="btn" data-eq="${k}"${eq ? ' disabled' : ''}>${eq ? '✓ Terpasang' : 'Pasang'}</button>`
             : `<button class="btn" data-buy="${k}"${g < pr ? ' disabled' : ''}>${g < pr ? 'Kurang ' + (pr - g) + ' ' + GL : GL + ' ' + pr}</button>`}</div></div>`;
       }).join('')}</div>`;
+    petLive(V);
     V.querySelectorAll('[data-st]').forEach(b => b.onclick = () => { shopTab = b.dataset.st; draw(); });
     V.querySelectorAll('[data-try]').forEach(b => b.onclick = () => play(b.dataset.try));
     V.querySelectorAll('[data-eq]').forEach(b => b.onclick = async () => {
-      try { st = await api('shop/equip', { item: b.dataset.eq }); draw(); renderChip(); const e = b.dataset.eq; if (e.startsWith('p_')) SFX.pet(e); toast(e.startsWith('p_') ? 'Hewan terpasang' : e.startsWith('n_') ? 'Gaya nama terpasang' : 'Efek terpasang', '✨'); } catch (e) { toast(e.message, '⚠️'); }
+      try { st = await api('shop/equip', { item: b.dataset.eq }); draw(); renderChip(); const e = b.dataset.eq; if (e.startsWith('p_')) { SFX.pet(e); petAct($('#sg-' + e)); } toast(e.startsWith('p_') ? 'Hewan terpasang' : e.startsWith('n_') ? 'Gaya nama terpasang' : 'Efek terpasang', '✨'); } catch (e) { toast(e.message, '⚠️'); }
     });
     V.querySelectorAll('[data-buy]').forEach(b => b.onclick = async () => {
       const k = b.dataset.buy, it = SHOP.find(x => x[0] === k) || NSHOP.find(x => x[0] === k) || PETS.find(x => x[0] === k);
@@ -1365,7 +1495,7 @@ function vHome() {
   const frac = nx ? (tot - rk[0]) / (nx[0] - rk[0]) : 1, p = Math.min(1, (ri + frac) / (RANKS.length - 1));
   const pid = myPet(), PP = PETS.find(x => x[0] === pid); let pli = Math.floor(Math.random() * PP[5].length);
   V.innerHTML = `<h1 class="hello">Assalamu'alaikum, ${esc(me.username)}</h1>
-    <div class="petrow"><button class="petbtn" id="pethome" aria-label="Sentuh hewan pendampingmu">${petSvg(pid, 'idle')}</button><div class="pbub"><b>${PP[1]} <span class="parab" dir="rtl">${PP[2]}</span></b><span id="petln">${PP[5][pli]}</span></div></div>
+    <div class="petrow"><button class="petbtn" id="pethome" aria-label="Sentuh hewan pendampingmu">${petSvg(pid, 'idle', 0, true)}</button><div class="pbub"><b>${PP[1]} <span class="parab" dir="rtl">${PP[2]}</span></b><span id="petln">${PP[5][pli]}</span></div></div>
     <div class="card hero" style="--rc:${rk[3]}">
       <div class="top2"><div class="who"><span class="medal">${RI(ri, 72)}</span><div><small>Tingkat saat ini</small><b>${rk[1]}</b></div></div>
         <div class="xpb"><h1><span id="tx">0</span> <small>XP</small></h1><span class="gold">${GL} ${gold()}</span></div></div>
@@ -1380,7 +1510,8 @@ function vHome() {
     <div class="sec"><h2>Latihan</h2><span>Pilih jenis kuis, lalu jilid dan levelnya</span></div>
     <div class="tabs htabs"><button data-ht="tulis">✍️ Kuis Tulis</button><button data-ht="lisan">🗣️ Kuis Lisan</button><button data-ht="sorof">🧩 Kuis Sorof</button></div>
     <div id="hpane"></div>`;
-  $('#pethome').onclick = e => { pli = (pli + 1) % PP[5].length; $('#petln').textContent = PP[5][pli]; petHop(e.currentTarget); SFX.pet(pid); };
+  $('#pethome').onclick = e => { pli = (pli + 1) % PP[5].length; $('#petln').textContent = PP[5][pli]; petAct(e.currentTarget); SFX.pet(pid); };
+  petLive(V);
   // Tab Kuis Tulis: quest per jilid (XP) + Mode Tathbiq sebagai puncaknya
   const paneTulis = () => `<p class="muted hnote">Soal pilihan ganda. Minimal ${PASS()}% benar di tiap level agar quest selesai; selesaikan semua jilid untuk membuka Mode Tathbiq.</p>
     <div class="grid jgrid">` + [1, 2, 3, 4].map((j, n) => `<div class="card jc" style="--i:${n};${jst(j)}"><div class="jh"><span class="tag">Jilid ${j}</span><span class="jst">${JD(j) ? (JP(j) ? '💯 Sempurna' : '🏅 Selesai') : JN(j) + '/3 level selesai'}</span></div><div class="lvls">` +
