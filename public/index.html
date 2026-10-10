@@ -732,11 +732,18 @@ const SFX = (() => {
       const c = ctx(); if (!c) return;
       tone(c, 196, 0, 0.2, 'triangle', 0.2); tone(c, 147, 0.13, 0.32, 'triangle', 0.2);
     },
-    win() { // hasil bagus atau hadiah: arpeggio naik
+    win(big) { // hasil bagus atau hadiah: arpeggio naik; big = hadiah besar, ditambah arpeggio kedua yang lebih tinggi
       vib([20, 40, 20, 40, 90]);
       const c = ctx(); if (!c) return;
       [523.25, 659.25, 783.99, 1046.5].forEach((f, i) => tone(c, f, i * 0.09, i === 3 ? 0.55 : 0.18, 'sine', 0.15));
-      setTimeout(() => SFX.pet(), 600); // hewan pendamping ikut bersuara
+      if (big) [783.99, 987.77, 1174.66, 1568].forEach((f, i) => tone(c, f, 0.45 + i * 0.08, i === 3 ? 0.6 : 0.16, 'sine', 0.13));
+      setTimeout(() => SFX.pet(), big ? 1150 : 600); // hewan pendamping ikut bersuara
+    },
+    spin() { // tombol spin ditekan: desis naik
+      const c = ctx(); if (!c) return; sw(c, 220, 880, 0, 0.45, 'triangle', 0.07);
+    },
+    tick(p) { // satu klik tiap kotak hadiah melewati penunjuk; p = kemajuan 0..1 (nada menurun seiring melambat)
+      const c = ctx(); if (!c) return; tone(c, 1500 - 700 * p, 0, 0.03, 'square', 0.045);
     },
     pet(id) { // suara khas tiap hewan: disentuh di Beranda, dicoba di toko, dan setelah hasil bagus
       const c = ctx(); if (!c) return;
@@ -1069,24 +1076,24 @@ const NSHOP = [ // gaya nama: [kunci, nama, ikon(tak dipakai), tier, deskripsi];
 const NSTYLE = new Set(NSHOP.map(x => x[0]).filter(k => k !== 'n_none'));
 const nc = k => NSTYLE.has(k) ? 'nfx ' + k : ''; // kelas CSS gaya nama (kosong bila tidak valid)
 const nm = (name, k) => { const c = nc(k); return c ? `<span class="${c}">${esc(name)}</span>` : esc(name); };
-const TIER = { Umum: '#8A97A6', Langka: '#2BA3E6', Epik: '#A94BC0', Legendaris: '#E8960F', Mitos: '#EF3E7B' };
+const TIER = { Umum: '#8A97A6', Langka: '#2BA3E6', Epik: '#A94BC0', Legendaris: '#E8960F', Mitos: '#EF3E7B', Hewan: '#2BB3A3' };
 /* ---------- Hewan pendamping ---------- */
 const PET0 = 'p_kucing'; // gratis untuk semua murid; yang lain dibeli di toko (harga ada di server)
 // [kunci, nama, nama Arab, tingkat, kisah, [tiga sapaan di Beranda]]
 const PETS = [
-  ['p_kucing', 'Kucing', 'قطة', 'Umum', 'Dalam hadis, kucing termasuk hewan yang biasa berkeliling di sekitar kita, sehingga tidak najis.',
+  ['p_kucing', 'Kucing', 'قطة', 'Hewan', 'Dalam hadis, kucing termasuk hewan yang biasa berkeliling di sekitar kita, sehingga tidak najis.',
     ['Meong! Ayo belajar sebentar, aku temani.', 'Kucing dalam bahasa Arab: قطة (qitthah).', 'Satu soal lagi? Aku siap menemanimu.']],
-  ['p_semut', 'Semut', 'نملة', 'Umum', 'Nabi Sulaiman mendengar seekor semut menyeru kaumnya masuk ke sarang (QS An-Naml: 18).',
+  ['p_semut', 'Semut', 'نملة', 'Hewan', 'Nabi Sulaiman mendengar seekor semut menyeru kaumnya masuk ke sarang (QS An-Naml: 18).',
     ['Tik tik! Pelan-pelan tapi rajin, seperti semut.', 'Semut dalam bahasa Arab: نملة (namlah). Ada surah An-Naml.', 'Kecil tidak masalah, yang penting terus melangkah.']],
-  ['p_lebah', 'Lebah', 'نحلة', 'Langka', 'Allah mengilhamkan kepada lebah untuk membuat sarang (QS An-Nahl: 68).',
+  ['p_lebah', 'Lebah', 'نحلة', 'Hewan', 'Allah mengilhamkan kepada lebah untuk membuat sarang (QS An-Nahl: 68).',
     ['Bzzz! Madu ilmu dikumpulkan sedikit demi sedikit.', 'Lebah dalam bahasa Arab: نحلة (nahlah). Ada surah An-Nahl.', 'Ayo kumpulkan XP hari ini!']],
-  ['p_hudhud', 'Hud-hud', 'هدهد', 'Langka', 'Hud-hud membawa kabar negeri Saba kepada Nabi Sulaiman (QS An-Naml: 20-22).',
+  ['p_hudhud', 'Hud-hud', 'هدهد', 'Hewan', 'Hud-hud membawa kabar negeri Saba kepada Nabi Sulaiman (QS An-Naml: 20-22).',
     ['Hu-hu-hu! Aku bawa kabar baik: waktunya belajar.', 'Burung ini dalam bahasa Arab: هدهد (hudhud).', 'Aku pernah membawa kabar penting kepada Nabi Sulaiman.']],
-  ['p_unta', 'Unta', 'ناقة', 'Epik', 'Unta betina mukjizat Nabi Shalih (QS Al-A\'raf: 73).',
+  ['p_unta', 'Unta', 'ناقة', 'Hewan', 'Unta betina mukjizat Nabi Shalih (QS Al-A\'raf: 73).',
     ['Perjalanan jauh dimulai dari satu langkah. Ayo belajar.', 'Unta betina: ناقة (naqah), unta jantan: جمل (jamal).', 'Sabar dan tekun, seperti unta di padang pasir.']],
-  ['p_gajah', 'Gajah', 'فيل', 'Epik', 'Tahun Gajah: pasukan bergajah Abrahah yang gagal menyerang Ka\'bah (QS Al-Fil).',
+  ['p_gajah', 'Gajah', 'فيل', 'Hewan', 'Tahun Gajah: pasukan bergajah Abrahah yang gagal menyerang Ka\'bah (QS Al-Fil).',
     ['Pelan tapi pasti. Aku tak pernah lupa pelajaran!', 'Gajah dalam bahasa Arab: فيل (fil). Ada surah Al-Fil.', 'Ayo, kita selesaikan tantangan hari ini.']],
-  ['p_paus', 'Paus', 'حوت', 'Mitos', 'Nabi Yunus ditelan ikan besar, lalu berdoa dan diselamatkan (QS Ash-Shaffat: 139-148).',
+  ['p_paus', 'Paus', 'حوت', 'Hewan', 'Nabi Yunus ditelan ikan besar, lalu berdoa dan diselamatkan (QS Ash-Shaffat: 139-148).',
     ['Wuush! Ayo menyelam ke dalam pelajaran hari ini.', 'Ikan besar dalam bahasa Arab: حوت (hut). Nabi Yunus pernah berada di perutnya.', 'Sabar dan berdoa, seperti Nabi Yunus.']],
 ];
 const PK = '#2b2b2b';
@@ -1219,6 +1226,25 @@ async function vShop() {
 
 /* ---------- Kuis harian + spin hadiah ---------- */
 let DAILY_PASS = 80; const EVP = { daily: 80, fast: 80, sorof: 80, oral: 80 }, setEvp = d => { if (d.dly) { DAILY_PASS = EVP.daily = d.dly.pass; } EVP.fast = d.fast.pass; EVP.sorof = d.sorof.pass; EVP.oral = d.oral.pass; }, PRIZE_C = { 100: '#8A97A6', 150: '#4CAF73', 200: '#2BA3E6', 300: '#A94BC0', 500: '#E8960F', 750: '#EF3E7B', 1000: '#F5C518' };
+// Jadwal klik spin: kapan tiap kotak hadiah melewati penunjuk. Dihitung dari kurva transisi yang sama dengan CSS
+// (cubic-bezier), jadi tidak ada pembacaan layout tiap frame. Mengembalikan [[ms, kemajuan], ...].
+function spinSchedule(W, x, dur) {
+  const x1 = .1, y1 = .75, x2 = .12, y2 = 1, D = -x, out = [];
+  const bx = t => 3 * (1 - t) * (1 - t) * t * x1 + 3 * (1 - t) * t * t * x2 + t * t * t;
+  const by = t => 3 * (1 - t) * (1 - t) * t * y1 + 3 * (1 - t) * t * t * y2 + t * t * t;
+  const timeAt = p => { let lo = 0, hi = 1; for (let i = 0; i < 30; i++) { const m = (lo + hi) / 2; if (by(m) < p) lo = m; else hi = m; } return bx((lo + hi) / 2); };
+  let last = -1e9;
+  for (let k = Math.floor(W / 2 / 104) + 1; k * 104 - W / 2 <= D; k++) { // tepi kiri kotak ke-k melewati penunjuk
+    const p = (k * 104 - W / 2) / D, t = timeAt(p) * dur;
+    if (p <= 0 || t - last < 34) continue; // terlalu rapat: dilewati supaya tidak menjadi dengung
+    last = t; out.push([t, p]);
+  }
+  return out;
+}
+function spinTicks(strip, W, x, dur) {
+  if (RM || !SFX.st.snd) return;
+  spinSchedule(W, x, dur).forEach(([t, p]) => setTimeout(() => { if (strip.isConnected) SFX.tick(p); }, t));
+}
 async function vDaily() {
   V.innerHTML = '<p class="muted">Memuat…</p>';
   let d; try { d = await api('daily'); } catch (e) { V.textContent = e.message; return; }
@@ -1257,7 +1283,8 @@ async function vDaily() {
   const mk = () => { const x = Math.random() * tot; let a = 0; for (const [g, w] of d.prizes) { a += w; if (x < a) return g; } return d.prizes[0][0]; };
   strip.innerHTML = Array.from({ length: 44 }, () => tile(mk())).join('');
   const reveal = r => {
-    const w = strip.children[WIN]; w.classList.add('win'); SFX.win(); me.bonus = (me.bonus || 0) + r.prize; noteAch(r.ach);
+    if (!strip.isConnected) { me.bonus = (me.bonus || 0) + r.prize; noteAch(r.ach); return; } // layar sudah ditinggalkan: cukup catat hadiahnya
+    const w = strip.children[WIN]; w.classList.add('win'); SFX.win(r.prize >= 1000); me.bonus = (me.bonus || 0) + r.prize; noteAch(r.ach);
     $('#spmsg').innerHTML = `<div class="fb ok" style="font-size:1.1rem">${r.prize >= 1000 ? '🎰 JACKPOT! ' : ''}Kamu mendapat ${GL} ${r.prize}!</div>`;
     const rc = w.getBoundingClientRect();
     if (r.prize >= 1000) { FX.fireworks(rc); setTimeout(() => FX.galaxy(rc, w), 300); flash('rgba(245,197,24,.3)'); }
@@ -1271,7 +1298,8 @@ async function vDaily() {
     strip.children[WIN].outerHTML = tile(r.prize);
     const W = strip.parentElement.clientWidth, x = W / 2 - (WIN * 104 + 48) + R(-34, 34);
     strip.style.transition = RM ? 'none' : 'transform 5.2s cubic-bezier(.1,.75,.12,1)';
-    requestAnimationFrame(() => requestAnimationFrame(() => { strip.style.transform = `translateX(${x}px)`; }));
+    if (!RM) SFX.spin();
+    requestAnimationFrame(() => requestAnimationFrame(() => { strip.style.transform = `translateX(${x}px)`; spinTicks(strip, W, x, 5200); }));
     setTimeout(() => reveal(r), RM ? 50 : 5400);
   };
 }
