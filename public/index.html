@@ -531,6 +531,27 @@ html[data-pet=p_unta] .fb.ok::before{animation-name:pf-cam}html[data-pet=p_gajah
 html[data-pet=p_unta] .fb.no::before,html[data-pet=p_gajah] .fb.no::before{animation:pf-droop .6s forwards}
 html[data-pet=p_lebah] .fb.no::before,html[data-pet=p_paus] .fb.no::before{animation:pf-sink .6s forwards}
 @media(prefers-reduced-motion:reduce){.fb::before{animation:none!important}}
+/* ===== Onboarding: penjelasan ⓘ, bantuan, misi pertama, login ramah ===== */
+.tip{display:inline-grid;place-items:center;width:18px;height:18px;margin-left:5px;border-radius:50%;background:var(--soft);color:var(--accent);font:700 .72rem/1 var(--body);cursor:pointer;vertical-align:middle;user-select:none;-webkit-user-select:none}
+.tip:hover,.tip:focus-visible{background:var(--accent);color:var(--on)}
+.gold .tip{background:rgba(0,0,0,.14);color:inherit;margin-left:6px}
+h1 .tip,h2 .tip{width:20px;height:20px;font-size:.78rem}
+.tipbox{position:fixed;z-index:80;max-width:min(280px,calc(100vw - 24px));background:var(--ink);color:var(--bg);padding:10px 14px;border-radius:12px;font-size:.86rem;font-weight:500;line-height:1.45;box-shadow:0 12px 30px -10px rgba(0,0,0,.55);animation:pop .2s}
+.helpbtn{font-size:1.05rem}
+.top{position:relative}.top .helpbtn{position:absolute;right:14px;top:50%;margin-top:-20px}
+.pw{position:relative}.pw input{padding-right:54px}
+.eye{position:absolute;right:6px;top:6px;width:40px;height:40px;border-radius:10px;display:grid;place-items:center;font-size:1.1rem}
+.eye[aria-pressed=true]{background:var(--soft)}
+.hint{margin:0 0 10px;font-size:.85rem;color:var(--muted)}.hint.bad{color:#c0392b}.hint a{color:var(--accent);font-weight:700}
+.forgot{text-align:center;margin:16px 0 0}
+.btn.xl{width:100%;padding:16px 24px;font-size:1.1rem}
+.mission{border-top:5px solid var(--accent)}.mission h2{margin:6px 0}
+.mnext{margin:10px 0 0;font-size:.88rem;color:var(--muted);text-align:center}
+.fnote{margin:14px 2px 12px}
+.why{margin-top:8px;padding:10px 14px;border-radius:14px;background:var(--soft);font-size:.92rem;font-weight:500}
+.res .gl{text-align:left;margin:14px auto;max-width:520px}
+.gl.steps{padding-left:22px}
+.gloss{margin:0}.gloss dt{font-weight:800;color:var(--accent);margin-top:12px}.gloss dd{margin:2px 0 0}
 </style>
 </head>
 <body>
@@ -541,12 +562,13 @@ html[data-pet=p_lebah] .fb.no::before,html[data-pet=p_paus] .fb.no::before{anima
     <button class="nav" data-v="home">Beranda</button>
     <button class="nav" data-v="daily">Harian</button><button class="nav" data-v="board">Leaderboard</button><button class="nav" data-v="shop">Efek</button><button class="nav" data-v="ach">Pencapaian</button>
     <button class="nav" data-v="admin" id="navAdmin" hidden>Panel Admin</button>
+    <button class="nav" id="navHelp" type="button">❓ Bantuan</button>
     <div class="sp"></div>
     <button class="nav" data-v="profile" id="who"></button>
     <div class="credit">Powered by<br><b>Nabil Ghufron</b> 1447-1448 H</div>
   </aside>
     <main class="main">
-    <header class="top"><img class="top-logo" src="/logo.png" alt="Al-Miftah – Mudah Belajar Membaca Kitab"></header>
+    <header class="top"><img class="top-logo" src="/logo.png" alt="Al-Miftah – Mudah Belajar Membaca Kitab"><button class="icon-btn helpbtn" id="topHelp" type="button" aria-label="Bantuan">❓</button></header>
     <div class="scroll"><div class="wrap" id="view"></div><div class="credit">Powered by <b>Nabil Ghufron</b> 1447-1448 H</div></div>
   </main>
   <nav class="bnav" aria-label="Menu utama">
@@ -618,27 +640,79 @@ function go(v, a) {
 /* ---------- Masuk / Daftar ---------- */
 function vAuth() {
   let mode = 'login';
+  const HINT = { login: 'Masuk dengan username dan password yang dulu kamu daftarkan.', reg: 'Username 3–20 karakter: huruf, angka, atau _ (tanpa spasi). Password minimal 6 karakter. Catat passwordmu di tempat yang aman.' };
   V.innerHTML = `<div class="card auth"><img class="auth-logo" src="/logo.png" alt="Al-Miftah – Mudah Belajar Membaca Kitab"><p class="muted" style="text-align:center">Kuis nahwu untuk murid Madrasah Idadiyah.</p>
     <div class="tabs"><button data-m="login" class="on">Masuk</button><button data-m="reg">Daftar</button></div>
-    <input id="u" placeholder="Username" autocomplete="username"><input id="p" type="password" placeholder="Password" autocomplete="current-password">
-    <div class="err" id="err"></div><button class="btn" id="go">Masuk</button></div>`;
+    <input id="u" placeholder="Username" autocomplete="username" autocapitalize="none" autocorrect="off" spellcheck="false" maxlength="20">
+    <div class="pw"><input id="p" type="password" placeholder="Password" autocomplete="current-password" maxlength="128"><button type="button" class="eye" id="eye" aria-label="Tampilkan password" aria-pressed="false">👁</button></div>
+    <p class="hint" id="hint">${HINT.login}</p>
+    <div class="err" id="err"></div><button class="btn" id="go">Masuk</button>
+    <p class="hint forgot">Lupa password? Hubungi admin: <a href="tel:+6285335101970">085335101970</a> (Nabil Ghufron).</p></div>`;
+  const hint = $('#hint'), uEl = $('#u'), pEl = $('#p'), goB = $('#go');
+  const paint = () => {
+    const badName = mode === 'reg' && /[^A-Za-z0-9_]/.test(uEl.value);
+    hint.textContent = badName ? 'Username hanya boleh huruf, angka, dan _ (tanpa spasi).' : HINT[mode];
+    hint.classList.toggle('bad', badName);
+  };
   V.querySelectorAll('.tabs button').forEach(b => b.onclick = () => {
     mode = b.dataset.m;
-    $('#p').setAttribute('autocomplete', mode === 'login' ? 'current-password' : 'new-password');
+    pEl.setAttribute('autocomplete', mode === 'login' ? 'current-password' : 'new-password');
     V.querySelectorAll('.tabs button').forEach(x => x.classList.toggle('on', x === b));
-    $('#go').textContent = mode === 'login' ? 'Masuk' : 'Daftar';
+    goB.textContent = mode === 'login' ? 'Masuk' : 'Daftar';
+    $('#err').textContent = ''; paint();
   });
+  $('#eye').onclick = e => {
+    const b = e.currentTarget, show = pEl.type === 'password';
+    pEl.type = show ? 'text' : 'password';
+    b.setAttribute('aria-pressed', String(show)); b.setAttribute('aria-label', show ? 'Sembunyikan password' : 'Tampilkan password'); b.textContent = show ? '🙈' : '👁';
+  };
+  uEl.oninput = paint;
   const submit = async () => {
+    const un = uEl.value.trim(), pw = pEl.value;
+    const msg = mode === 'reg'
+      ? (!/^[A-Za-z0-9_]{3,20}$/.test(un) ? 'Username 3–20 karakter: hanya huruf, angka, atau _ (tanpa spasi).' : pw.length < 6 ? 'Password minimal 6 karakter.' : '')
+      : (!un || !pw ? 'Isi username dan password dulu.' : '');
+    if (msg) { $('#err').textContent = msg; return; }
+    goB.disabled = true; $('#err').textContent = '';
     try {
-      const d = await api(mode === 'login' ? 'login' : 'register', { username: $('#u').value.trim(), password: $('#p').value });
+      const d = await api(mode === 'login' ? 'login' : 'register', { username: un, password: pw });
       tok = d.token; try { localStorage.setItem('tk', tok); } catch (e) {}
       if (mode === 'reg') justReg = true;
       await boot();
-    } catch (e) { $('#err').textContent = e.message; }
+    } catch (e) { $('#err').textContent = e.message; goB.disabled = false; }
   };
-  $('#go').onclick = submit;
-  $('#p').onkeydown = e => { if (e.key === 'Enter') submit(); };
+  goB.onclick = submit;
+  uEl.onkeydown = e => { if (e.key === 'Enter') { e.preventDefault(); pEl.focus(); } };
+  pEl.onkeydown = e => { if (e.key === 'Enter') submit(); };
 }
+
+/* ---------- Penjelasan singkat (ikon ⓘ) ---------- */
+/* tip('teks') menghasilkan ikon kecil; diketuk/diklik menampilkan gelembung penjelasan. Satu pendengar global (fase capture), jadi ikon aman diletakkan di dalam tombol. */
+const tip = t => `<span class="tip" role="button" tabindex="0" aria-label="Penjelasan" data-tip="${esc(t)}">ⓘ</span>`;
+(() => {
+  let box = null;
+  const close = () => { if (box) { box.remove(); box = null; } };
+  const open = el => {
+    close();
+    box = document.createElement('div'); box.className = 'tipbox'; box.setAttribute('role', 'tooltip'); box.textContent = el.dataset.tip;
+    document.body.appendChild(box);
+    const r = el.getBoundingClientRect(), w = box.offsetWidth, h = box.offsetHeight;
+    const x = Math.min(Math.max(12, r.left + r.width / 2 - w / 2), innerWidth - w - 12);
+    let y = r.bottom + 8; if (y + h > innerHeight - 12) y = Math.max(12, r.top - h - 8);
+    box.style.left = x + 'px'; box.style.top = y + 'px'; box._for = el;
+  };
+  document.addEventListener('click', e => {
+    const t = e.target.closest && e.target.closest('.tip');
+    if (!t) { close(); return; }
+    e.preventDefault(); e.stopPropagation();
+    if (box && box._for === t) close(); else open(t);
+  }, true);
+  document.addEventListener('keydown', e => {
+    if (e.key === 'Escape') close();
+    else if ((e.key === 'Enter' || e.key === ' ') && e.target.classList && e.target.classList.contains('tip')) { e.preventDefault(); e.target.click(); }
+  });
+  addEventListener('scroll', close, true); addEventListener('resize', close);
+})();
 
 /* ---------- Efek ---------- */
 const RM = matchMedia('(prefers-reduced-motion: reduce)').matches;
@@ -1333,7 +1407,7 @@ async function vShop() {
   const play = k => { if (k.startsWith('p_')) { petAct($('#sg-' + k)); SFX.pet(k); return; } const s = $('#sg-' + k); if (s) { SFX.ok(k, true); (FX[k] || FX.confetti)(s.getBoundingClientRect(), s); } };
   const draw = () => {
     sync(); const g = st.gold, nameTab = shopTab === 'nm', petTab = shopTab === 'pt', list = petTab ? PETS : nameTab ? NSHOP : SHOP;
-    V.innerHTML = `<div class="shopbar"><h1>Efek</h1><span class="gold" style="font-size:1.15rem">${GL} ${g}</span></div>
+    V.innerHTML = `<div class="shopbar"><h1>Efek${tip('Efek adalah hiasan: efek saat jawabanmu benar, gaya nama, dan hewan pendamping. Dibeli dengan Gold dan tidak mengurangi XP atau rankmu.')}</h1><span class="gold" style="font-size:1.15rem">${GL} ${g}</span></div>
       <div class="tabs"><button data-st="fx" class="${shopTab === 'fx' ? 'on' : ''}">🎆 Efek Jawaban</button><button data-st="nm" class="${nameTab ? 'on' : ''}">✒️ Gaya Nama</button><button data-st="pt" class="${petTab ? 'on' : ''}">🐾 Hewan</button></div>
       <p class="muted shopnote">${petTab ? 'Hewan pendamping menemanimu di Beranda dan ikut bereaksi saat kamu menjawab. Sentuh hewannya untuk mendengar suaranya, dan pilih satu untuk dipakai. ' : nameTab ? 'Gaya nama mengubah tampilan namamu di leaderboard, profil, dan menu. ' : 'Gold bertambah bersama XP di tiap level. Pakai untuk efek yang muncul saat jawabanmu benar. '}${!st.admin && me.pays ? `Bonus harian rank ${RANKS[rkOf(totalXp())][1]}: +${me.pays[rkOf(totalXp())]} Gold. ` : ''}Membeli tidak mengurangi XP atau rank.${st.admin ? ' Admin: semua item terbuka.' : ''}</p>
       <div class="shopg">${list.map(([k, nm_, ic, tr, ds]) => {
@@ -1460,7 +1534,7 @@ function vDailyQuiz(d) {
       clearInterval(tt); h.textContent = q.q; h.classList.remove('cur');
       [...all].find(x => x.dataset.k === q.answer).classList.add('ok');
       if (ok) ansFx(b); else { b.classList.add('no'); SFX.no(); wrong.push({ id: q.id, q: q.q, a: q[q.answer.toLowerCase()], k: q.answer }); }
-      $('#fb').innerHTML = ok ? `<div class="fb ok">${pick(['Benar!', 'Masya Allah, tepat!', 'Barakallahu fiik!'])}</div>` : `<div class="fb no">Belum tepat. Jawaban yang benar: ${q.answer}</div>`;
+      $('#fb').innerHTML = ok ? `<div class="fb ok">${pick(['Benar!', 'Masya Allah, tepat!', 'Barakallahu fiik!'])}</div>` : `<div class="fb no">Belum tepat. Jawaban yang benar: ${ansTxt(q)}</div>${why(q)}`;
       $('#nx').hidden = false; $('#nx').focus();
     });
     $('#nx').onclick = async () => {
@@ -1497,7 +1571,7 @@ function vFastQuiz(d) {
       const k = b.dataset.k, ok = k === q.answer; ans[q.id] = k; tms[q.id] = el;
       key.classList.add('ok');
       if (ok) ansFx(b); else { b.classList.add('no'); SFX.no(); wrong.push({ id: q.id, q: q.q, a: q[q.answer.toLowerCase()], k: q.answer }); }
-      $('#fb').innerHTML = ok ? `<div class="fb ok">${pick(['Benar!', 'Cepat dan tepat!', 'Barakallahu fiik!'])} (${(el / 1000).toFixed(1)} dtk)</div>` : `<div class="fb no">Belum tepat. Jawaban yang benar: ${q.answer}</div>`;
+      $('#fb').innerHTML = ok ? `<div class="fb ok">${pick(['Benar!', 'Cepat dan tepat!', 'Barakallahu fiik!'])} (${(el / 1000).toFixed(1)} dtk)</div>` : `<div class="fb no">Belum tepat. Jawaban yang benar: ${ansTxt(q)}</div>${why(q)}`;
       next(ok ? 800 : 1500);
     });
     const tick = now => {
@@ -1653,7 +1727,36 @@ const RI = (n, sz = 40) => `<img class="ri" src="/rank/${RANKS[n][1].toLowerCase
 const payText = () => { const p = me && me.pays; return p ? RANKS.map((r, i) => r[1] + ' ' + p[i]).join(', ') : ''; };
 const rkOf = t => RANKS.reduce((a, r, n) => t >= r[0] ? n : a, 0), totalXp = () => Object.values(me.best).reduce((a, b) => a + b, 0);
 function noteRank(t0) { const a = rkOf(t0), b = rkOf(totalXp()); if (b > a) setTimeout(() => toast(`Pencapaian baru: <b>${RANKS[b][1]}</b>! Rankmu naik.${me.pays ? ' Bonus harian jadi <b>+' + me.pays[b] + '</b> ' + GL + ' mulai besok.' : ''}`, RI(b, 34)), 500); }
+/* Beranda murid baru (belum pernah mengerjakan kuis): hanya yang inti. Fitur lain terbuka setelah kuis pertama. */
+let showAll = false, wasFresh = null;
+const FRESH = () => !ADM() && Object.keys(me.best || {}).length === 0;
+function vHomeNew() {
+  const pid = myPet(), PP = PETS.find(x => x[0] === pid); let pli = Math.floor(Math.random() * PP[5].length);
+  V.innerHTML = `<h1 class="hello">Assalamu'alaikum, ${esc(me.username)}</h1>
+    <div class="petrow"><button class="petbtn" id="pethome" aria-label="Sentuh hewan pendampingmu">${petSvg(pid, 'idle', 0, true)}</button><div class="pbub"><b>${PP[1]} <span class="parab" dir="rtl">${PP[2]}</span></b><span id="petln">${PP[5][pli]}</span></div></div>
+    <div class="card mission"><span class="tag">Misi pertama</span>
+      <h2>Mulai dengan 5 soal latihan</h2>
+      <p class="muted">Soal pilihan ganda nahwu dari Jilid 1. Ini hanya latihan coba: <b>tidak dicatat</b>, jadi tenang saja kalau ada yang salah. Setelah selesai, kamu akan melihat cara kerja XP, rank, dan Gold.</p>
+      <button class="btn xl" id="mTrial">Mulai latihan 5 soal</button>
+      <p class="mnext">Berikutnya: kuis sungguhan di bawah, yang hasilnya dicatat sebagai XP-mu.</p></div>
+    <div class="sec"><h2>Kuis sungguhan${tip('Hasilnya dicatat sebagai XP-mu. Yang dihitung hanya nilai terbaik tiap level, jadi boleh mengulang kapan saja tanpa takut nilaimu turun.')}</h2><span>Jilid 1 · pilih tingkat kesulitan</span></div>
+    <div class="card jc" style="${jst(1)}"><div class="jh"><span class="tag">Jilid 1</span><span class="jst">0/3 level selesai</span></div><div class="lvls">` +
+    Object.entries(LV).map(([k, [nm, c, x, ic, cl]]) => `<button class="lvl ${cl}" data-l="${k}"><span class="ic">${ic}</span><b>${nm}</b><small>${c} soal</small><span class="xp">0/${x} XP</span><i class="pb"><u style="width:0%"></u></i></button>`).join('') +
+    `</div></div>
+    <p class="muted fnote">🔒 Tantangan Harian, Kuis Lisan, Kuis Sorof, dan Mode Tathbiq akan terbuka setelah kamu menyelesaikan kuis pertamamu.</p>
+    <button class="btn ghost" id="mAll">Belajar di Jilid 2–4? Tampilkan semua jilid dan fitur</button>`;
+  $('#pethome').onclick = e => { pli = (pli + 1) % PP[5].length; $('#petln').textContent = PP[5][pli]; petAct(e.currentTarget); SFX.pet(pid); };
+  petLive(V);
+  $('#mTrial').onclick = () => startTrial();
+  V.querySelectorAll('.lvl').forEach(b => b.onclick = async () => {
+    try { vQuiz(await api(`quiz?jilid=1&level=${b.dataset.l}`), 1, b.dataset.l); } catch (e) { toast(e.message, '⚠️'); }
+  });
+  $('#mAll').onclick = () => { showAll = true; wasFresh = false; vHome(); };
+}
 function vHome() {
+  const isFr = FRESH(), justUnl = wasFresh === true && !isFr; wasFresh = isFr;
+  if (isFr && !showAll) return vHomeNew();
+  if (justUnl) setTimeout(() => toast('Fitur baru terbuka: <b>Tantangan Harian</b>, <b>Kuis Lisan</b>, dan <b>Kuis Sorof</b>. Mode Tathbiq terbuka setelah semua quest Jilid 1–4 selesai.', '🔓'), 700);
   const tot = Object.values(me.best).reduce((a, b) => a + b, 0), tat = TAT();
   const ri = RANKS.reduce((a, r, n) => tot >= r[0] ? n : a, 0), nx = RANKS[ri + 1], rk = RANKS[ri];
   const frac = nx ? (tot - rk[0]) / (nx[0] - rk[0]) : 1, p = Math.min(1, (ri + frac) / (RANKS.length - 1));
@@ -1661,13 +1764,13 @@ function vHome() {
   V.innerHTML = `<h1 class="hello">Assalamu'alaikum, ${esc(me.username)}</h1>
     <div class="petrow"><button class="petbtn" id="pethome" aria-label="Sentuh hewan pendampingmu">${petSvg(pid, 'idle', 0, true)}</button><div class="pbub"><b>${PP[1]} <span class="parab" dir="rtl">${PP[2]}</span></b><span id="petln">${PP[5][pli]}</span></div></div>
     <div class="card hero" style="--rc:${rk[3]}">
-      <div class="top2"><div class="who"><span class="medal">${RI(ri, 72)}</span><div><small>Tingkat saat ini</small><b>${rk[1]}</b></div></div>
-        <div class="xpb"><h1><span id="tx">0</span> <small>XP</small></h1><span class="gold">${GL} ${gold()}</span></div></div>
+      <div class="top2"><div class="who"><span class="medal">${RI(ri, 72)}</span><div><small>Tingkat saat ini${tip('Rank naik otomatis saat total XP-mu bertambah: Bronze, Silver, Gold, Platinum, Diamond, lalu Legend.')}</small><b>${rk[1]}</b></div></div>
+        <div class="xpb"><h1><span id="tx">0</span> <small>XP${tip('XP adalah poin dari nilai terbaikmu di tiap level. Makin banyak soal benar, makin besar XP-nya, dan XP menaikkan rank.')}</small></h1><span class="gold">${GL} ${gold()}${tip('Gold dipakai untuk membeli efek di menu Efek. Didapat dari XP, bonus harian sesuai rank, spin hadiah, dan pencapaian.')}</span></div></div>
       <div class="prog"><i id="pg"></i></div>
       <div class="cap"><span>${nx ? (nx[0] - tot) + ' XP lagi menuju ' + nx[1] : 'Tingkat tertinggi tercapai!'}</span><span>${tot}${nx ? ' / ' + nx[0] : ''} XP</span></div>
       <div class="track" style="--p:${p};--n:${RANKS.length}">${RANKS.map((r, n) => `<div class="stp ${n < ri ? 'done' : n === ri ? 'cur' : 'lock'}" style="--rc:${r[3]}"><span class="dot">${RI(n, 46)}</span><b>${r[1]}</b><small>${r[0]} XP</small></div>`).join('')}</div>
     </div>
-    <div class="sec"><h2>Tantangan Harian</h2><span>Sekali sehari, menangkan hadiah ${GL}</span></div>
+    <div class="sec"><h2>Tantangan Harian${tip('Empat kuis, masing-masing sekali sehari. Nilai di atas batas lulus memberi satu spin: putaran hadiah Gold.')}</h2><span>Sekali sehari, menangkan hadiah ${GL}</span></div>
     <div class="dch" id="chk"><div class="dhd"><b id="chn">Memuat…</b><span class="dnav"><button class="dar" id="dprev" aria-label="Sebelumnya">‹</button><button class="dar" id="dnext" aria-label="Berikutnya">›</button></span></div>
       <div class="dtrack" id="dtrack">${[['dly', '🎯', 'Kuis Harian', 'Soal acak, spin hadiah'], ['fast', '⚡', 'Cepat Tepat', 'Tiap soal berpacu dengan waktu'], ['sorof', '🧩', 'Sorof Harian', "Sighot dan bentuk fi'il"], ['oral', '🗣️', 'Lisan Harian', 'Praktek lafadz']].map(([k, ic, n, h]) => `<div class="dsl" data-k="${k}"><span class="dic">${ic}</span><div class="dtx"><h3>${n}</h3><p class="muted">${h}</p><small id="cs_${k}">…</small></div><button class="btn" data-go="${k}">Buka</button></div>`).join('')}</div>
       <div class="ddots" id="ddots">${[0, 1, 2, 3].map(i => `<i data-i="${i}"></i>`).join('')}</div></div>
@@ -1768,12 +1871,15 @@ function vHome() {
 }
 
 /* ---------- Kuis ---------- */
-function vQuiz(d, j, l) {
-  const qs = d.questions, wrong = [], ans = {}; let i = 0, streak = 0;
+/* Teks jawaban benar lengkap dengan isi pilihannya, dan pembahasan (bila soal punya kolom e) */
+const ansTxt = q => esc(q.answer + '. ' + (q[q.answer.toLowerCase()] || ''));
+const why = q => q.e ? `<div class="why">💡 ${esc(q.e)}</div>` : '';
+function vQuiz(d, j, l, trial) {
+  const qs = trial ? d.questions.slice(0, 5) : d.questions, wrong = [], ans = {}; let i = 0, streak = 0;
   const draw = () => {
     const q = qs[i];
     V.innerHTML = `<div class="card jc" style="${jst(j)}"><div class="bar"><i style="width:${i / qs.length * 100}%"></i></div>
-      <div class="meta"><span class="muted">Jilid ${j} · ${LV[l][0]} · Soal ${i + 1}/${qs.length}</span><span class="chip" id="cb">🔥 ${streak}</span></div>
+      <div class="meta"><span class="muted">${trial ? '🧪 Latihan coba (tidak dicatat) · ' : 'Jilid ' + j + ' · ' + LV[l][0] + ' · '}Soal ${i + 1}/${qs.length}</span><span class="chip" id="cb">🔥 ${streak}</span></div>
       ${rptRow(q.id)}<h2 dir="auto" id="qt"></h2><div>` +
       ['a', 'b', 'c', 'd'].map((k, n) => `<button class="opt" style="--i:${n}" data-k="${k.toUpperCase()}" dir="auto"><b>${k.toUpperCase()}</b><span>${esc(q[k])}</span></button>`).join('') +
       `</div><div id="fb"></div><div class="row"><span></span><button class="btn" id="nx" hidden>${i < qs.length - 1 ? 'Berikutnya →' : 'Lihat hasil'}</button></div></div>`;
@@ -1789,12 +1895,13 @@ function vQuiz(d, j, l) {
       else { b.classList.add('no'); SFX.no(); streak = 0; wrong.push({ id: q.id, q: q.q, a: q[q.answer.toLowerCase()], k: q.answer }); }
       const cb = $('#cb'); cb.textContent = '🔥 ' + streak; cb.classList.add('pop');
       $('#fb').innerHTML = ok
-        ? `<div class="fb ok">${pick(['Benar!', 'Masya Allah, tepat!', 'Barakallahu fiik!'])}${streak > 2 ? ' ' + streak + ' beruntun!' : ''}</div>`
-        : `<div class="fb no">Belum tepat. Jawaban yang benar: ${q.answer}</div>`;
+        ? `<div class="fb ok">${pick(['Benar!', 'Masya Allah, tepat!', 'Barakallahu fiik!'])}${streak > 2 ? ' ' + streak + ' beruntun!' : ''}</div>${why(q)}`
+        : `<div class="fb no">Belum tepat. Jawaban yang benar: ${ansTxt(q)}</div>${why(q)}`;
       $('#nx').hidden = false; $('#nx').focus();
     });
     $('#nx').onclick = async () => {
       if (i < qs.length - 1) { i++; draw(); return; }
+      if (trial) return vTrialResult(qs.length - wrong.length, qs.length, wrong, j, l);
       try { vResult(await api('submit', { token: d.token, answers: ans }), j, l, wrong); } catch (e) { alert(e.message); }
     };
   };
@@ -1810,13 +1917,34 @@ function vResult(r, j, l, wrong) {
   const em = r.score >= 90 ? '🏆' : r.score >= 70 ? '🎉' : r.score >= 40 ? '👍' : '💪';
   V.innerHTML = `<div class="card res jc" style="${jst(j)}"><div class="big">${em}</div><span class="tag">Hasil · Jilid ${j} · ${LV[l][0]}</span>
     <h1><span id="rx">0</span> / ${LV[l][2]} XP</h1><p class="muted">${r.correct} dari ${r.total} soal benar · nilai ${r.score}</p>
-    ${GR(r.score) ? `<span class="gtag" style="background:${GR(r.score)[2]}">${GR(r.score)[1]} ${GR(r.score)[0]} · quest selesai</span>` : `<p class="muted">Belum lulus. Butuh minimal ${PASS()}% benar agar quest ini selesai.</p>`}
+    ${GR(r.score) ? `<span class="gtag" style="background:${GR(r.score)[2]}">${GR(r.score)[1]} ${GR(r.score)[0]} · quest selesai</span>` : `<p class="muted">Belum lulus, tidak apa-apa: kamu benar ${r.correct} dari ${r.total}. Butuh minimal ${PASS()}% agar quest ini selesai. XP-mu tidak pernah turun, jadi ulangi sebanyak yang kamu mau.</p>`}
     <span class="chip pop">${gain ? '+' + gain + ' XP dan +' + Math.floor(gain * (me.rate || 1)) + ' ' + GL + ' masuk ke totalmu' : 'Rekor di level ini: ' + prev + ' XP. Lampaui untuk menambah total.'}</span>
-    <div class="row"><button class="btn" id="hm">Kembali</button><button class="btn ghost" id="lb">Lihat leaderboard</button></div></div>` +
+    <div class="row">${GR(r.score) ? '' : '<button class="btn" id="again">Coba lagi</button>'}<button class="btn${GR(r.score) ? '' : ' ghost'}" id="hm">Kembali</button><button class="btn ghost" id="lb">Lihat leaderboard</button></div></div>` +
     (wrong.length ? `<h2>Pembahasan (${wrong.length} salah)</h2>` + wrong.map((w, n) => `<div class="card" style="--i:${n}"><p dir="auto"><b>${esc(w.q)}</b></p><p class="muted" dir="auto">Jawaban benar: ${w.k}. ${esc(w.a)}</p>${w.id ? rptRow(w.id) : ''}</div>`).join('') : '');
   bindRpts(); count($('#rx'), r.xp);
   if (r.score >= 70) [0, 250, 500].forEach(t => setTimeout(() => { if (!t) SFX.win(); burst(innerWidth / 2, 130, 36); }, t));
   $('#hm').onclick = () => go('home'); $('#lb').onclick = () => go('board');
+  if ($('#again')) $('#again').onclick = async () => { try { vQuiz(await api(`quiz?jilid=${j}&level=${l}`), j, l); } catch (e) { toast(e.message, '⚠️'); } };
+}
+
+/* ---------- Latihan coba (5 soal, tidak dicatat): pengalaman pertama murid baru, lalu penjelasan XP, rank, dan Gold ---------- */
+async function startTrial(j = 1, l = 'easy') {
+  try { vQuiz(await api(`quiz?jilid=${j}&level=${l}`), j, l, true); } catch (e) { toast(e.message, '⚠️'); }
+}
+function vTrialResult(c, t, wrong, j, l) {
+  const sc = Math.round(c * 100 / t), xp = Math.round(LV[l][2] * c / t), em = sc >= 80 ? '🎉' : sc >= 40 ? '👍' : '💪';
+  V.innerHTML = `<div class="card res jc" style="${jst(j)}"><div class="big">${em}</div><span class="tag">Latihan coba selesai</span>
+    <h1>${c} dari ${t} benar</h1>
+    <p class="muted">Ini hanya latihan, jadi tidak dicatat dan tidak ada yang berkurang. Kalau ini kuis sungguhan, hasil ini setara <b>±${xp} XP</b>.</p>
+    <ul class="gl"><li><b>XP</b> bertambah dari nilai terbaikmu di tiap level, dan XP menaikkan <b>rank</b> (Bronze, Silver, dan seterusnya).</li>
+      <li><b>Gold ${GL}</b> ikut bertambah sebanyak XP-nya. Tukarkan di menu <b>Efek</b> untuk efek saat jawabanmu benar.</li>
+      <li>Nilaimu <b>tidak pernah turun</b>: yang dihitung hanya rekor terbaik, jadi mengulang itu aman.</li></ul>
+    <div class="row"><button class="btn" id="real">Kerjakan kuis sungguhan</button><button class="btn ghost" id="again2">Latihan lagi</button><button class="btn ghost" id="hm">Kembali</button></div></div>` +
+    (wrong.length ? `<h2>Pembahasan (${wrong.length} salah)</h2>` + wrong.map((w, n) => `<div class="card" style="--i:${n}"><p dir="auto"><b>${esc(w.q)}</b></p><p class="muted" dir="auto">Jawaban benar: ${w.k}. ${esc(w.a)}</p></div>`).join('') : '');
+  if (sc >= 70) { SFX.win(); burst(innerWidth / 2, 130, 30); }
+  $('#real').onclick = async () => { try { vQuiz(await api(`quiz?jilid=${j}&level=${l}`), j, l); } catch (e) { toast(e.message, '⚠️'); } };
+  $('#again2').onclick = () => startTrial(j, l);
+  $('#hm').onclick = () => go('home');
 }
 
 /* ---------- Kuis Sorof: 6 level mengikuti file Tathbiq (Pra Tathbiq, Tathbiq 1–5) ---------- */
@@ -1854,8 +1982,8 @@ function vSorofQuiz(d, L, daily) {
       else { b.classList.add('no'); SFX.no(); streak = 0; wrong.push({ q: q.q, a: q[q.answer.toLowerCase()], k: q.answer }); }
       const cb = $('#cb'); cb.textContent = '🔥 ' + streak; cb.classList.add('pop');
       $('#fb').innerHTML = ok
-        ? `<div class="fb ok">${pick(['Benar!', 'Masya Allah, tepat!', 'Barakallahu fiik!'])}${streak > 2 ? ' ' + streak + ' beruntun!' : ''}</div>`
-        : `<div class="fb no">Belum tepat. Jawaban yang benar: ${q.answer}</div>`;
+        ? `<div class="fb ok">${pick(['Benar!', 'Masya Allah, tepat!', 'Barakallahu fiik!'])}${streak > 2 ? ' ' + streak + ' beruntun!' : ''}</div>${why(q)}`
+        : `<div class="fb no">Belum tepat. Jawaban yang benar: ${ansTxt(q)}</div>${why(q)}`;
       $('#nx').hidden = false; $('#nx').focus();
     });
     $('#nx').onclick = async () => {
@@ -1875,7 +2003,7 @@ function vSorofResult(r, L, wrong) {
   const em = r.score >= 90 ? '🏆' : r.score >= 70 ? '🎉' : r.score >= 40 ? '👍' : '💪';
   V.innerHTML = `<div class="card res jc" style="${jst(6)}"><div class="big">${em}</div><span class="tag">Hasil · Sorof · ${esc(L.title)}</span>
     <h1><span id="rx">0</span> / ${mx} XP</h1><p class="muted">${r.correct} dari ${r.total} soal benar · nilai ${r.score}</p>
-    ${GR(r.score) ? `<span class="gtag" style="background:${GR(r.score)[2]}">${GR(r.score)[1]} ${GR(r.score)[0]} · quest selesai</span>` : `<p class="muted">Belum lulus. Butuh minimal ${PASS()}% benar agar quest ini selesai.</p>`}
+    ${GR(r.score) ? `<span class="gtag" style="background:${GR(r.score)[2]}">${GR(r.score)[1]} ${GR(r.score)[0]} · quest selesai</span>` : `<p class="muted">Belum lulus, tidak apa-apa: kamu benar ${r.correct} dari ${r.total}. Butuh minimal ${PASS()}% agar quest ini selesai. XP-mu tidak pernah turun, jadi ulangi sebanyak yang kamu mau.</p>`}
     <span class="chip pop">${gain ? '+' + gain + ' XP dan +' + Math.floor(gain * (me.rate || 1)) + ' ' + GL + ' masuk ke totalmu' : 'Rekor di level ini: ' + prev + ' XP. Lampaui untuk menambah total.'}</span>
     <div class="row"><button class="btn" id="hm">Kembali</button><button class="btn ghost" id="sag">Ulangi level ini</button><button class="btn ghost" id="lb">Lihat leaderboard</button></div></div>` +
     (wrong.length ? `<h2>Pembahasan (${wrong.length} salah)</h2>` + wrong.map((w, n) => `<div class="card" style="--i:${n}"><p dir="auto"><b>${esc(w.q)}</b></p><p class="muted" dir="auto">Jawaban benar: ${w.k}. ${esc(w.a)}</p></div>`).join('') : '');
@@ -1916,7 +2044,7 @@ function vEndless(d) {
       else { b.classList.add('no'); SFX.no(); $('#hp').classList.add('shk'); }
       $('#hp').textContent = hearts(); $('#sc').textContent = '⭐ ' + score;
       $('#fb').innerHTML = ok ? `<div class="fb ok">${pick(['Benar!', 'Masya Allah, tepat!', 'Barakallahu fiik!'])} +${pts} XP</div>`
-        : `<div class="fb no">Nyawa berkurang. Jawaban yang benar: ${q.answer}</div>`;
+        : `<div class="fb no">Nyawa berkurang. Jawaban yang benar: ${ansTxt(q)}</div>${why(q)}`;
       const over = lives <= 0; if (over) sync(true); else if (Q.length - idx - 1 <= 5) prefetch();
       const nx = $('#nx'); nx.hidden = false; nx.textContent = over ? 'Lihat hasil' : 'Lanjut →'; nx.focus();
       nx.onclick = async () => {
@@ -2001,6 +2129,22 @@ function noteStage(n) {
   else if (n > 1 && (n - 1) % 10 === 0) toast(`Naik ke <b>${s[0]}</b>! +${pts} XP per jawaban benar.`, '⬆️');
 }
 const GUIDE = {
+  quick: `<p class="muted">Cara paling cepat mulai belajar:</p><ol class="gl steps"><li><b>Pilih jilid dan level.</b> Mulai dari Jilid 1 Mudah (10 soal).</li>
+    <li><b>Jawab soal.</b> Jawaban langsung dicek, dan kalau salah kamu langsung melihat jawaban yang benar.</li>
+    <li><b>Kumpulkan XP.</b> XP naik dari nilai terbaikmu, dan XP menaikkan rank. Nilaimu tidak pernah turun, jadi mengulang itu aman.</li>
+    <li><b>Tukar Gold.</b> Gold dipakai membeli efek di menu <b>Efek</b>.</li></ol>
+    <button class="btn" id="gTrial" type="button">Coba 5 soal latihan (tidak dicatat)</button>`,
+  gloss: `<dl class="gloss"><dt>XP</dt><dd>Poin dari nilai terbaikmu di tiap level. Makin banyak soal benar, makin besar XP-nya.</dd>
+    <dt>Rank</dt><dd>Tingkat liga (Bronze sampai Legend) yang naik otomatis saat total XP bertambah.</dd>
+    <dt>Quest</dt><dd>Satu level, misalnya Jilid 1 Mudah. Quest selesai bila benar minimal 60%.</dd>
+    <dt>Gold ${GL}</dt><dd>Mata uang untuk membeli efek di menu Efek. Didapat dari XP, bonus harian sesuai rank, spin, dan pencapaian.</dd>
+    <dt>Spin</dt><dd>Putaran hadiah Gold. Didapat dari Tantangan Harian bila nilaimu mencapai batas lulus.</dd>
+    <dt>Tantangan Harian</dt><dd>Empat kuis (Kuis Harian, Cepat Tepat, Sorof Harian, Lisan Harian) yang masing-masing hanya sekali sehari.</dd>
+    <dt>Tathbiq</dt><dd>Mode soal acak tanpa henti dengan 3 nyawa. Terbuka setelah semua quest Jilid 1–4 selesai.</dd>
+    <dt>Sorof</dt><dd>Latihan menebak sighot dan bentuk fi'il, seperti di kitab Tathbiq.</dd>
+    <dt>Lisan</dt><dd>Praktek menjawab lafadz dengan tulisanmu sendiri, seperti di depan ustadz. Dinilai dari maksudnya.</dd>
+    <dt>Streak</dt><dd>Jumlah hari aktif berturut-turut. Hari Jumat tidak memutus streak.</dd>
+    <dt>Lulus, Jayyid, Mumtaz, Sempurna</dt><dd>Penilaian level: Lulus 60%+, Jayyid 75%+, Mumtaz 90%+, Sempurna 100%.</dd></dl>`,
   app: `<ul class="gl"><li>Pilih <b>Jilid 1–4</b> lalu tingkat kesulitan: Mudah 10 soal (maks 100 XP), Sedang 20 soal (maks 200 XP), Sulit 30 soal (maks 300 XP).</li>
     <li>XP sebanding dengan jawaban benar. Yang dihitung hanya <b>rekor terbaik</b> tiap jilid dan level, jadi mengulang hanya menambah XP kalau rekormu terlampaui.</li>
     <li>Jawaban langsung dicek dan tidak bisa diubah setelah dipilih.</li>
@@ -2023,26 +2167,34 @@ const GUIDE = {
     <li>Mencapai tahap baru memberi <b>pencapaian</b> yang tampil di profilmu. Skor tersimpan tiap soal, jadi keluar di tengah jalan tetap tercatat.</li></ul>`
 };
 const guideTxt = k => GUIDE[k].replace('@@GOLDINFO@@', me && me.starter ? ` Murid baru mendapat Gold awal ${me.starter}, dan setiap hari kamu mendapat bonus Gold sesuai rank (${payText()}) yang masuk otomatis saat kamu membuka aplikasi. Bonus tidak menumpuk kalau sehari tidak dibuka.` : '');
-function openGuide() {
+function openGuide(first = 'quick') {
   const m = document.createElement('div'); m.className = 'modal';
-  m.innerHTML = `<div class="box"><h2>Panduan Al-Miftah</h2><div class="tabs"><button class="on" data-g="app">Sistem aplikasi</button><button data-g="tat">Mode Tathbiq</button></div><div id="gb">${guideTxt('app')}</div><div class="row"><span></span><button class="btn" id="gx">Mengerti</button></div></div>`;
+  const T = [['quick', 'Mulai cepat'], ['gloss', 'Istilah'], ['app', 'Sistem aplikasi'], ['tat', 'Mode Tathbiq']];
+  m.innerHTML = `<div class="box"><h2>Bantuan Al-Miftah</h2><div class="tabs">${T.map(([k, n]) => `<button data-g="${k}">${n}</button>`).join('')}</div><div id="gb"></div><div class="row"><span></span><button class="btn" id="gx">Mengerti</button></div></div>`;
   document.body.appendChild(m);
-  m.querySelectorAll('[data-g]').forEach(b => b.onclick = () => { m.querySelectorAll('[data-g]').forEach(x => x.classList.toggle('on', x === b)); m.querySelector('#gb').innerHTML = guideTxt(b.dataset.g); });
-  const close = () => m.remove(); m.querySelector('#gx').onclick = close; m.onclick = e => { if (e.target === m) close(); };
+  const close = () => m.remove();
+  const show = k => {
+    m.querySelectorAll('[data-g]').forEach(x => x.classList.toggle('on', x.dataset.g === k));
+    m.querySelector('#gb').innerHTML = guideTxt(k);
+    const tr = m.querySelector('#gTrial'); if (tr) tr.onclick = () => { close(); startTrial(); };
+  };
+  m.querySelectorAll('[data-g]').forEach(b => b.onclick = () => show(b.dataset.g));
+  m.querySelector('#gx').onclick = close; m.onclick = e => { if (e.target === m) close(); };
+  show(first);
 }
-/* Pemberitahuan untuk murid yang baru daftar; setelah ditutup, panduan muncul bila belum pernah dilihat */
-function openWelcome(thenGuide) {
+/* Sambutan murid yang baru daftar: singkat, lalu langsung diajak mencoba. Panduan lengkap ada di tombol Bantuan. */
+function openWelcome() {
   const m = document.createElement('div'); m.className = 'modal';
-  m.innerHTML = `<div class="box"><h2>Selamat datang, ${esc(me.username)}! 🎉</h2><p class="muted">Akunmu sudah jadi. Ada beberapa hal penting yang perlu kamu ketahui:</p>
-    <ul class="gl">${me.starter ? `<li><b>Gold awal ${me.starter} ${GL}!</b> Murid baru mendapat Gold untuk dibelanjakan di menu <b>Efek</b>. Setiap hari kamu juga mendapat Gold bonus sesuai rank (${payText()}), otomatis saat kamu membuka aplikasi.</li>` : ''}<li><b>Akunmu tersimpan.</b> Setelah mendaftar, kamu bisa masuk lagi kapan saja dengan akun yang kamu daftarkan. Semua pencapaianmu (XP, rank, jilid yang selesai, dan efek foto) tersimpan di server, jadi tidak hilang walau kamu menutup halaman atau pindah perangkat.</li>
-    <li><b>Jaga passwordmu.</b> Jangan beritahukan ke siapa pun, termasuk teman. Admin tidak bisa melihat passwordmu; kalau lupa, admin hanya bisa mengaturnya ulang.</li>
-    <li><b>Password bisa diganti</b> kapan saja lewat menu <b>Profil</b>.</li>
-    <li><b>Username bisa diubah nanti.</b> Buka menu <b>Profil</b>, lalu ubah username (3–20 karakter: huruf, angka, atau _). Username tampil di leaderboard, jadi pilih nama yang sopan.</li>
-    <li><b>Masih bingung?</b> Hubungi <b>Nabil Ghufron</b>: <a href="tel:+6285335101970" style="color:var(--accent);font-weight:700">085335101970</a>.</li></ul>
-    <div class="row"><span></span><button class="btn" id="wx">Mengerti</button></div></div>`;
+  m.innerHTML = `<div class="box"><h2>Selamat datang, ${esc(me.username)}! 🎉</h2><p class="muted">Akunmu sudah jadi dan tersimpan di server, jadi bisa dipakai masuk dari perangkat mana pun.</p>
+    <ul class="gl">${me.starter ? `<li><b>Hadiah ${me.starter} ${GL}!</b> Gold awal untuk dibelanjakan di menu <b>Efek</b>. Tiap hari kamu juga mendapat bonus Gold sesuai rank, otomatis saat membuka aplikasi.</li>` : ''}
+    <li><b>Jaga passwordmu</b> dan jangan beritahukan ke siapa pun. Kalau lupa, admin hanya bisa mengaturnya ulang. Password dan username bisa diganti di menu <b>Profil</b>.</li>
+    <li>Bingung? Tombol <b>❓ Bantuan</b> selalu ada, atau hubungi <b>Nabil Ghufron</b>: <a href="tel:+6285335101970" style="color:var(--accent);font-weight:700">085335101970</a>.</li></ul>
+    <div class="row"><button class="btn ghost" id="wx">Nanti dulu</button><button class="btn" id="wgo">Coba 5 soal dulu →</button></div></div>`;
   document.body.appendChild(m);
-  m.querySelector('#wx').onclick = () => { m.remove(); if (thenGuide) openGuide(); };
+  m.querySelector('#wx').onclick = () => m.remove();
+  m.querySelector('#wgo').onclick = () => { m.remove(); startTrial(); };
 }
+
 /* ---------- Kompresi foto pribadi (dikerjakan di perangkat murid, sebelum diunggah) ----------
    Tujuan: sekecil mungkin tapi tetap tajam di bingkai terbesar (84 px; layar 2x = 168 px), jadi dimulai dari 192 px.
    1) Orientasi EXIF dikoreksi, lalu dipotong persegi. Foto potret: pusat potong dinaikkan ke 35% tinggi agar wajah tidak terpotong.
@@ -2226,7 +2378,7 @@ async function vAch() {
 let bq = '';
 let lio;
 async function vBoard(j = 0) {
-  V.innerHTML = `<h1>Leaderboard</h1><div class="tabs">` +
+  V.innerHTML = `<h1>Leaderboard${tip('Urutan murid berdasarkan total XP. Ketuk nama untuk melihat profil pemain.')}</h1><div class="tabs">` +
     ['Semua', 1, 2, 3, 4, 'Tathbiq', 'Sorof', 'Lisan'].map((x, n) => `<button data-j="${n}" class="${n === j ? 'on' : ''}">${n === 5 ? '📚 Tathbiq' : n === 6 ? '🧩 Sorof' : n === 7 ? '🗣️ Lisan' : n ? 'Jilid ' + x : x}</button>`).join('') +
     `</div><input type="search" id="sq" placeholder="Cari nama murid…" value="${esc(bq)}" autocomplete="off"><div class="card" id="lbr"><p class="muted">Memuat…</p></div>`;
   V.querySelectorAll('[data-j]').forEach(b => b.onclick = () => vBoard(+b.dataset.j));
@@ -2951,10 +3103,11 @@ async function boot() {
     }
   }
   document.body.classList.toggle('anon', !me);
-  if (me) { renderChip(); warmFx(); $('#navAdmin').hidden = me.role !== 'admin'; setRep(me.reports || 0); go('home'); if (me.unseen && me.unseen.length) { noteAch(me.unseen, true); api('achievements/seen', {}).catch(() => {}); } if (me.role === 'admin' && me.reports) setTimeout(() => toast('Ada <b>' + me.reports + ' soal</b> dilaporkan murid. Buka Panel Admin → Laporan.', '🚩'), 800); let g = false; try { if (!localStorage.getItem('guide1')) { localStorage.setItem('guide1', '1'); g = true; } } catch (e) {}
+  if (me) { showAll = false; wasFresh = null; renderChip(); warmFx(); $('#navAdmin').hidden = me.role !== 'admin'; setRep(me.reports || 0); go('home'); if (me.unseen && me.unseen.length) { noteAch(me.unseen, true); api('achievements/seen', {}).catch(() => {}); } if (me.role === 'admin' && me.reports) setTimeout(() => toast('Ada <b>' + me.reports + ' soal</b> dilaporkan murid. Buka Panel Admin → Laporan.', '🚩'), 800); let g = false; try { if (!localStorage.getItem('guide1')) { localStorage.setItem('guide1', '1'); g = true; } } catch (e) {}
     if (justReg) { justReg = false; openWelcome(g); } else if (g) openGuide(); } else go('auth');
 }
 document.querySelectorAll('.nav[data-v], .bn[data-v]').forEach(b => b.onclick = () => go(b.dataset.v));
+$('#navHelp').onclick = $('#topHelp').onclick = () => openGuide();
 function theme(t) { document.documentElement.setAttribute('data-theme', t); try { localStorage.setItem('theme', t); } catch (e) {} }
 try { const t = localStorage.getItem('theme'); if (t) theme(t); } catch (e) {}
 if ('serviceWorker' in navigator) addEventListener('load', () => navigator.serviceWorker.register('/sw.js').catch(() => {}));
