@@ -20,8 +20,7 @@ const NSHOP = { n_mint: 100, n_ocean: 150, n_grape: 300, n_sunset: 400, n_shimme
 // Hewan pendamping (toko): kunci diawali p_. 'p_kucing' gratis untuk semua murid (tidak ada di PRICES); yang terpasang ada di users.pet (null = p_kucing).
 const PET_PRICE = 1500, PET0 = 'p_kucing';
 const PSHOP = Object.fromEntries(['p_semut', 'p_lebah', 'p_hudhud', 'p_unta', 'p_gajah', 'p_paus'].map(k => [k, PET_PRICE]));
-const ASHOP = { a_peci: 400, a_sorban: 600, a_mahkota: 1000 }; // Aksesori hewan (toko): kunci diawali a_. Dibeli lewat shop/buy yang sama; pemasangannya disimpan di perangkat murid.
-const PRICES = { ...SHOP, ...NSHOP, ...PSHOP, ...ASHOP };
+const PRICES = { ...SHOP, ...NSHOP, ...PSHOP };
 // Kuis harian: 10 soal acak semua jilid; nilai >= DAILY_PASS memberi 1 spin. Hadiah = [gold, bobot]. Spin ke-PITY sejak hadiah >= RARE terakhir dijamin langka.
 const DAILY_N = 10, DAILY_PASS = 80, RARE = 500, PITY = 10;
 const PRIZES = [[150, 30], [200, 25], [300, 20], [500, 13], [750, 7], [1000, 5]]; // hadiah minimal 150 gold; rata-rata sekitar 322 gold per spin
