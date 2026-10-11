@@ -593,14 +593,17 @@ const setRep = n => {
   const gb = document.querySelector('[data-g="usr"]'); if (gb && me) gb.textContent = '👥 Murid' + (me.reports ? ' 🚩' + me.reports : '');
 };
 async function api(p, b) {
-  const r = await fetch('/api/' + p, {
-    method: b ? 'POST' : 'GET',
-    headers: { 'Content-Type': 'application/json', ...(tok ? { Authorization: 'Bearer ' + tok } : {}) },
-    body: b ? JSON.stringify(b) : undefined
-  });
+  let r;
+  try {
+    r = await fetch('/api/' + p, {
+      method: b ? 'POST' : 'GET',
+      headers: { 'Content-Type': 'application/json', ...(tok ? { Authorization: 'Bearer ' + tok } : {}) },
+      body: b ? JSON.stringify(b) : undefined
+    });
+  } catch (x) { throw Object.assign(new Error('Tidak bisa terhubung ke server. Periksa koneksi internetmu.'), { status: 0 }); }
   const d = await r.json().catch(() => ({}));
   if (r.status === 401 && tok && p !== 'login' && p !== 'register') { tok = null; try { localStorage.removeItem('tk'); } catch (e) {} setTimeout(boot, 0); }
-  if (!r.ok) throw new Error(d.error || 'Terjadi kesalahan');
+  if (!r.ok) throw Object.assign(new Error(d.error || 'Terjadi kesalahan'), { status: r.status });
   if (p === 'me' && d.rankGot) setTimeout(() => toast(`Bonus harian rank <b>${RANKS[rkOf(Object.values(d.best || {}).reduce((a, b) => a + b, 0))][1]}</b>: +${d.rankGot} ${GL}`, '🎁'), 900);
   return d;
 }
@@ -2803,7 +2806,17 @@ function adminUsers() {
 
 /* ---------- Awal ---------- */
 async function boot() {
-  try { me = await api('me'); } catch (e) { tok = null; me = null; try { localStorage.removeItem('tk'); } catch (x) {} }
+  try { me = await api('me'); }
+  catch (e) {
+    me = null;
+    if (e.status === 401) { tok = null; try { localStorage.removeItem('tk'); } catch (x) {} } // token memang tidak sah: keluar
+    else if (tok) { // koneksi putus atau server sedang error: token tetap disimpan, tawarkan coba lagi
+      document.body.classList.add('anon');
+      V.innerHTML = `<div class="card auth"><img class="auth-logo" src="/logo.png" alt="Al-Miftah"><h2 style="text-align:center">Belum bisa terhubung</h2><p class="muted" style="text-align:center">${esc(e.message)} Kamu tidak perlu masuk ulang.</p><button class="btn" id="retry">Coba lagi</button></div>`;
+      $('#retry').onclick = () => { $('#retry').disabled = true; boot(); };
+      return;
+    }
+  }
   document.body.classList.toggle('anon', !me);
   if (me) { renderChip(); warmFx(); $('#navAdmin').hidden = me.role !== 'admin'; setRep(me.reports || 0); go('home'); if (me.unseen && me.unseen.length) { noteAch(me.unseen, true); api('achievements/seen', {}).catch(() => {}); } if (me.role === 'admin' && me.reports) setTimeout(() => toast('Ada <b>' + me.reports + ' soal</b> dilaporkan murid. Buka Panel Admin → Laporan.', '🚩'), 800); let g = false; try { if (!localStorage.getItem('guide1')) { localStorage.setItem('guide1', '1'); g = true; } } catch (e) {}
     if (justReg) { justReg = false; openWelcome(g); } else if (g) openGuide(); } else go('auth');
