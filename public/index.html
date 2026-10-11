@@ -699,36 +699,165 @@ function ago(t) {
   return new Date(t).toLocaleDateString('id-ID', { day: 'numeric', month: 'short', year: 'numeric' });
 }
 
-/* ---------- Suara dan getaran: dibuat dengan Web Audio (tanpa file audio). Bisa dimatikan di Profil > Pengaturan. ---------- */
+/* ---------- Suara dan getaran: dibuat dengan Web Audio (tanpa file audio). Bisa dimatikan di Profil > Pengaturan. ----------
+   Tiap efek jawaban punya suara sendiri (FXS di bawah). Semua dibuat dari osilator + derau yang disaring, jadi tanpa unduhan,
+   tetap jalan offline, dan tiap putaran sedikit berbeda (nada dan waktu diacak) sehingga tidak membosankan.
+   Penyetelan cepat: FXV = volume tiap efek (sudah diseimbangkan: makin langka efeknya, makin menonjol, tetapi tidak melebihi nada "benar"), HAP = pola getar. */
 const SFX = (() => {
-  let ac = null, run = 0, last = 0;
+  let ac = null, run = 0, last = 0, mix = null, dst = null, nb = null, lastFx = 0;
   const st = { snd: qGet('snd') !== '0', hap: qGet('hap') !== '0' };
   const ctx = () => { // AudioContext dibuat saat murid menyentuh layar (syarat browser), lalu dipakai ulang
     if (!st.snd || document.hidden) return null;
     try { ac = ac || new (window.AudioContext || window.webkitAudioContext)(); if (ac.state === 'suspended') ac.resume(); return ac; } catch (e) { return null; }
   };
-  const tone = (c, f, t0, d, type = 'sine', v = 0.16) => { // satu nada: frekuensi, mulai (detik), lama, gelombang, volume
+  const bus = c => { // mixer utama: pembatas lembut. Rata (tidak mengubah volume) sampai 0,6, di atasnya melengkung halus, jadi tumpukan suara tidak pecah dan suara lama tetap sama kerasnya.
+    // (Sengaja bukan DynamicsCompressor: node itu menambah makeup gain otomatis ~+6 dB yang akan mengeraskan semua suara.)
+    if (!mix) { const w = c.createWaveShaper(), cv = new Float32Array(1025); for (let i = 0; i < 1025; i++) { const x = i / 512 - 1, a = Math.abs(x); cv[i] = Math.sign(x) * (a <= 0.6 ? a : 0.6 + 0.4 * Math.tanh((a - 0.6) / 0.4)); } w.curve = cv; w.connect(c.destination); mix = w; }
+    return mix;
+  };
+  const out = (c, g, p = 0) => { // sambungkan ke mixer (atau submixer efek yang sedang dibunyikan); p = posisi stereo -1..1
+    let n = g;
+    if (p && c.createStereoPanner) { const s = c.createStereoPanner(); s.pan.value = Math.max(-1, Math.min(1, p)); g.connect(s); n = s; }
+    n.connect(dst || bus(c));
+  };
+  const rnd = (a, b) => a + Math.random() * (b - a);
+  const lite = () => { try { return LITE(); } catch (e) { return false; } };
+  const dn = n => Math.max(1, Math.round(n * (lite() ? 0.4 : 1))); // perangkat lemah: lapisan suara dikurangi
+  const noise = c => { // satu buffer derau putih dipakai bersama (dibuat sekali)
+    if (!nb) { nb = c.createBuffer(1, Math.round(c.sampleRate * 2), c.sampleRate); const d = nb.getChannelData(0); for (let i = 0; i < d.length; i++) d[i] = Math.random() * 2 - 1; }
+    return nb;
+  };
+  const tone = (c, f, t0, d, type = 'sine', v = 0.16, p = 0) => { // satu nada: frekuensi, mulai (detik), lama, gelombang, volume, posisi stereo
     const o = c.createOscillator(), g = c.createGain(), t = c.currentTime + t0;
     o.type = type; o.frequency.setValueAtTime(f, t);
     g.gain.setValueAtTime(0.0001, t); g.gain.exponentialRampToValueAtTime(v, t + 0.015); g.gain.exponentialRampToValueAtTime(0.0001, t + d);
-    o.connect(g); g.connect(c.destination); o.start(t); o.stop(t + d + 0.03);
+    o.connect(g); out(c, g, p); o.start(t); o.stop(t + d + 0.03);
   };
-  const sw = (c, f0, f1, t0, d, type = 'sine', v = 0.16) => { // nada yang meluncur dari f0 ke f1
+  const sw = (c, f0, f1, t0, d, type = 'sine', v = 0.16, p = 0) => { // nada yang meluncur dari f0 ke f1
     const o = c.createOscillator(), g = c.createGain(), t = c.currentTime + t0;
     o.type = type; o.frequency.setValueAtTime(f0, t); o.frequency.exponentialRampToValueAtTime(f1, t + d);
     g.gain.setValueAtTime(0.0001, t); g.gain.exponentialRampToValueAtTime(v, t + 0.02); g.gain.exponentialRampToValueAtTime(0.0001, t + d);
-    o.connect(g); g.connect(c.destination); o.start(t); o.stop(t + d + 0.03);
+    o.connect(g); out(c, g, p); o.start(t); o.stop(t + d + 0.03);
   };
+  const pad = (c, f, t0, at, d, v, p = 0) => { // nada yang mengembang pelan lalu bertahan sejenak (at = lama naik, harus < d)
+    const o = c.createOscillator(), g = c.createGain(), t = c.currentTime + t0;
+    o.type = 'sine'; o.frequency.setValueAtTime(f, t);
+    g.gain.setValueAtTime(0.0001, t); g.gain.exponentialRampToValueAtTime(v, t + at); g.gain.exponentialRampToValueAtTime(v * 0.55, t + at + (d - at) * 0.45); g.gain.exponentialRampToValueAtTime(0.0001, t + d);
+    o.connect(g); out(c, g, p); o.start(t); o.stop(t + d + 0.03);
+  };
+  const nz = (c, t0, d, ft, f0, f1, q, v, a = 0.004, p = 0) => { // derau yang disaring: letupan, desis, gemuruh. Filter meluncur f0 -> f1; a = lama naik (< d)
+    const s = c.createBufferSource(), f = c.createBiquadFilter(), g = c.createGain(), t = c.currentTime + t0;
+    s.buffer = noise(c); s.loop = true;
+    f.type = ft; f.Q.value = q; f.frequency.setValueAtTime(f0, t); if (f1 !== f0) f.frequency.exponentialRampToValueAtTime(f1, t + d);
+    g.gain.setValueAtTime(0.0001, t); g.gain.exponentialRampToValueAtTime(v, t + a); g.gain.exponentialRampToValueAtTime(0.0001, t + d);
+    s.connect(f); f.connect(g); out(c, g, p); s.start(t, rnd(0, 1.5)); s.stop(t + d + 0.03);
+  };
+  const ping = (c, f, t0, d, v, parts, p = 0) => parts.forEach(([r, a], i) => { if (f * r < 12000) tone(c, f * r, t0, d / (1 + i * 0.6), 'sine', v * a, p); }); // denting: nada dasar + sebagian harmonik (rasio tak bulat = logam/kaca)
   const vib = pat => { if (st.hap && navigator.vibrate) { try { navigator.vibrate(pat); } catch (e) {} } };
-  return {
+
+  // Volume tiap efek (di atas 1 = diperkeras; diukur per tingkatan Umum/Langka/Epik/Legendaris/Mitos) dan pola getar saat benar. Efek yang mengguncang layar ikut menggetarkan perangkat.
+  const FXV = { confetti: 1.8, stars: 1.3, bubbles: 2.0, petals: 0.9, coins: 0.87, fireworks: 1.6, fire: 2.5, ice: 1.45, lightning: 1.7, comet: 0.87, galaxy: 1.35 };
+  const HAP = { fireworks: [10, 30, 10, 30, 14], fire: [16, 24, 16], lightning: [18, 40, 30], comet: [45, 30, 20], galaxy: [12, 40, 12, 40, 30] };
+
+  // Resep suara. Waktu (detik) disamakan dengan jadwal animasinya di FX: kembang api meledak tiap 0,21 dtk (+0,28 dtk meluncur),
+  // petir menyambar di 0 dan 0,19, komet jatuh 0,55 dtk lalu menghantam. Bunyi dentum diberi unsur 100-400 Hz karena speaker HP lemah di bawah itu.
+  const FXS = {
+    confetti(c) { // letupan kecil + kertas berhamburan (efek bawaan, sengaja ringan)
+      sw(c, 520, 170, 0, 0.09, 'sine', 0.14);
+      nz(c, 0, 0.1, 'bandpass', 2200, 1200, 1.1, 0.12, 0.002);
+      nz(c, 0.05, 0.26, 'highpass', 5200, 8000, 0.6, 0.045, 0.02);
+      for (let i = 0; i < 3; i++) ping(c, rnd(2600, 4200), 0.09 + i * 0.06 + rnd(0, 0.02), 0.14, 0.03, [[1, 1]], rnd(-0.5, 0.5));
+    },
+    stars(c) { // kerlip bintang: nada tinggi pentatonik, urutan agak acak
+      const P = [1318.5, 1568, 1760, 1975.5, 2349.3, 2637, 3136], n = dn(6);
+      for (let i = 0; i < n; i++) ping(c, P[Math.min(6, Math.round(i * 5 / Math.max(1, n - 1)) + (Math.random() * 2 | 0))], 0.02 + i * 0.06 + rnd(0, 0.025), 0.42, 0.075, [[1, 1], [2.005, 0.3]], rnd(-0.6, 0.6));
+      nz(c, 0, 0.22, 'highpass', 6500, 9500, 0.5, 0.04, 0.004);
+    },
+    bubbles(c) { // "blup" gelembung naik, lalu beberapa pecah
+      for (let i = 0, n = dn(7); i < n; i++) { const f = rnd(420, 820); sw(c, f, f * rnd(2.1, 3), i * 0.085 + rnd(0, 0.06), rnd(0.07, 0.12), 'sine', rnd(0.07, 0.11), rnd(-0.7, 0.7)); }
+      for (let i = 0, n = dn(3); i < n; i++) nz(c, 0.55 + i * 0.17 + rnd(0, 0.08), 0.03, 'bandpass', rnd(1800, 2800), 1200, 3, 0.06, 0.002, rnd(-0.6, 0.6));
+    },
+    petals(c) { // desir angin lembut + empat petikan kalimba
+      nz(c, 0, 0.6, 'bandpass', 1100, 3400, 0.9, 0.05, 0.22);
+      [[784, -0.3], [1046.5, 0], [1318.5, 0.3], [1568, 0.5]].forEach(([f, p], i) => ping(c, f, 0.03 + i * 0.11 + rnd(0, 0.02), 0.55, 0.09, [[1, 1], [3, 0.1]], p));
+    },
+    coins(c) { // "ka-ching" (B5 ke E6) + denting koin berjatuhan
+      tone(c, 987.77, 0, 0.09, 'square', 0.05); tone(c, 1318.5, 0.075, 0.55, 'square', 0.05); tone(c, 1318.5, 0.075, 0.55, 'triangle', 0.08);
+      tone(c, 1318.5 * 2.76, 0.075, 0.3, 'sine', 0.05);
+      nz(c, 0, 0.05, 'highpass', 4500, 4500, 0.6, 0.06, 0.001);
+      for (let i = 0, n = dn(7); i < n; i++) ping(c, rnd(2400, 4300), 0.35 + i * 0.085 + rnd(0, 0.05), 0.2, 0.05, [[1, 1], [2.76, 0.5], [5.4, 0.2]], rnd(-0.7, 0.7));
+    },
+    fireworks(c) { // empat kali: desing meluncur, dentum ledakan, desis percikan, retak-retak kecil
+      for (let k = 0; k < 4; k++) {
+        const tl = k * 0.21, tb = tl + 0.28, g = 1 - k * 0.12, p = [-0.4, 0.5, 0, -0.2][k];
+        sw(c, 480 + k * 90, 1900, tl, 0.27, 'sine', 0.035, p);
+        sw(c, 150, 55, tb, 0.3, 'sine', 0.2 * g, p); sw(c, 300, 110, tb, 0.2, 'triangle', 0.07 * g, p);
+        nz(c, tb, 0.42, 'lowpass', 2600, 450, 0.7, 0.22 * g, 0.003, p);
+        nz(c, tb + 0.015, 0.5, 'highpass', 3800, 7000, 0.5, 0.05 * g, 0.006, p);
+        for (let i = 0, n = dn(6); i < n; i++) { const f = rnd(4000, 7000); nz(c, tb + rnd(0.1, 0.6), 0.018, 'highpass', f, f, 0.8, rnd(0.04, 0.09) * g, 0.001, p + rnd(-0.2, 0.2)); }
+      }
+    },
+    fire(c) { // "whuum" menyala + gemuruh api + retak dan letupan kayu
+      nz(c, 0, 1.1, 'lowpass', 1000, 240, 0.8, 0.22, 0.05);
+      sw(c, 140, 80, 0, 0.7, 'triangle', 0.1);
+      nz(c, 0.05, 1.0, 'bandpass', 650, 380, 0.7, 0.07, 0.3);
+      for (let i = 0, n = dn(12); i < n; i++) { const f = rnd(2600, 5600); nz(c, rnd(0.06, 1.1), rnd(0.012, 0.03), 'highpass', f, f, 0.9, rnd(0.04, 0.11), 0.001, rnd(-0.5, 0.5)); }
+      for (let i = 0, n = dn(3); i < n; i++) nz(c, rnd(0.15, 0.9), 0.05, 'bandpass', rnd(900, 1500), 700, 2, rnd(0.08, 0.14), 0.002, rnd(-0.5, 0.5));
+    },
+    ice(c) { // retak es + denting kristal (harmonik tak bulat = kaca) + pecahan jatuh
+      nz(c, 0, 0.12, 'highpass', 5500, 9000, 0.6, 0.12, 0.001);
+      nz(c, 0, 0.08, 'lowpass', 900, 300, 0.8, 0.1, 0.002);
+      ping(c, 2093, 0, 0.9, 0.07, [[1, 1], [1.5, 0.5], [2.76, 0.35], [4.07, 0.2]], -0.2);
+      ping(c, 3136, 0.04, 0.7, 0.05, [[1, 1], [2.76, 0.4]], 0.25);
+      sw(c, 3800, 1400, 0.02, 0.3, 'sine', 0.03);
+      for (let i = 0, n = dn(7); i < n; i++) ping(c, rnd(3000, 6500), rnd(0.12, 0.8), 0.12, 0.035, [[1, 1], [2.4, 0.4]], rnd(-0.7, 0.7));
+    },
+    lightning(c) { // dua sambaran: retakan, desing listrik, guntur menggelegar
+      const bolt = (t, pw, len) => {
+        nz(c, t, 0.12, 'highpass', 1400, 4200, 0.5, 0.2 * pw, 0.002);
+        sw(c, 2800, 150, t, 0.2, 'sawtooth', 0.06 * pw);
+        sw(c, 1700, 120, t + 0.01, 0.14, 'square', 0.025 * pw);
+        nz(c, t + 0.035, len, 'lowpass', 600, 110, 0.9, 0.42 * pw, 0.02);
+        sw(c, 150, 62, t + 0.03, len * 0.8, 'sine', 0.13 * pw);
+        sw(c, 300, 124, t + 0.03, len * 0.5, 'triangle', 0.15 * pw);
+      };
+      bolt(0, 1, 1.6); bolt(0.19, 0.7, 1.0);
+    },
+    comet(c) { // desir jatuh yang menajam (0,55 dtk), lalu hantaman, dentum, dan serpihan
+      const T = 0.55;
+      sw(c, 2200, 320, 0, T, 'sine', 0.05);
+      nz(c, 0, T, 'bandpass', 3500, 400, 1.2, 0.14, T - 0.03);
+      sw(c, 160, 38, T, 0.7, 'sine', 0.3); sw(c, 320, 80, T, 0.4, 'triangle', 0.12);
+      nz(c, T, 0.65, 'lowpass', 3000, 250, 0.8, 0.3, 0.002);
+      nz(c, T, 0.08, 'highpass', 2000, 2000, 0.5, 0.2, 0.001);
+      for (let i = 0, n = dn(8); i < n; i++) { const f = rnd(1500, 3500); nz(c, T + rnd(0.05, 0.7), rnd(0.015, 0.04), 'bandpass', f, f, 1.5, rnd(0.04, 0.1), 0.001, rnd(-0.6, 0.6)); }
+      for (let i = 0, n = dn(3); i < n; i++) ping(c, rnd(2500, 4000), T + 0.1 + i * 0.12, 0.2, 0.03, [[1, 1], [2.76, 0.3]], rnd(-0.6, 0.6));
+    },
+    galaxy(c) { // pad kosmik mengembang (susunan kuint), sapuan berkilau, lalu glissando lonceng dari kiri ke kanan
+      [196, 293.66, 440, 659.25, 987.77].forEach((f, i) => { pad(c, f, 0, 0.35, 1.7, 0.035, -0.3 + i * 0.15); pad(c, f * 1.004, 0, 0.35, 1.7, 0.035, 0.3 - i * 0.15); });
+      sw(c, 500, 2600, 0, 0.8, 'sine', 0.035);
+      nz(c, 0, 0.9, 'bandpass', 900, 6500, 1.4, 0.06, 0.5);
+      sw(c, 220, 110, 0, 0.9, 'triangle', 0.08);
+      const G = [783.99, 880, 987.77, 1174.66, 1318.5, 1567.98, 1760, 1975.5, 2349.3], n = dn(9);
+      for (let i = 0; i < n; i++) ping(c, G[Math.round(i * 8 / Math.max(1, n - 1))], 0.12 + i * 0.085, 0.65, 0.05, [[1, 1], [2, 0.25]], -0.8 + 1.6 * i / Math.max(1, n - 1));
+    },
+  };
+
+  const self = {
     st, petId: null,
     set(k, v) { st[k] = !!v; qSet(k, v ? '1' : '0'); },
-    ok() { // jawaban benar: dua nada naik; makin tinggi nadanya tiap benar beruntun (reset bila salah atau jeda > 20 detik)
-      const now = Date.now(); run = now - last > 20000 ? 1 : run + 1; last = now;
-      vib(12);
+    ok(k, pv) { // jawaban benar: dua nada naik (makin tinggi tiap benar beruntun; reset bila salah atau jeda > 20 detik).
+      // k = kunci efek terpasang: ditambah suara khasnya, nada dasar diperkecil supaya tetap jelas "benar" tanpa menumpuk. pv = pratinjau (toko/profil): tidak menghitung beruntun dan tidak bergetar.
+      if (!pv) { const now = Date.now(); run = now - last > 20000 ? 1 : run + 1; last = now; vib(HAP[k] || 12); }
       const c = ctx(); if (!c) return;
-      const f = 659.25 * Math.pow(2, Math.min(run - 1, 9) / 12);
-      tone(c, f, 0, 0.16); tone(c, f * 1.5, 0.07, 0.24);
+      const f = 659.25 * Math.pow(2, Math.min((pv ? 1 : run) - 1, 9) / 12), v = k ? (k === 'confetti' ? 0.14 : 0.11) : 0.16;
+      tone(c, f, 0, 0.16, 'sine', v); tone(c, f * 1.5, 0.07, 0.24, 'sine', v);
+      if (k) self.fx(k);
+    },
+    fx(k) { // suara khas satu efek jawaban. Kegagalan audio tidak boleh mengganggu kuis, jadi dibungkus try.
+      const c = ctx(); if (!c) return;
+      const t = Date.now(); if (t - lastFx < 90) return; lastFx = t;
+      try { const sub = c.createGain(); sub.gain.value = FXV[k] || 0.9; sub.connect(bus(c)); dst = sub; (FXS[k] || FXS.confetti)(c); } catch (e) { console.error('sfx', e); } finally { dst = null; }
     },
     no() { // jawaban salah atau waktu habis: dua nada turun, lembut
       run = 0; vib([35, 45, 35]);
@@ -750,7 +879,7 @@ const SFX = (() => {
     },
     pet(id) { // suara khas tiap hewan: disentuh di Beranda, dicoba di toko, dan setelah hasil bagus
       const c = ctx(); if (!c) return;
-      switch (id || st.petId) {
+      switch (id || self.petId) {
         case 'p_semut': [0, 0.07, 0.14].forEach((t, i) => tone(c, i === 1 ? 2400 : 1800, t, 0.05, 'sine', 0.09)); break;
         case 'p_lebah': sw(c, 190, 235, 0, 0.25, 'sawtooth', 0.06); sw(c, 235, 180, 0.25, 0.25, 'sawtooth', 0.06); break;
         case 'p_hudhud': [0, 0.2, 0.4].forEach(t => tone(c, 420, t, 0.15, 'sine', 0.2)); break;
@@ -761,6 +890,10 @@ const SFX = (() => {
       }
     },
   };
+  // Buka kunci audio pada sentuhan pertama (iOS hanya mengizinkan dari pointerup/keydown), supaya jawaban benar pertama sudah bersuara tanpa jeda.
+  const prime = () => { if (ctx()) { try { noise(ac); bus(ac); } catch (e) {} removeEventListener('pointerup', prime); removeEventListener('keydown', prime); } };
+  addEventListener('pointerup', prime, { passive: true }); addEventListener('keydown', prime, { passive: true });
+  return self;
 })();
 const FXQ = (() => { // mode: auto | high | mid | low. Otomatis: awal dari jenis perangkat, lalu turun sendiri bila efek terukur patah-patah.
   const mob = /Android|Mobi|iPhone|iPad/i.test(navigator.userAgent);
@@ -1047,7 +1180,7 @@ const FX = {
 };
 const WARM = {"fire":["144,24,0","168,24,0","168,48,0","192,48,0","216,48,0","216,72,0","240,72,0","240,96,0","255,120,24","255,144,24","255,144,48","255,168,48","255,168,72","255,192,48","255,192,72","255,192,96","255,216,120","255,216,144","255,216,96","255,240,144","255,240,168","255,240,192","255,96,0","255,96,24"],"comet":["120,24,0","120,48,0","144,48,0","168,48,0","168,72,0","192,72,0","192,72,24","216,72,24","216,96,24","240,120,24","240,96,24","255,120,24","255,120,48","255,144,48","255,168,48","255,168,72","255,192,72","255,192,96","255,216,120","255,216,144","255,216,168","255,216,96","255,240,144","255,240,168","255,240,192","255,240,216","255,255,240"]}; // warna sprite yang dipakai Api dan Komet, dibuat saat browser menganggur supaya jawaban benar pertama tidak tersendat
 function warmFx() { const k = WARM[me && me.fxa]; if (!k || RM) return; (window.requestIdleCallback || (f => setTimeout(f, 1500)))(() => E3.warm(k)); }
-function ansFx(el) { SFX.ok(); if (!RM) (FX[me.fxa] || FX.confetti)(el.getBoundingClientRect(), el); }
+function ansFx(el) { SFX.ok(RM ? null : (me.fxa || 'confetti')); if (!RM) (FX[me.fxa] || FX.confetti)(el.getBoundingClientRect(), el); }
 
 /* ---------- Efek: tampilan ---------- */
 const SHOP = [
@@ -1197,7 +1330,7 @@ async function vShop() {
   V.innerHTML = '<p class="muted">Memuat…</p>';
   let st; try { st = await api('shop'); } catch (e) { V.textContent = e.message; return; }
   const sync = () => { me.spent = st.spent; me.bonus = st.bonus; me.fxa = st.equipped; me.fxn = st.equippedName; me.pet = st.equippedPet; };
-  const play = k => { if (k.startsWith('p_')) { petAct($('#sg-' + k)); SFX.pet(k); return; } const s = $('#sg-' + k); if (s) (FX[k] || FX.confetti)(s.getBoundingClientRect(), s); };
+  const play = k => { if (k.startsWith('p_')) { petAct($('#sg-' + k)); SFX.pet(k); return; } const s = $('#sg-' + k); if (s) { SFX.ok(k, true); (FX[k] || FX.confetti)(s.getBoundingClientRect(), s); } };
   const draw = () => {
     sync(); const g = st.gold, nameTab = shopTab === 'nm', petTab = shopTab === 'pt', list = petTab ? PETS : nameTab ? NSHOP : SHOP;
     V.innerHTML = `<div class="shopbar"><h1>Efek</h1><span class="gold" style="font-size:1.15rem">${GL} ${g}</span></div>
@@ -1878,7 +2011,7 @@ const GUIDE = {
     <li>Di <b>Profil</b> kamu bisa mengganti username, foto (emoji atau foto pribadi dari galeri yang otomatis dikompres), dan password (pilihan yang tersedia) serta melihat pencapaian. Lupa password? Minta admin mengatur ulang.</li>
     <li><b>Efek foto profil:</b> tiap pencapaian (khatam jilid dan tahap Tathbiq) menambah efek pada fotomu di sidebar, profil, dan leaderboard: dari cincin sederhana, cincin berputar bercahaya, titik cahaya mengorbit, sampai mahkota emas di tahap Takhossus. Di <b>Profil</b> kamu bebas memilih efek yang sudah terbuka (atau Otomatis, atau tanpa efek).</li>
     <li><b>Pencapaian rank:</b> Bronze, Silver, Gold, Platinum, Diamond, dan Legend diraih dari total XP. Tiga teratas di leaderboard mendapat bingkai khusus: api 🔥 (juara 1), petir ⚡ (juara 2), dan percikan aura ✨ (juara 3).</li>
-    <li><b>Gold dan Efek:</b> tiap rekor baru memberi Gold sebanyak XP-nya.@@GOLDINFO@@ Belanjakan di menu <b>Efek</b> untuk efek yang muncul saat jawabanmu benar, dari yang sederhana sampai petir dan galaksi. Efek bisa dicoba dulu, dan membeli tidak mengurangi XP atau rankmu.</li>
+    <li><b>Gold dan Efek:</b> tiap rekor baru memberi Gold sebanyak XP-nya.@@GOLDINFO@@ Belanjakan di menu <b>Efek</b> untuk efek yang muncul saat jawabanmu benar, lengkap dengan suara khasnya (bisa dimatikan di Profil > Setelan), dari yang sederhana sampai petir dan galaksi. Efek bisa dicoba dulu, dan membeli tidak mengurangi XP atau rankmu.</li>
     <li><b>Tantangan Harian:</b> ada empat event, masing-masing sekali sehari dan tidak bisa diulang: <b>Kuis Harian</b> (soal acak semua jilid), <b>Cepat Tepat</b> (tiap soal berbatas waktu), <b>Sorof Harian</b> (soal Sorof acak), dan <b>Lisan Harian</b> (beberapa lafadz acak). Nilai di atas batas lulus tiap event (diatur admin, awalnya 80) memberi satu kali spin hadiah Gold, sampai 1000! Jangan tutup halaman sebelum selesai, karena kesempatan hari itu langsung terpakai.</li>
     <li><b>Kuis Lisan:</b> latihan praktek lafadz. Kamu diberi satu lafadz Arab lalu menjawab pertanyaan berurutan (kalimat apa, tandanya, mu'rab atau mabni, i'rab, dan alasannya) dengan tulisanmu sendiri, boleh bahasa Indonesia atau Arab. Jawaban dinilai dari maksudnya, jadi tidak harus sama persis dengan kunci. XP dihitung seperti kuis tulis: 100/200/300 XP (Mudah/Sedang/Sulit) dikali persen langkah yang benar dalam satu sesi, dan hanya rekor terbaik tiap jilid dan level yang dihitung. Selesaikan sampai halaman hasil agar XP tercatat.</li>
     <li><b>Pencapaian dan lencana:</b> menu <b>Pencapaian</b> berisi puluhan target, dari streak harian, nilai sempurna, jawaban beruntun, sampai koleksi Efek. Tiap pencapaian memberi Gold sekali, ada juga yang tersembunyi. Di <b>Profil</b> kamu bisa memasang sampai 3 lencana yang tampil di leaderboard dan profilmu. Hari Jumat tidak memutus streak.</li></ul>`,
@@ -2025,7 +2158,7 @@ async function vProfile() {
   const qn = () => { $('#fxqn').textContent = 'Sekarang: ' + QN[FXQ.level] + (FXQ.mode === 'auto' ? ' (otomatis)' : ''); };
   V.querySelectorAll('[data-fq]').forEach(b => b.onclick = () => { FXQ.set(b.dataset.fq); V.querySelectorAll('[data-fq]').forEach(x => x.classList.toggle('on', x === b)); qn(); });
   { const sn = $('#sndOn'), hp = $('#hapOn'); sn.onchange = () => { SFX.set('snd', sn.checked); if (sn.checked) SFX.ok(); }; if (hp) hp.onchange = () => { SFX.set('hap', hp.checked); if (hp.checked) navigator.vibrate(30); }; }
-  $('#fxt').onclick = e => { if (!RM) (FX[me.fxa] || FX.confetti)(e.currentTarget.getBoundingClientRect(), e.currentTarget); }; qn();
+  $('#fxt').onclick = e => { SFX.ok(RM ? null : (me.fxa || 'confetti'), true); if (!RM) (FX[me.fxa] || FX.confetti)(e.currentTarget.getBoundingClientRect(), e.currentTarget); }; qn();
   $('#ps').onclick = save; $('#fxs').onclick = save;
   $('#pws').onclick = async () => {
     const o = $('#pwo').value, n = $('#pwn').value, err = $('#perr');
