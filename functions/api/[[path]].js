@@ -484,6 +484,7 @@ export async function onRequest({ request, env, params, waitUntil }) {
         from questions where (${j}::int = 0 or jilid = ${j}::int) and id <> all(${excl}::int[])) t
       order by nb, rk, random() limit ${n}) s order by random()`;
 
+  let who = 0; // id pemanggil yang sudah terautentikasi (dipakai penanganan error di bawah)
   try {
     // ---------- Foto profil (publik: dipanggil lewat <img>, yang tidak bisa mengirim header Authorization) ----------
     // URL memuat versi (?v=), jadi tiap unggahan baru = URL baru. Browser menyimpannya setahun; edge Cloudflare sehari (hemat compute Neon).
@@ -533,6 +534,7 @@ export async function onRequest({ request, env, params, waitUntil }) {
     // (getUser) hanya diambil di rute yang memerlukannya: profil dan admin.
     const claim = await verify((request.headers.get('Authorization') || '').slice(7), S);
     const uid = claim && claim.k === 'auth' ? +claim.uid : 0;
+    who = uid;
     if (!uid) return bad('Silakan masuk dulu', 401);
     let cachedUser;
     const getUser = async () => cachedUser ||= (await sql`select id, username, role, avatar, fx, on_board, photo_v, use_photo from users where id = ${uid}`)[0] || null;
@@ -1566,7 +1568,13 @@ export async function onRequest({ request, env, params, waitUntil }) {
 
     return bad('Tidak ditemukan', 404);
   } catch (e) {
-    if (e.code === '23503') return bad('Silakan masuk dulu', 401); // akun sudah dihapus
+    if (e.code === '23503') {
+      // Pelanggaran FK bisa karena akun pemanggil dihapus, atau data lain (mis. soal dihapus saat dilaporkan). Hanya akun hilang yang berarti 401 (klien keluar).
+      let gone = false;
+      try { gone = !!who && !(await sql`select 1 from users where id = ${who}::int`).length; } catch (x) { console.error(x); }
+      if (gone) return bad('Silakan masuk dulu', 401);
+      return bad('Data terkait sudah berubah. Muat ulang lalu coba lagi.', 409);
+    }
     console.error(e);
     return bad('Kesalahan server', 500);
   }
