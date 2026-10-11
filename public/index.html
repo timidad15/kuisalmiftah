@@ -552,6 +552,13 @@ h1 .tip,h2 .tip{width:20px;height:20px;font-size:.78rem}
 .res .gl{text-align:left;margin:14px auto;max-width:520px}
 .gl.steps{padding-left:22px}
 .gloss{margin:0}.gloss dt{font-weight:800;color:var(--accent);margin-top:12px}.gloss dd{margin:2px 0 0}
+/* ===== Latihan offline ===== */
+.offhome{max-width:560px;margin:4vh auto 0}
+.offban{text-align:center;border:2px dashed var(--line)}
+.offwho{text-align:center;margin:0 0 12px}
+.offrow{display:flex;align-items:center;justify-content:space-between;gap:10px;flex-wrap:wrap;margin-top:10px}
+.offrow>div{display:flex;gap:8px;flex-wrap:wrap}
+.offrow .btn{padding:8px 14px}
 </style>
 </head>
 <body>
@@ -624,14 +631,14 @@ async function api(p, b) {
     });
   } catch (x) { throw Object.assign(new Error('Tidak bisa terhubung ke server. Periksa koneksi internetmu.'), { status: 0 }); }
   const d = await r.json().catch(() => ({}));
-  if (r.status === 401 && tok && p !== 'login' && p !== 'register') { tok = null; try { localStorage.removeItem('tk'); } catch (e) {} setTimeout(boot, 0); }
+  if (r.status === 401 && tok && p !== 'login' && p !== 'register') { tok = null; try { localStorage.removeItem('tk'); localStorage.removeItem(OFFS); } catch (e) {} setTimeout(boot, 0); }
   if (!r.ok) throw Object.assign(new Error(d.error || 'Terjadi kesalahan'), { status: r.status });
   if (p === 'me' && d.rankGot) setTimeout(() => toast(`Bonus harian rank <b>${RANKS[rkOf(Object.values(d.best || {}).reduce((a, b) => a + b, 0))][1]}</b>: +${d.rankGot} ${GL}`, '🎁'), 900);
   return d;
 }
 const closeMenu = () => $('#app').classList.remove('open');
 function go(v, a) {
-  closeMenu(); if (me) renderChip();
+  closeMenu(); if (me) { renderChip(); offSnap(); }
   document.querySelectorAll('.nav[data-v], .bn[data-v]').forEach(b => b.classList.toggle('active', b.dataset.v === v));
   ({ auth: vAuth, home: vHome, board: vBoard, daily: vDaily, shop: vShop, ach: vAch, admin: vAdmin, profile: vProfile })[v](a);
   $('.scroll').scrollTop = 0;
@@ -1254,7 +1261,8 @@ const FX = {
 };
 const WARM = {"fire":["144,24,0","168,24,0","168,48,0","192,48,0","216,48,0","216,72,0","240,72,0","240,96,0","255,120,24","255,144,24","255,144,48","255,168,48","255,168,72","255,192,48","255,192,72","255,192,96","255,216,120","255,216,144","255,216,96","255,240,144","255,240,168","255,240,192","255,96,0","255,96,24"],"comet":["120,24,0","120,48,0","144,48,0","168,48,0","168,72,0","192,72,0","192,72,24","216,72,24","216,96,24","240,120,24","240,96,24","255,120,24","255,120,48","255,144,48","255,168,48","255,168,72","255,192,72","255,192,96","255,216,120","255,216,144","255,216,168","255,216,96","255,240,144","255,240,168","255,240,192","255,240,216","255,255,240"]}; // warna sprite yang dipakai Api dan Komet, dibuat saat browser menganggur supaya jawaban benar pertama tidak tersendat
 function warmFx() { const k = WARM[me && me.fxa]; if (!k || RM) return; (window.requestIdleCallback || (f => setTimeout(f, 1500)))(() => E3.warm(k)); }
-function ansFx(el) { SFX.ok(RM ? null : (me.fxa || 'confetti')); if (!RM) (FX[me.fxa] || FX.confetti)(el.getBoundingClientRect(), el); }
+let offFxa = null; // efek jawaban milik murid saat offline (diambil dari ringkasan di perangkat)
+function ansFx(el) { const fa = me ? me.fxa : offFxa; SFX.ok(RM ? null : (fa || 'confetti')); if (!RM) (FX[fa] || FX.confetti)(el.getBoundingClientRect(), el); }
 
 /* ---------- Efek: tampilan ---------- */
 const SHOP = [
@@ -1875,12 +1883,12 @@ function vHome() {
 const ansTxt = q => esc(q.answer + '. ' + (q[q.answer.toLowerCase()] || ''));
 const why = q => q.e ? `<div class="why">💡 ${esc(q.e)}</div>` : '';
 function vQuiz(d, j, l, trial) {
-  const qs = trial ? d.questions.slice(0, 5) : d.questions, wrong = [], ans = {}; let i = 0, streak = 0;
+  const qs = trial === 'off' ? d.questions : trial ? d.questions.slice(0, 5) : d.questions, wrong = [], ans = {}; let i = 0, streak = 0;
   const draw = () => {
     const q = qs[i];
     V.innerHTML = `<div class="card jc" style="${jst(j)}"><div class="bar"><i style="width:${i / qs.length * 100}%"></i></div>
-      <div class="meta"><span class="muted">${trial ? '🧪 Latihan coba (tidak dicatat) · ' : 'Jilid ' + j + ' · ' + LV[l][0] + ' · '}Soal ${i + 1}/${qs.length}</span><span class="chip" id="cb">🔥 ${streak}</span></div>
-      ${rptRow(q.id)}<h2 dir="auto" id="qt"></h2><div>` +
+      <div class="meta"><span class="muted">${trial === 'off' ? '📴 Latihan offline (tidak dicatat) · Jilid ' + j + ' · ' + LV[l][0] + ' · ' : trial ? '🧪 Latihan coba (tidak dicatat) · ' : 'Jilid ' + j + ' · ' + LV[l][0] + ' · '}Soal ${i + 1}/${qs.length}</span><span class="chip" id="cb">🔥 ${streak}</span></div>
+      ${trial === 'off' ? '' : rptRow(q.id)}<h2 dir="auto" id="qt"></h2><div>` +
       ['a', 'b', 'c', 'd'].map((k, n) => `<button class="opt" style="--i:${n}" data-k="${k.toUpperCase()}" dir="auto"><b>${k.toUpperCase()}</b><span>${esc(q[k])}</span></button>`).join('') +
       `</div><div id="fb"></div><div class="row"><span></span><button class="btn" id="nx" hidden>${i < qs.length - 1 ? 'Berikutnya →' : 'Lihat hasil'}</button></div></div>`;
     const h = $('#qt'), all = V.querySelectorAll('.opt'); bindRpts();
@@ -1901,7 +1909,7 @@ function vQuiz(d, j, l, trial) {
     });
     $('#nx').onclick = async () => {
       if (i < qs.length - 1) { i++; draw(); return; }
-      if (trial) return vTrialResult(qs.length - wrong.length, qs.length, wrong, j, l);
+      if (trial) return vTrialResult(qs.length - wrong.length, qs.length, wrong, j, l, trial);
       try { vResult(await api('submit', { token: d.token, answers: ans }), j, l, wrong); } catch (e) { alert(e.message); }
     };
   };
@@ -1931,20 +1939,21 @@ function vResult(r, j, l, wrong) {
 async function startTrial(j = 1, l = 'easy') {
   try { vQuiz(await api(`quiz?jilid=${j}&level=${l}`), j, l, true); } catch (e) { toast(e.message, '⚠️'); }
 }
-function vTrialResult(c, t, wrong, j, l) {
-  const sc = Math.round(c * 100 / t), xp = Math.round(LV[l][2] * c / t), em = sc >= 80 ? '🎉' : sc >= 40 ? '👍' : '💪';
-  V.innerHTML = `<div class="card res jc" style="${jst(j)}"><div class="big">${em}</div><span class="tag">Latihan coba selesai</span>
-    <h1>${c} dari ${t} benar</h1>
-    <p class="muted">Ini hanya latihan, jadi tidak dicatat dan tidak ada yang berkurang. Kalau ini kuis sungguhan, hasil ini setara <b>±${xp} XP</b>.</p>
+function vTrialResult(c, t, wrong, j, l, mode) {
+  const off = mode === 'off', sc = Math.round(c * 100 / t), xp = Math.round(LV[l][2] * c / t), em = sc >= 80 ? '🎉' : sc >= 40 ? '👍' : '💪';
+  V.innerHTML = `<div class="card res jc" style="${jst(j)}"><div class="big">${em}</div><span class="tag">${off ? 'Latihan offline selesai' : 'Latihan coba selesai'}</span>
+    <h1>${c} dari ${t} benar</h1>` +
+    (off ? `<p class="muted">Hasil latihan offline <b>tidak dicatat</b>, jadi XP-mu tidak berubah. Begitu ada sinyal, kerjakan kuis sungguhan agar nilaimu tercatat.</p>`
+      : `<p class="muted">Ini hanya latihan, jadi tidak dicatat dan tidak ada yang berkurang. Kalau ini kuis sungguhan, hasil ini setara <b>±${xp} XP</b>.</p>
     <ul class="gl"><li><b>XP</b> bertambah dari nilai terbaikmu di tiap level, dan XP menaikkan <b>rank</b> (Bronze, Silver, dan seterusnya).</li>
       <li><b>Gold ${GL}</b> ikut bertambah sebanyak XP-nya. Tukarkan di menu <b>Efek</b> untuk efek saat jawabanmu benar.</li>
-      <li>Nilaimu <b>tidak pernah turun</b>: yang dihitung hanya rekor terbaik, jadi mengulang itu aman.</li></ul>
-    <div class="row"><button class="btn" id="real">Kerjakan kuis sungguhan</button><button class="btn ghost" id="again2">Latihan lagi</button><button class="btn ghost" id="hm">Kembali</button></div></div>` +
+      <li>Nilaimu <b>tidak pernah turun</b>: yang dihitung hanya rekor terbaik, jadi mengulang itu aman.</li></ul>`) +
+    `<div class="row">${off ? '<button class="btn" id="again2">Latihan lagi</button>' : '<button class="btn" id="real">Kerjakan kuis sungguhan</button><button class="btn ghost" id="again2">Latihan lagi</button>'}<button class="btn ghost" id="hm">Kembali</button></div></div>` +
     (wrong.length ? `<h2>Pembahasan (${wrong.length} salah)</h2>` + wrong.map((w, n) => `<div class="card" style="--i:${n}"><p dir="auto"><b>${esc(w.q)}</b></p><p class="muted" dir="auto">Jawaban benar: ${w.k}. ${esc(w.a)}</p></div>`).join('') : '');
   if (sc >= 70) { SFX.win(); burst(innerWidth / 2, 130, 30); }
-  $('#real').onclick = async () => { try { vQuiz(await api(`quiz?jilid=${j}&level=${l}`), j, l); } catch (e) { toast(e.message, '⚠️'); } };
-  $('#again2').onclick = () => startTrial(j, l);
-  $('#hm').onclick = () => go('home');
+  if ($('#real')) $('#real').onclick = async () => { try { vQuiz(await api(`quiz?jilid=${j}&level=${l}`), j, l); } catch (e) { toast(e.message, '⚠️'); } };
+  $('#again2').onclick = () => off ? offStart(j, l) : startTrial(j, l);
+  $('#hm').onclick = () => (off && !me) ? vOffline() : go('home');
 }
 
 /* ---------- Kuis Sorof: 6 level mengikuti file Tathbiq (Pra Tathbiq, Tathbiq 1–5) ---------- */
@@ -2143,6 +2152,7 @@ const GUIDE = {
     <dt>Tathbiq</dt><dd>Mode soal acak tanpa henti dengan 3 nyawa. Terbuka setelah semua quest Jilid 1–4 selesai.</dd>
     <dt>Sorof</dt><dd>Latihan menebak sighot dan bentuk fi'il, seperti di kitab Tathbiq.</dd>
     <dt>Lisan</dt><dd>Praktek menjawab lafadz dengan tulisanmu sendiri, seperti di depan ustadz. Dinilai dari maksudnya.</dd>
+    <dt>Latihan offline</dt><dd>Berlatih tanpa sinyal memakai soal yang tersimpan di HP. Hasilnya tidak dicatat sebagai XP.</dd>
     <dt>Streak</dt><dd>Jumlah hari aktif berturut-turut. Hari Jumat tidak memutus streak.</dd>
     <dt>Lulus, Jayyid, Mumtaz, Sempurna</dt><dd>Penilaian level: Lulus 60%+, Jayyid 75%+, Mumtaz 90%+, Sempurna 100%.</dd></dl>`,
   app: `<ul class="gl"><li>Pilih <b>Jilid 1–4</b> lalu tingkat kesulitan: Mudah 10 soal (maks 100 XP), Sedang 20 soal (maks 200 XP), Sulit 30 soal (maks 300 XP).</li>
@@ -2264,12 +2274,17 @@ async function vProfile() {
     <div class="card"><h2>Suara dan getaran</h2><p class="muted">Bunyi singkat saat jawabanmu benar atau salah, dan saat hasil keluar.</p>
     <label class="chk"><input type="checkbox" id="sndOn"${SFX.st.snd ? ' checked' : ''}> Suara</label>
     ${navigator.vibrate ? `<label class="chk"><input type="checkbox" id="hapOn"${SFX.st.hap ? ' checked' : ''}> Getaran</label>` : '<p class="muted" style="font-size:.85rem">Getaran belum didukung di perangkat atau browser ini.</p>'}</div>
+    <div class="card"><h2>Latihan offline</h2><p class="muted" id="offinfo"></p><div class="acts"><button class="btn ghost" id="offUp">Perbarui soal offline</button><button class="btn ghost" id="offTry">Coba Latihan Offline</button></div></div>
     <div class="card"><h2>Bantuan dan akun</h2><div class="slist"><button class="srow" id="pGuide"><span>📖</span><b>Panduan</b><small>Cara memakai Al-Miftah</small></button><button class="srow" id="pTheme"><span>🌓</span><b>Ganti tema</b><small>Terang atau gelap</small></button>${ADM() ? `<button class="srow adminlnk" data-v="admin"><span>🛠️</span><b>Panel Admin</b><small>${me.reports ? me.reports + ' laporan soal menunggu' : 'Kelola soal dan murid'}</small></button>` : ''}<a class="srow" href="/privasi.html" style="text-decoration:none;color:inherit"><span>🔒</span><b>Kebijakan privasi</b><small>Data apa yang kami simpan</small></a>${ADM() ? '' : `<button class="srow out" id="pDel"><span>🗑️</span><b>Hapus akun</b><small>Hapus akun dan semua datamu secara permanen</small></button>`}<button class="srow out" id="pOut"><span>🚪</span><b>Keluar</b><small>Akhiri sesi di perangkat ini</small></button></div></div></section>
     <section class="pnl" data-p="win"${ptab === 'win' ? '' : ' hidden'}><div class="card"><h2>Rank</h2><div class="phrow"><span>${RI(ri, 56)}</span><div style="flex:1;min-width:160px"><b style="font-size:1.1rem">${RANKS[ri][1]}</b><div class="muted" style="margin:2px 0 8px">${xp} XP${RANKS[ri + 1] ? ' · ' + (RANKS[ri + 1][0] - xp) + ' XP lagi menuju ' + RANKS[ri + 1][1] : ' · tingkat tertinggi'}</div><div class="bar" style="margin:0"><i style="width:${RANKS[ri + 1] ? Math.round((xp - RANKS[ri][0]) / (RANKS[ri + 1][0] - RANKS[ri][0]) * 100) : 100}%;background:${RANKS[ri][3]}"></i></div></div></div></div><div class="card"><h2>Jilid dan Tathbiq (${myFx()}/11)</h2><div class="chips">${[1, 2, 3, 4].map(j => `<span class="pchip${AJD(j) ? ' on' : ''}" style="--c:${JC[j][0]}">${AJD(j) ? '🏅' : '🔒'} Jilid ${j}${AJD(j) ? '' : ' · ' + JN(j) + '/3'}</span>`).join('')}</div><p class="muted" style="margin:12px 0 0">${TAT() ? 'Mode Tathbiq: tahap ' + TS() + ' dari ' + STG.length + (TS() ? ' (' + STG[TS() - 1][0] + ')' : '') + '.' : 'Mode Tathbiq terbuka setelah keempat jilid selesai.'}</p></div><div class="card"><h2>Pencapaian</h2><p class="muted" id="pcnt">Memuat…</p><button class="btn" id="pgoAch">Lihat semua pencapaian →</button></div></section>`;
   V.querySelectorAll('[data-pt]').forEach(b => b.onclick = () => { ptab = b.dataset.pt; V.querySelectorAll('[data-pt]').forEach(x => x.classList.toggle('on', x === b)); V.querySelectorAll('.pnl').forEach(x => { x.hidden = x.dataset.p !== ptab; }); });
   $('#pGuide').onclick = () => openGuide();
+  const offUI = () => { const p = offLoad(); $('#offinfo').textContent = p ? `Paket siap: ${offCount(p)} soal Kuis Tulis, diperbarui ${new Date(p.t).toLocaleString('id-ID', { dateStyle: 'medium', timeStyle: 'short' })}. Dipakai saat tidak ada sinyal, dan hasilnya tidak dicatat.` : 'Belum ada paket soal offline. Tekan Perbarui saat ada sinyal.'; };
+  offUI();
+  $('#offUp').onclick = async e => { const b = e.currentTarget; b.disabled = true; b.textContent = 'Mengunduh…'; const ok = await offRefresh(true); b.disabled = false; b.textContent = 'Perbarui soal offline'; offUI(); toast(ok ? 'Soal offline sudah diperbarui.' : 'Belum berhasil. Periksa sinyalmu.', ok ? '✅' : '⚠️'); };
+  $('#offTry').onclick = () => vOffline('Ini tampilan mode offline (hanya percobaan).');
   $('#pTheme').onclick = () => theme(document.documentElement.getAttribute('data-theme') === 'dark' ? 'light' : 'dark');
-  $('#pOut').onclick = () => { tok = null; try { localStorage.removeItem('tk'); } catch (e) {} boot(); };
+  $('#pOut').onclick = () => { tok = null; try { localStorage.removeItem('tk'); localStorage.removeItem(OFFS); } catch (e) {} boot(); };
   if ($('#pDel')) $('#pDel').onclick = openDeleteAccount;
   $('#pgoAch').onclick = () => go('ach');
   V.querySelectorAll('.adminlnk').forEach(b => b.onclick = () => go('admin'));
@@ -2422,7 +2437,7 @@ function openDeleteAccount() {
     b.disabled = true;
     try {
       await api('account/delete', { password: pw });
-      close(); tok = null; me = null; try { localStorage.removeItem('tk'); } catch (x) {}
+      close(); tok = null; me = null; try { localStorage.removeItem('tk'); localStorage.removeItem(OFFS); } catch (x) {}
       toast('Akunmu sudah dihapus', '✅'); boot();
     } catch (x) { er.textContent = x.message; b.disabled = false; }
   };
@@ -3090,12 +3105,62 @@ function adminUsers() {
 }
 
 /* ---------- Awal ---------- */
+/* ---------- Latihan Offline ---------- */
+/* Paket soal Kuis Tulis (Jilid 1–4) disimpan di HP saat online, lalu bisa dimainkan tanpa sinyal.
+   Nilai dihitung di perangkat dan TIDAK dicatat sebagai XP: XP dan Gold tetap hanya berasal dari server. */
+const OFFK = 'offpk1', OFFS = 'offsnap1', OFF_AGE = 20 * 36e5;
+const offLoad = () => { try { const p = JSON.parse(localStorage.getItem(OFFK) || 'null'); return p && p.p ? p : null; } catch (e) { return null; } };
+const offPool = (p, j) => { const m = new Map(); Object.keys(LV).forEach(l => (p.p[j + ':' + l] || []).forEach(q => m.set(q.id, q))); return [...m.values()]; };
+const offCount = p => { const s = new Set(); Object.values(p.p).forEach(a => a.forEach(q => s.add(q.id))); return s.size; };
+const offSnap = () => { try { localStorage.setItem(OFFS, JSON.stringify({ u: me.username, xp: totalXp(), fxa: me.fxa || null, t: Date.now() })); } catch (e) {} };
+let offBusy = false;
+async function offRefresh(force) {
+  if (offBusy || !me || navigator.onLine === false) return false;
+  const cur = offLoad();
+  if (!force && cur && Date.now() - cur.t < OFF_AGE) return true;
+  offBusy = true; const pk = cur || { t: 0, p: {} }; let got = 0;
+  try {
+    outer: for (const j of [1, 2, 3, 4]) for (const l of Object.keys(LV)) {
+      try {
+        const d = await api(`quiz?jilid=${j}&level=${l}`);
+        if (d.questions && d.questions.length) { pk.p[j + ':' + l] = d.questions.map(q => ({ id: q.id, q: q.q, a: q.a, b: q.b, c: q.c, d: q.d, answer: q.answer, ...(q.e ? { e: q.e } : {}) })); got++; }
+      } catch (e) { if (e.status === 0 || e.status === 401) break outer; } // sinyal hilang atau sesi habis: berhenti
+    }
+  } finally { offBusy = false; }
+  if (!got) return !!cur;
+  pk.t = Date.now(); try { localStorage.setItem(OFFK, JSON.stringify(pk)); } catch (e) { return !!cur; }
+  return true;
+}
+function offStart(j, l) {
+  const p = offLoad(), pool = p ? offPool(p, j) : [];
+  if (!pool.length) { toast(`Belum ada soal offline untuk Jilid ${j}. Buka aplikasi saat ada sinyal dulu.`, '📴'); return; }
+  const a = pool.slice(); for (let i = a.length - 1; i > 0; i--) { const k = Math.floor(Math.random() * (i + 1)); [a[i], a[k]] = [a[k], a[i]]; }
+  vQuiz({ questions: a.slice(0, Math.min(LV[l][1], a.length)), token: null }, j, l, 'off');
+}
+function vOffline(msg) {
+  document.body.classList.add('anon');
+  let s = null; try { s = JSON.parse(localStorage.getItem(OFFS) || 'null'); } catch (e) {}
+  offFxa = s && s.fxa || null;
+  const p = offLoad(), has = !!p && offCount(p) > 0;
+  V.innerHTML = `<div class="offhome"><img class="auth-logo" src="/logo.png" alt="Al-Miftah">
+    <div class="card offban"><b>📴 Mode offline</b><p class="muted" style="margin:6px 0 12px">${esc(msg || 'Belum bisa terhubung ke server.')} Kamu tidak perlu masuk ulang.</p><button class="btn" id="offRetry">Coba sambungkan lagi</button></div>
+    ${s ? `<p class="muted offwho">Assalamu'alaikum, <b>${esc(s.u)}</b> · terakhir tercatat ${s.xp} XP (${RANKS[rkOf(s.xp)][1]})</p>` : ''}
+    <div class="card"><h2>Latihan offline${tip('Berlatih memakai soal yang tersimpan di HP-mu. Hasilnya tidak dicatat sebagai XP; XP dan Gold hanya bertambah saat kamu mengerjakan kuis sungguhan dengan sinyal.')}</h2>` +
+    (has ? `<p class="muted">Soal diambil dari paket di HP-mu (${offCount(p)} soal Kuis Tulis). Hasilnya tidak dicatat, hanya untuk berlatih.</p>` +
+      [1, 2, 3, 4].map(j => `<div class="offrow"><b>Jilid ${j}</b><div>${Object.entries(LV).map(([k, v]) => `<button class="btn ghost" data-oj="${j}" data-ol="${k}">${v[0]}</button>`).join('')}</div></div>`).join('')
+      : '<p class="muted">Belum ada paket soal di HP ini. Buka aplikasi sekali saat ada sinyal, dan soal akan tersimpan otomatis untuk latihan offline.</p>') + '</div></div>';
+  $('#offRetry').onclick = e => { e.currentTarget.disabled = true; boot(); };
+  V.querySelectorAll('[data-oj]').forEach(b => b.onclick = () => offStart(+b.dataset.oj, b.dataset.ol));
+}
+addEventListener('online', () => { if ($('#offRetry') && !$('#offRetry').disabled) boot(); }); // sinyal kembali saat di layar offline: sambungkan otomatis
+
 async function boot() {
   try { me = await api('me'); }
   catch (e) {
     me = null;
-    if (e.status === 401) { tok = null; try { localStorage.removeItem('tk'); } catch (x) {} } // token memang tidak sah: keluar
+    if (e.status === 401) { tok = null; try { localStorage.removeItem('tk'); localStorage.removeItem(OFFS); } catch (x) {} } // token memang tidak sah: keluar
     else if (tok) { // koneksi putus atau server sedang error: token tetap disimpan, tawarkan coba lagi
+      if (e.status === 0) { vOffline(e.message); return; } // tidak ada sinyal: tawarkan latihan offline
       document.body.classList.add('anon');
       V.innerHTML = `<div class="card auth"><img class="auth-logo" src="/logo.png" alt="Al-Miftah"><h2 style="text-align:center">Belum bisa terhubung</h2><p class="muted" style="text-align:center">${esc(e.message)} Kamu tidak perlu masuk ulang.</p><button class="btn" id="retry">Coba lagi</button></div>`;
       $('#retry').onclick = () => { $('#retry').disabled = true; boot(); };
@@ -3103,7 +3168,7 @@ async function boot() {
     }
   }
   document.body.classList.toggle('anon', !me);
-  if (me) { showAll = false; wasFresh = null; renderChip(); warmFx(); $('#navAdmin').hidden = me.role !== 'admin'; setRep(me.reports || 0); go('home'); if (me.unseen && me.unseen.length) { noteAch(me.unseen, true); api('achievements/seen', {}).catch(() => {}); } if (me.role === 'admin' && me.reports) setTimeout(() => toast('Ada <b>' + me.reports + ' soal</b> dilaporkan murid. Buka Panel Admin → Laporan.', '🚩'), 800); let g = false; try { if (!localStorage.getItem('guide1')) { localStorage.setItem('guide1', '1'); g = true; } } catch (e) {}
+  if (me) { showAll = false; wasFresh = null; offSnap(); setTimeout(offRefresh, 5000); renderChip(); warmFx(); $('#navAdmin').hidden = me.role !== 'admin'; setRep(me.reports || 0); go('home'); if (me.unseen && me.unseen.length) { noteAch(me.unseen, true); api('achievements/seen', {}).catch(() => {}); } if (me.role === 'admin' && me.reports) setTimeout(() => toast('Ada <b>' + me.reports + ' soal</b> dilaporkan murid. Buka Panel Admin → Laporan.', '🚩'), 800); let g = false; try { if (!localStorage.getItem('guide1')) { localStorage.setItem('guide1', '1'); g = true; } } catch (e) {}
     if (justReg) { justReg = false; openWelcome(g); } else if (g) openGuide(); } else go('auth');
 }
 document.querySelectorAll('.nav[data-v], .bn[data-v]').forEach(b => b.onclick = () => go(b.dataset.v));
