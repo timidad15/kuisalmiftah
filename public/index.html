@@ -531,6 +531,10 @@ html[data-pet=p_unta] .fb.ok::before{animation-name:pf-cam}html[data-pet=p_gajah
 html[data-pet=p_unta] .fb.no::before,html[data-pet=p_gajah] .fb.no::before{animation:pf-droop .6s forwards}
 html[data-pet=p_lebah] .fb.no::before,html[data-pet=p_paus] .fb.no::before{animation:pf-sink .6s forwards}
 @media(prefers-reduced-motion:reduce){.fb::before{animation:none!important}}
+.pcheer{position:fixed;left:12px;bottom:calc(12px + env(safe-area-inset-bottom,0px));z-index:60;display:flex;align-items:center;gap:8px;max-width:min(86vw,320px);padding:6px 14px 6px 8px;background:var(--surface);border:1px solid var(--line);border-radius:18px 18px 18px 4px;box-shadow:0 6px 18px rgba(0,0,0,.18);font-weight:700;font-size:.9rem;line-height:1.3;pointer-events:none;animation:pcin .3s ease-out}
+.pcheer svg{width:52px;height:52px;flex:none;display:block}
+@keyframes pcin{from{opacity:0;transform:translateY(10px)}}
+@media(prefers-reduced-motion:reduce){.pcheer{animation:none}}
 </style>
 </head>
 <body>
@@ -1235,7 +1239,7 @@ const PETS = [
 const PK = '#2b2b2b';
 // Wajah bersama: m = 'idle' | 'ok' | 'no'. my = jarak mulut dari mata, mo = gambar mulut atau tidak.
 // Mata dibungkus <g class="bl"> supaya bisa berkedip lewat CSS.
-const pFace = (m, x, y, g = 9, s = 1, my = 6, mo = true) => {
+const pFace0 = (m, x, y, g = 9, s = 1, my = 6, mo = true) => {
   const eye = cx => '<g class="bl">' + (m === 'ok'
     ? `<path d="M${cx - 3.6 * s} ${y + s}q${3.6 * s} ${-5 * s} ${7.2 * s} 0" fill="none" stroke="${PK}" stroke-width="${2.2 * s}" stroke-linecap="round"/>`
     : `<circle cx="${cx}" cy="${y}" r="${3.3 * s}" fill="${PK}"/><circle cx="${cx + 1.1 * s}" cy="${y - 1.2 * s}" r="${1.1 * s}" fill="#fff"/>`) + '</g>';
@@ -1249,6 +1253,13 @@ const pFace = (m, x, y, g = 9, s = 1, my = 6, mo = true) => {
   return ch + eye(x - g) + eye(x + g) + (mo ? `<path d="${mp}" fill="none" stroke="${PK}" stroke-width="${2 * s}" stroke-linecap="round"/>` : '') + sad;
 };
 
+// Ekspresi tambahan memakai wajah dasar + hiasan kecil, jadi berlaku untuk semua hewan: cheer (gembira), think (berpikir), sleep (tidur).
+const pFace = (m, x, y, g = 9, s = 1, my = 6, mo = true) => {
+  if (m === 'cheer') return pFace0('ok', x, y, g, s, my, mo) + `<path d="M${x - g - 9 * s} ${y - 8 * s}l${-3 * s} ${-3 * s}M${x + g + 9 * s} ${y - 8 * s}l${3 * s} ${-3 * s}M${x} ${y - 14 * s}v${-4 * s}" stroke="#F5C518" stroke-width="${2 * s}" stroke-linecap="round" fill="none"/>`;
+  if (m === 'think') return pFace0('idle', x, y, g, s, my, mo) + `<circle cx="${x + g + 8 * s}" cy="${y - 9 * s}" r="${1.8 * s}" fill="#9BB1C8"/><circle cx="${x + g + 13 * s}" cy="${y - 15 * s}" r="${3 * s}" fill="#9BB1C8"/>`;
+  if (m === 'sleep') return pFace0('ok', x, y, g, s, my, mo) + `<path d="M${x + g + 7 * s} ${y - 11 * s}h${5 * s}l${-5 * s} ${5 * s}h${5 * s}" stroke="#7CA7D8" stroke-width="${1.5 * s}" stroke-linecap="round" stroke-linejoin="round" fill="none"/>`;
+  return pFace0(m, x, y, g, s, my, mo);
+};
 // Kelas k-/s-/l-/h-/u-/g-/w- menandai bagian yang digerakkan CSS (lihat blok "Hewan pendamping" di stylesheet).
 const PET_ART = {
   p_kucing: m => `<g class="k-tail"><path d="M72 90c16 0 20-16 12-28" fill="none" stroke="#E0832A" stroke-width="7" stroke-linecap="round"/></g>
@@ -1295,13 +1306,38 @@ const PET_ART = {
     <path d="M12 66c10 14 34 20 54 17 12-2 20-7 22-15-12 8-46 11-76-2z" fill="#DCEEFF"/>${pFace(m, 34, 54, 9, 1, 8)}</g>`,
 };
 
+// Aksesori hewan: lapisan SVG statis di atas kepala (tanpa animasi, jadi tanpa beban). Dibeli di toko (a_*), dipasang di perangkat ini.
+const ASHOP = [['a_peci', 'Peci', '🎩', 'Hewan', 'Peci hitam untuk hewan pendampingmu.'], ['a_sorban', 'Sorban', '👳', 'Hewan', 'Sorban putih ala santri.'], ['a_mahkota', 'Mahkota', '👑', 'Hewan', 'Mahkota emas untuk juara kuis.']];
+const accOn = () => { try { const a = localStorage.getItem('pa_acc'); return ASHOP.some(x => x[0] === a) ? a : ''; } catch (e) { return ''; } };
+const setAcc = a => { try { a ? localStorage.setItem('pa_acc', a) : localStorage.removeItem('pa_acc'); } catch (e) {} applyPet(); };
+const ANCH = { kucing: [50, 27], semut: [50, 16], lebah: [50, 34], hudhud: [46, 28], unta: [27, 15], gajah: [50, 22], paus: [34, 29] };
+const ACC_ART = { a_peci: '<path d="M-12 3L-10-11H10L12 3z" fill="#222"/><path d="M-11 0H11" stroke="#F5C518" stroke-width="1.6"/>', a_sorban: '<ellipse cy="-4" rx="15" ry="9" fill="#fff" stroke="#D5D5D5"/><path d="M-12-2q12 6 24 0M-6-10q6 4 12 0" fill="none" stroke="#D5D5D5"/>', a_mahkota: '<path d="M-12 3V-10L-6-3 0-12 6-3 12-10V3z" fill="#F5C518" stroke="#E8960F"/>' };
+const accArt = (id, a) => { const c = ACC_ART[a], p = ANCH[(id || 'p_kucing').slice(2)]; return c && p ? `<g transform="translate(${p[0]} ${p[1]})">${c}</g>` : ''; };
 // live = true untuk hewan yang tampil di layar (diberi kelas agar bisa dianimasikan); gambar statis (.fb) tanpa kelas.
-const petSvg = (id, m = 'idle', px, live) => `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100"${px ? ` width="${px}" height="${px}"` : ''}${live ? ` class="pa pa-${(id || 'p_kucing').slice(2)}" aria-hidden="true"` : ''}>${(PET_ART[id] || PET_ART.p_kucing)(m)}</svg>`;
+const petSvg = (id, m = 'idle', px, live, acc = accOn()) => `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100"${px ? ` width="${px}" height="${px}"` : ''}${live ? ` class="pa pa-${(id || 'p_kucing').slice(2)}" aria-hidden="true"` : ''}>${(PET_ART[id] || PET_ART.p_kucing)(m)}${accArt(id, acc)}</svg>`;
 const myPetOf = x => PETS.some(q => q[0] === x) ? x : PET0, myPet = () => myPetOf(me && me.pet);
 const petUrl = (id, m) => 'url("data:image/svg+xml,' + encodeURIComponent(petSvg(id, m)) + '")';
+// Gelembung hewan sesaat (satu SVG, dibuang otomatis): dipakai untuk layar hasil, naik rank, dan kombo jawaban.
+function petSay(m, txt, ms = 2800) {
+  document.querySelectorAll('.pcheer').forEach(x => x.remove());
+  const el = document.createElement('div'); el.className = 'pcheer';
+  el.innerHTML = petSvg(myPet(), m, 0, true) + '<span>' + esc(txt) + '</span>';
+  document.body.appendChild(el); el.querySelector('svg').classList.add('live'); petAct(el); setTimeout(() => el.remove(), ms);
+}
+function petCheer(r, t0) { try { const up = rkOf(totalXp()) > rkOf(t0); petSay('cheer', up ? 'Rank naik! Barakallahu fiik!' : pick(['Alhamdulillah, selesai!', 'Kerja bagus!', 'Sampai jumpa di soal berikutnya!']), up ? 4200 : 3000); SFX.pet(myPet()); } catch (e) {} }
+function petCombo(n) { if ([3, 5, 8, 12, 20].includes(n)) petSay('cheer', n + ' beruntun! Masya Allah!', 1800); else if (n <= -3) petSay('no', 'Tidak apa-apa, ayo lagi!', 2200); }
+function petCtx() { // sapaan sesuai konteks dari data yang sudah ada di klien (tanpa query baru)
+  const dt = new Date(), h = dt.getHours(), tot = totalXp(), nx = RANKS[rkOf(tot) + 1];
+  if (nx && nx[0] - tot <= 60) return `Sedikit lagi! ${nx[0] - tot} XP menuju ${nx[1]}.`;
+  if (dt.getDay() === 5) return 'Hari Jumat: streak aman. Boleh istirahat, atau belajar santai.';
+  if (h < 5) return 'Sudah larut, jangan lupa istirahat ya.';
+  if (h < 11) return 'Selamat pagi! Ayo mulai dengan satu kuis.';
+  if (h >= 18) return 'Malam ini, satu kuis dulu sebelum tidur?';
+  return null;
+}
 let petOn = null;
 function applyPet() { // wajah hewan di balasan jawaban (.fb) lewat variabel CSS, jadi semua jenis kuis ikut tanpa mengubah kodenya
-  const id = myPet(); SFX.petId = id; if (petOn === id) return; petOn = id; document.documentElement.dataset.pet = id;
+  const id = myPet(), ak = id + '|' + accOn(); SFX.petId = id; if (petOn === ak) return; petOn = ak; document.documentElement.dataset.pet = id;
   const st = document.documentElement.style; ['idle', 'ok', 'no'].forEach(m => st.setProperty('--pet-' + m, petUrl(id, m)));
 }
 // Reaksi saat disentuh: tiap hewan punya gerakan sendiri (lihat CSS .pa-xxx.act)
@@ -1330,30 +1366,30 @@ async function vShop() {
   V.innerHTML = '<p class="muted">Memuat…</p>';
   let st; try { st = await api('shop'); } catch (e) { V.textContent = e.message; return; }
   const sync = () => { me.spent = st.spent; me.bonus = st.bonus; me.fxa = st.equipped; me.fxn = st.equippedName; me.pet = st.equippedPet; };
-  const play = k => { if (k.startsWith('p_')) { petAct($('#sg-' + k)); SFX.pet(k); return; } const s = $('#sg-' + k); if (s) { SFX.ok(k, true); (FX[k] || FX.confetti)(s.getBoundingClientRect(), s); } };
+  const play = k => { if (k.startsWith('p_') || k.startsWith('a_')) { petAct($('#sg-' + k)); SFX.pet(k.startsWith('a_') ? myPet() : k); return; } const s = $('#sg-' + k); if (s) { SFX.ok(k, true); (FX[k] || FX.confetti)(s.getBoundingClientRect(), s); } };
   const draw = () => {
-    sync(); const g = st.gold, nameTab = shopTab === 'nm', petTab = shopTab === 'pt', list = petTab ? PETS : nameTab ? NSHOP : SHOP;
+    sync(); const g = st.gold, nameTab = shopTab === 'nm', petTab = shopTab === 'pt', atab = shopTab === 'at', list = atab ? ASHOP : petTab ? PETS : nameTab ? NSHOP : SHOP;
     V.innerHTML = `<div class="shopbar"><h1>Efek</h1><span class="gold" style="font-size:1.15rem">${GL} ${g}</span></div>
-      <div class="tabs"><button data-st="fx" class="${shopTab === 'fx' ? 'on' : ''}">🎆 Efek Jawaban</button><button data-st="nm" class="${nameTab ? 'on' : ''}">✒️ Gaya Nama</button><button data-st="pt" class="${petTab ? 'on' : ''}">🐾 Hewan</button></div>
-      <p class="muted shopnote">${petTab ? 'Hewan pendamping menemanimu di Beranda dan ikut bereaksi saat kamu menjawab. Sentuh hewannya untuk mendengar suaranya, dan pilih satu untuk dipakai. ' : nameTab ? 'Gaya nama mengubah tampilan namamu di leaderboard, profil, dan menu. ' : 'Gold bertambah bersama XP di tiap level. Pakai untuk efek yang muncul saat jawabanmu benar. '}${!st.admin && me.pays ? `Bonus harian rank ${RANKS[rkOf(totalXp())][1]}: +${me.pays[rkOf(totalXp())]} Gold. ` : ''}Membeli tidak mengurangi XP atau rank.${st.admin ? ' Admin: semua item terbuka.' : ''}</p>
+      <div class="tabs"><button data-st="fx" class="${shopTab === 'fx' ? 'on' : ''}">🎆 Efek Jawaban</button><button data-st="nm" class="${nameTab ? 'on' : ''}">✒️ Gaya Nama</button><button data-st="pt" class="${petTab ? 'on' : ''}">🐾 Hewan</button><button data-st="at" class="${atab ? 'on' : ''}">🎩 Aksesori</button></div>
+      <p class="muted shopnote">${atab ? 'Aksesori dipakai hewan pendampingmu di Beranda dan balasan jawaban. Pemasangan tersimpan di perangkat ini. ' : petTab ? 'Hewan pendamping menemanimu di Beranda dan ikut bereaksi saat kamu menjawab. Sentuh hewannya untuk mendengar suaranya, dan pilih satu untuk dipakai. ' : nameTab ? 'Gaya nama mengubah tampilan namamu di leaderboard, profil, dan menu. ' : 'Gold bertambah bersama XP di tiap level. Pakai untuk efek yang muncul saat jawabanmu benar. '}${!st.admin && me.pays ? `Bonus harian rank ${RANKS[rkOf(totalXp())][1]}: +${me.pays[rkOf(totalXp())]} Gold. ` : ''}Membeli tidak mengurangi XP atau rank.${st.admin ? ' Admin: semua item terbuka.' : ''}</p>
       <div class="shopg">${list.map(([k, nm_, ic, tr, ds]) => {
         const free = k === 'confetti' || k === 'n_none' || k === PET0, own = free || st.owned.includes(k), pr = st.prices[k] || 0;
-        const eq = petTab ? myPetOf(st.equippedPet) === k : nameTab ? (st.equippedName || 'n_none') === k : (st.equipped || 'confetti') === k;
-        const stage = petTab ? `<div class="stage pimg" id="sg-${k}">${petSvg(k, 'idle', 0, true)}</div>` : nameTab ? `<div class="stage nm"><b class="${nc(k)}">${esc(me.username)}</b></div>` : `<div class="stage" id="sg-${k}"><span>${ic}</span></div>`;
+        const eq = atab ? accOn() === k : petTab ? myPetOf(st.equippedPet) === k : nameTab ? (st.equippedName || 'n_none') === k : (st.equipped || 'confetti') === k;
+        const stage = atab ? `<div class="stage pimg" id="sg-${k}">${petSvg(myPet(), 'idle', 0, true, k)}</div>` : petTab ? `<div class="stage pimg" id="sg-${k}">${petSvg(k, 'idle', 0, true)}</div>` : nameTab ? `<div class="stage nm"><b class="${nc(k)}">${esc(me.username)}</b></div>` : `<div class="stage" id="sg-${k}"><span>${ic}</span></div>`;
         return `<div class="si${eq ? ' eq' : ''}${tr === 'Legendaris' || tr === 'Mitos' ? ' hi' : ''}" style="--tc:${TIER[tr]}"><span class="tg">${tr}</span>${stage}<h3>${nm_}${petTab ? ` <span class="parab" dir="rtl">${ic}</span>` : ''}</h3><p>${ds}</p>
           <div class="acts">${nameTab ? '' : `<button class="btn ghost" data-try="${k}">Coba</button>`}${own
-            ? `<button class="btn" data-eq="${k}"${eq ? ' disabled' : ''}>${eq ? '✓ Terpasang' : 'Pasang'}</button>`
+            ? `<button class="btn" data-eq="${k}"${eq && !atab ? ' disabled' : ''}>${eq ? (atab ? 'Lepas' : '✓ Terpasang') : 'Pasang'}</button>`
             : `<button class="btn" data-buy="${k}"${g < pr ? ' disabled' : ''}>${g < pr ? 'Kurang ' + (pr - g) + ' ' + GL : GL + ' ' + pr}</button>`}</div></div>`;
       }).join('')}</div>`;
     petLive(V);
     V.querySelectorAll('[data-st]').forEach(b => b.onclick = () => { shopTab = b.dataset.st; draw(); });
     V.querySelectorAll('[data-try]').forEach(b => b.onclick = () => play(b.dataset.try));
     V.querySelectorAll('[data-eq]').forEach(b => b.onclick = async () => {
-      try { st = await api('shop/equip', { item: b.dataset.eq }); draw(); renderChip(); const e = b.dataset.eq; if (e.startsWith('p_')) { SFX.pet(e); petAct($('#sg-' + e)); } toast(e.startsWith('p_') ? 'Hewan terpasang' : e.startsWith('n_') ? 'Gaya nama terpasang' : 'Efek terpasang', '✨'); } catch (e) { toast(e.message, '⚠️'); }
+      if (b.dataset.eq.startsWith('a_')) { setAcc(accOn() === b.dataset.eq ? '' : b.dataset.eq); draw(); renderChip(); toast('Aksesori diperbarui', '✨'); return; } try { st = await api('shop/equip', { item: b.dataset.eq }); draw(); renderChip(); const e = b.dataset.eq; if (e.startsWith('p_')) { SFX.pet(e); petAct($('#sg-' + e)); } toast(e.startsWith('p_') ? 'Hewan terpasang' : e.startsWith('n_') ? 'Gaya nama terpasang' : 'Efek terpasang', '✨'); } catch (e) { toast(e.message, '⚠️'); }
     });
     V.querySelectorAll('[data-buy]').forEach(b => b.onclick = async () => {
-      const k = b.dataset.buy, it = SHOP.find(x => x[0] === k) || NSHOP.find(x => x[0] === k) || PETS.find(x => x[0] === k);
-      if (!confirm(`Beli ${k.startsWith('p_') ? 'hewan' : k.startsWith('n_') ? 'gaya nama' : 'efek'} "${it[1]}" seharga ${st.prices[k]} Gold?`)) return;
+      const k = b.dataset.buy, it = SHOP.find(x => x[0] === k) || NSHOP.find(x => x[0] === k) || PETS.find(x => x[0] === k) || ASHOP.find(x => x[0] === k);
+      if (!confirm(`Beli ${k.startsWith('a_') ? 'aksesori' : k.startsWith('p_') ? 'hewan' : k.startsWith('n_') ? 'gaya nama' : 'efek'} "${it[1]}" seharga ${st.prices[k]} Gold?`)) return;
       try { st = await api('shop/buy', { item: k }); draw(); toast('Berhasil dibeli: ' + it[1], '🛍️'); noteAch(st.ach, true); if (!k.startsWith('n_')) play(k); } catch (e) { toast(e.message, '⚠️'); }
     });
   };
@@ -1624,7 +1660,7 @@ function vOralQuiz(d, j, daily) {
     if (p >= 70) [0, 250].forEach(t2 => setTimeout(() => { if (!t2) SFX.win(); burst(innerWidth / 2, 130, 30); }, t2));
     api('oral/finish', { token: d.token }).then(r => {
       const k = (11 + j) + ':' + d.level, prev = me.best[k] || 0, gain = Math.max(0, r.xp - prev), t0 = totalXp();
-      me.best[k] = Math.max(prev, r.xp); noteRank(t0); noteAch(r.ach); oralCache = null;
+      me.best[k] = Math.max(prev, r.xp); noteRank(t0); noteAch(r.ach); petCheer(r, t0); oralCache = null;
       const e = $('#oxp'); if (e) e.textContent = gain ? '+' + gain + ' XP dan +' + Math.floor(gain * (me.rate || 1)) + ' ' + GL + ' masuk ke totalmu' : 'XP sesi ini ' + r.xp + '. Rekor level ini: ' + prev + ' XP. Lampaui untuk menambah total.';
     }).catch(x => { const e = $('#oxp'); if (e) e.textContent = x.message; });
     $('#oh').onclick = () => go('home'); $('#oa2').onclick = async e => { e.currentTarget.disabled = true; try { vOralQuiz(await api('oral/start', { jilid: j, level: d.level }), j); } catch (x) { alert(x.message); go('home'); } };
@@ -1657,9 +1693,9 @@ function vHome() {
   const tot = Object.values(me.best).reduce((a, b) => a + b, 0), tat = TAT();
   const ri = RANKS.reduce((a, r, n) => tot >= r[0] ? n : a, 0), nx = RANKS[ri + 1], rk = RANKS[ri];
   const frac = nx ? (tot - rk[0]) / (nx[0] - rk[0]) : 1, p = Math.min(1, (ri + frac) / (RANKS.length - 1));
-  const pid = myPet(), PP = PETS.find(x => x[0] === pid); let pli = Math.floor(Math.random() * PP[5].length);
+  const pid = myPet(), PP = PETS.find(x => x[0] === pid); const PL = [petCtx(), ...PP[5]].filter(Boolean); let pli = 0;
   V.innerHTML = `<h1 class="hello">Assalamu'alaikum, ${esc(me.username)}</h1>
-    <div class="petrow"><button class="petbtn" id="pethome" aria-label="Sentuh hewan pendampingmu">${petSvg(pid, 'idle', 0, true)}</button><div class="pbub"><b>${PP[1]} <span class="parab" dir="rtl">${PP[2]}</span></b><span id="petln">${PP[5][pli]}</span></div></div>
+    <div class="petrow"><button class="petbtn" id="pethome" aria-label="Sentuh hewan pendampingmu">${petSvg(pid, new Date().getHours() < 5 ? 'sleep' : 'idle', 0, true)}</button><div class="pbub"><b>${PP[1]} <span class="parab" dir="rtl">${PP[2]}</span></b><span id="petln">${PL[0]}</span></div></div>
     <div class="card hero" style="--rc:${rk[3]}">
       <div class="top2"><div class="who"><span class="medal">${RI(ri, 72)}</span><div><small>Tingkat saat ini</small><b>${rk[1]}</b></div></div>
         <div class="xpb"><h1><span id="tx">0</span> <small>XP</small></h1><span class="gold">${GL} ${gold()}</span></div></div>
@@ -1674,7 +1710,7 @@ function vHome() {
     <div class="sec"><h2>Latihan</h2><span>Pilih jenis kuis, lalu jilid dan levelnya</span></div>
     <div class="tabs htabs"><button data-ht="tulis">✍️ Kuis Tulis</button><button data-ht="lisan">🗣️ Kuis Lisan</button><button data-ht="sorof">🧩 Kuis Sorof</button></div>
     <div id="hpane"></div>`;
-  $('#pethome').onclick = e => { pli = (pli + 1) % PP[5].length; $('#petln').textContent = PP[5][pli]; petAct(e.currentTarget); SFX.pet(pid); };
+  $('#pethome').onclick = e => { pli = (pli + 1) % PL.length; $('#petln').textContent = PL[pli]; petAct(e.currentTarget); SFX.pet(pid); };
   petLive(V);
   // Tab Kuis Tulis: quest per jilid (XP) + Mode Tathbiq sebagai puncaknya
   const paneTulis = () => `<p class="muted hnote">Soal pilihan ganda. Minimal ${PASS()}% benar di tiap level agar quest selesai; selesaikan semua jilid untuk membuka Mode Tathbiq.</p>
@@ -1785,8 +1821,8 @@ function vQuiz(d, j, l) {
       const k = b.dataset.k, ok = k === q.answer; ans[q.id] = k;
       clearInterval(tt); h.textContent = q.q; h.classList.remove('cur');
       [...all].find(x => x.dataset.k === q.answer).classList.add('ok');
-      if (ok) { streak++; ansFx(b); }
-      else { b.classList.add('no'); SFX.no(); streak = 0; wrong.push({ id: q.id, q: q.q, a: q[q.answer.toLowerCase()], k: q.answer }); }
+      if (ok) { streak++; ansFx(b); petCombo(streak); }
+      else { b.classList.add('no'); SFX.no(); petCombo(-streak); streak = 0; wrong.push({ id: q.id, q: q.q, a: q[q.answer.toLowerCase()], k: q.answer }); }
       const cb = $('#cb'); cb.textContent = '🔥 ' + streak; cb.classList.add('pop');
       $('#fb').innerHTML = ok
         ? `<div class="fb ok">${pick(['Benar!', 'Masya Allah, tepat!', 'Barakallahu fiik!'])}${streak > 2 ? ' ' + streak + ' beruntun!' : ''}</div>`
@@ -1804,7 +1840,7 @@ function vResult(r, j, l, wrong) {
   const k = j + ':' + l, prev = me.best[k] || 0, gain = Math.max(0, r.xp - prev);
   const wasJ = JD(j), wasT = TAT();
   const t0 = totalXp();
-  me.best[k] = Math.max(prev, r.xp); noteRank(t0); noteAch(r.ach);
+  me.best[k] = Math.max(prev, r.xp); noteRank(t0); noteAch(r.ach); petCheer(r, t0);
   if (!wasJ && JD(j)) toast(`Pencapaian baru: <b>Jilid ${j}</b> selesai!`, '🏅');
   if (!wasT && TAT()) setTimeout(() => toast('<b>Mode Tathbiq terbuka!</b> Semua quest Jilid 1–4 sudah selesai.', '🔓'), 900);
   const em = r.score >= 90 ? '🏆' : r.score >= 70 ? '🎉' : r.score >= 40 ? '👍' : '💪';
@@ -1850,8 +1886,8 @@ function vSorofQuiz(d, L, daily) {
       const k = b.dataset.k, ok = k === q.answer; ans[q.id] = k;
       clearInterval(tt); h.textContent = q.q; h.classList.remove('cur');
       [...all].find(x => x.dataset.k === q.answer).classList.add('ok');
-      if (ok) { streak++; ansFx(b); }
-      else { b.classList.add('no'); SFX.no(); streak = 0; wrong.push({ q: q.q, a: q[q.answer.toLowerCase()], k: q.answer }); }
+      if (ok) { streak++; ansFx(b); petCombo(streak); }
+      else { b.classList.add('no'); SFX.no(); petCombo(-streak); streak = 0; wrong.push({ q: q.q, a: q[q.answer.toLowerCase()], k: q.answer }); }
       const cb = $('#cb'); cb.textContent = '🔥 ' + streak; cb.classList.add('pop');
       $('#fb').innerHTML = ok
         ? `<div class="fb ok">${pick(['Benar!', 'Masya Allah, tepat!', 'Barakallahu fiik!'])}${streak > 2 ? ' ' + streak + ' beruntun!' : ''}</div>`
@@ -1870,7 +1906,7 @@ function vSorofQuiz(d, L, daily) {
 }
 function vSorofResult(r, L, wrong) {
   const k = L.j + ':' + L.xl, prev = me.best[k] || 0, gain = Math.max(0, r.xp - prev), mx = LV[L.xl][2], need = mx * PASS() / 100, t0 = totalXp();
-  me.best[k] = Math.max(prev, r.xp); noteRank(t0); noteAch(r.ach);
+  me.best[k] = Math.max(prev, r.xp); noteRank(t0); noteAch(r.ach); petCheer(r, t0);
   if (prev < need && r.xp >= need) setTimeout(() => toast(`Pencapaian baru: <b>${esc(L.title)}</b> selesai!`, '🏅'), 400);
   const em = r.score >= 90 ? '🏆' : r.score >= 70 ? '🎉' : r.score >= 40 ? '👍' : '💪';
   V.innerHTML = `<div class="card res jc" style="${jst(6)}"><div class="big">${em}</div><span class="tag">Hasil · Sorof · ${esc(L.title)}</span>
@@ -1934,7 +1970,7 @@ function vEndless(d) {
 function vEndResult(r) {
   const cap = me.tcap || 2000, sc = Math.min(r.score, cap), prev = me.best['0:endless'] || 0, gain = Math.max(0, sc - prev);
   const t0 = totalXp();
-  me.best['0:endless'] = Math.max(prev, sc); me.tathRaw = Math.max(me.tathRaw || 0, r.score); noteRank(t0);
+  me.best['0:endless'] = Math.max(prev, sc); me.tathRaw = Math.max(me.tathRaw || 0, r.score); noteRank(t0); petCheer(r, t0);
   V.innerHTML = `<div class="card res"><div class="big">${gain ? '🏆' : '🏁'}</div><span class="tag">Hasil Tathbiq</span>
     <h1><span id="rx">0</span> XP</h1><p class="muted">${r.correct} benar dari ${r.answered} soal${r.cleared ? ' · semua soal berhasil dijawab!' : ''}</p>
     <span class="chip pop">${gain ? '+' + gain + ' XP dan +' + Math.floor(gain * (me.rate || 1)) + ' ' + GL + ' masuk ke totalmu (rekor baru!)' : 'Rekor Tathbiq-mu: ' + me.tathRaw + ' XP' + (me.tathRaw > cap ? ' (yang dihitung ke total maksimal ' + cap + ' XP)' : '') + '. Lampaui untuk menambah total.'}</span>
