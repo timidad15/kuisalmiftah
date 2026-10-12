@@ -1,57 +1,70 @@
-/* Service worker Al-Miftah.
-   - Halaman (/): jaringan dulu supaya selalu versi terbaru. Kalau offline, atau jaringan lambat (lebih dari 4 detik) dan sudah ada salinan,
-     tampilkan salinan itu agar aplikasi tetap terbuka. Bila belum ada salinan sama sekali, tampilkan /offline.html.
-   - Gambar png/webp: tampil dari cache, diperbarui di belakang layar.
-   - Font Google: disimpan agar huruf Arab tetap bagus saat offline.
-   - /api/* TIDAK PERNAH disimpan di sini (data murid selalu dari server). Paket soal untuk Latihan Offline disimpan oleh aplikasi
-     sendiri di localStorage, bukan oleh service worker.
+/* Service worker Al-Miftah: shell aplikasi bisa dibuka tanpa internet.
+   - Halaman (/)      : jaringan dulu (maks. 4 detik), lalu salinan terakhir yang tersimpan, lalu /offline.html.
+   - Font, gambar, ikon: tersimpan, jadi tampilan offline sama persis dengan online.
+   - /api/photo        : foto profil disimpan (URL-nya memuat versi, jadi aman disimpan lama).
+   - Data lain di /api/* TIDAK disimpan di sini. Salinan data untuk tampilan offline dikelola index.html sendiri (localStorage).
    Naikkan VERSI bila daftar PRECACHE berubah. */
-const VERSI = 'v2', CACHE = 'almiftah-' + VERSI, SHELL = '/', LAMBAT = 4000;
-const PRECACHE = ['/offline.html', '/icon-192.png', '/logo.png'];
-const FONT = ['fonts.googleapis.com', 'fonts.gstatic.com'];
+const VERSI = 'v2', CACHE = 'almiftah-' + VERSI, RUNTIME = 'almiftah-rt-' + VERSI;
+const CORE = ['/', '/offline.html']; // wajib ada, kalau gagal instalasi dibatalkan
+const EXTRA = ['/logo.png', '/icon-192.png', '/icon-512.png', '/apple-touch-icon.png', '/manifest.webmanifest',
+  '/fonts/plus-jakarta-sans-latin-wght-normal.woff2', '/fonts/plus-jakarta-sans-latin-ext-wght-normal.woff2',
+  '/fonts/amiri-arabic-400-normal.woff2', '/fonts/amiri-arabic-700-normal.woff2',
+  ...['bronze', 'silver', 'gold', 'platinum', 'diamond', 'legend'].map(n => '/rank/' + n + '.webp')]; // gagal satu tidak membatalkan yang lain
 
 self.addEventListener('install', e => {
-  e.waitUntil(caches.open(CACHE).then(async c => {
-    await c.addAll(PRECACHE);
-    // salinan awal halaman utama; kalau gagal, pemasangan tetap lanjut (salinan akan tersimpan saat kunjungan berikutnya)
-    try { const r = await fetch(SHELL, { cache: 'reload' }); if (r.ok && !r.redirected) await c.put(SHELL, r); } catch (x) {}
-  }).then(() => self.skipWaiting()));
+  e.waitUntil((async () => {
+    const c = await caches.open(CACHE);
+    await c.addAll(CORE);
+    await Promise.allSettled(EXTRA.map(u => c.add(u)));
+    await self.skipWaiting();
+  })());
 });
-
 self.addEventListener('activate', e => {
-  e.waitUntil(caches.keys().then(ks => Promise.all(ks.filter(k => k.startsWith('almiftah-') && k !== CACHE).map(k => caches.delete(k)))).then(() => self.clients.claim()));
+  e.waitUntil((async () => {
+    const ks = await caches.keys();
+    await Promise.all(ks.filter(k => k.startsWith('almiftah-') && k !== CACHE && k !== RUNTIME).map(k => caches.delete(k)));
+    await self.clients.claim();
+  })());
 });
 
-async function halaman(e) {
-  const r = e.request, c = await caches.open(CACHE), salinan = await c.match(SHELL);
-  const net = fetch(r).then(res => {
-    if (res.type === 'opaqueredirect') return res;              // biarkan pengalihan berjalan
-    if (res.ok && !res.redirected) { c.put(SHELL, res.clone()); return res; } // simpan versi terbaru
-    return salinan || res;                                      // server error: pakai salinan bila ada
-  });
-  e.waitUntil(net.catch(() => {}));                              // biarkan penyimpanan versi terbaru selesai di belakang layar
-  if (!salinan) return net.catch(() => caches.match('/offline.html'));
-  return Promise.race([net.catch(() => salinan), new Promise(ok => setTimeout(() => ok(salinan), LAMBAT))]);
+const withTimeout = (p, ms) => new Promise((ok, no) => { const t = setTimeout(() => no(new Error('timeout')), ms); p.then(v => { clearTimeout(t); ok(v); }, x => { clearTimeout(t); no(x); }); });
+
+async function pageResponse(e) {
+  const c = await caches.open(CACHE);
+  try {
+    const res = await withTimeout(fetch(e.request), 4000);
+    if (res.ok && res.type === 'basic') e.waitUntil(c.put('/', res.clone())); // satu salinan shell untuk semua alamat aplikasi
+    return res;
+  } catch (x) {
+    return (await c.match('/')) || (await c.match('/offline.html')) || new Response('Offline', { status: 503 });
+  }
+}
+
+// cache dulu, perbarui diam-diam di belakang (untuk gambar dan font)
+async function staleWhileRevalidate(e, name) {
+  const c = await caches.open(name), hit = await c.match(e.request);
+  const net = fetch(e.request).then(res => { if (res.status === 200) c.put(e.request, res.clone()); return res; }).catch(() => null);
+  if (hit) { e.waitUntil(net); return hit; }
+  return (await net) || new Response('', { status: 404 });
+}
+
+// cache dulu, tanpa pembaruan (URL berversi / berkas yang tidak berubah)
+async function cacheFirst(e, name) {
+  const c = await caches.open(name), hit = await c.match(e.request);
+  if (hit) return hit;
+  try {
+    const res = await fetch(e.request);
+    if (res.status === 200) e.waitUntil(c.put(e.request, res.clone()));
+    return res;
+  } catch (x) { return new Response('', { status: 404 }); }
 }
 
 self.addEventListener('fetch', e => {
   const r = e.request, u = new URL(r.url);
-  if (r.method !== 'GET') return;
-  if (FONT.includes(u.hostname)) { // font: tampilkan cache, perbarui di belakang layar
-    e.respondWith(caches.open(CACHE).then(async c => {
-      const hit = await c.match(r);
-      const net = fetch(r).then(res => { if (res.ok || res.type === 'opaque') c.put(r, res.clone()); return res; }).catch(() => hit);
-      return hit || net;
-    }));
-    return;
-  }
-  if (u.origin !== location.origin || u.pathname.startsWith('/api/')) return; // biarkan jaringan
-  if (r.mode === 'navigate') { e.respondWith(halaman(e)); return; }
-  if (/\.(png|webp)$/.test(u.pathname)) { // gambar: tampilkan cache, perbarui di belakang layar
-    e.respondWith(caches.open(CACHE).then(async c => {
-      const hit = await c.match(r);
-      const net = fetch(r).then(res => { if (res.ok) c.put(r, res.clone()); return res; }).catch(() => hit);
-      return hit || net;
-    }));
-  }
+  if (r.method !== 'GET' || u.origin !== location.origin) return;
+  if (u.pathname === '/api/photo') { e.respondWith(cacheFirst(e, RUNTIME)); return; }
+  if (u.pathname.startsWith('/api/')) return; // data murid selalu dari server
+  if (r.mode === 'navigate') { e.respondWith(pageResponse(e)); return; }
+  if (u.pathname.startsWith('/fonts/')) { e.respondWith(cacheFirst(e, CACHE)); return; }
+  if (/\.(png|webp|ico)$/.test(u.pathname) || u.pathname === '/manifest.webmanifest') e.respondWith(staleWhileRevalidate(e, CACHE));
 });

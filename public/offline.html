@@ -1,2 +1,20 @@
-<!DOCTYPE html><html lang="id"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Tidak ada koneksi – Al-Miftah</title><style>:root{--bg:#F0FAF4;--ink:#0F2718;--muted:#4D7260;--line:#C5E4CF;--accent:#1A7A3C;--surface:#fff}@media(prefers-color-scheme:dark){:root{--bg:#0A1A10;--ink:#E8F5EC;--muted:#7AAF8A;--line:#1A3D24;--accent:#3DC26B;--surface:#0E2116}}body{margin:0;background:var(--bg);color:var(--ink);font:16px/1.7 "Plus Jakarta Sans","Segoe UI",system-ui,sans-serif}main{max-width:720px;margin:0 auto;padding:24px 18px 48px}h1{font-size:1.7rem;line-height:1.2}h2{font-size:1.1rem;margin-top:28px}a{color:var(--accent)}.card{background:var(--surface);border:1px solid var(--line);border-radius:14px;padding:14px 18px;margin:14px 0}.btn{display:inline-block;background:var(--accent);color:#fff;border-radius:12px;padding:10px 18px;text-decoration:none;font-weight:700}small,.muted{color:var(--muted)}</style></head>
-<body><main style="text-align:center;padding-top:15vh"><img src="/logo.png" width="200" alt="Al-Miftah"><h1>Tidak ada koneksi internet</h1><p class="muted">Kuis Al-Miftah memerlukan internet agar nilai dan XP-mu tersimpan. Periksa koneksimu, lalu coba lagi.</p><p><a class="btn" href="/" onclick="location.reload();return false">Coba lagi</a></p></main></body></html>
+<!DOCTYPE html><html lang="id"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta name="theme-color" content="#1A7A3C"><title>Tidak ada koneksi – Al-Miftah</title><style>
+@font-face{font-family:"Plus Jakarta Sans";font-weight:200 800;font-display:swap;src:url(/fonts/plus-jakarta-sans-latin-wght-normal.woff2) format("woff2")}
+:root{--bg:#F0FAF4;--ink:#0F2718;--muted:#4D7260;--accent:#1A7A3C}@media(prefers-color-scheme:dark){:root{--bg:#0A1A10;--ink:#E8F5EC;--muted:#7AAF8A;--accent:#3DC26B}}
+body{margin:0;background:var(--bg);color:var(--ink);font:16px/1.7 "Plus Jakarta Sans","Segoe UI",system-ui,sans-serif}
+main{max-width:720px;margin:0 auto;padding:15vh 18px 48px;text-align:center}h1{font-size:1.7rem;line-height:1.2}
+.btn{background:var(--accent);color:#fff;border:0;border-radius:12px;padding:10px 18px;font:inherit;font-weight:700;cursor:pointer}.btn:disabled{opacity:.6;cursor:default}
+.muted{color:var(--muted)}#st{min-height:1.7em;margin:12px 0 0}
+</style></head>
+<body><main><img src="/logo.png" width="200" alt="Al-Miftah"><h1>Tidak ada koneksi internet</h1>
+<p class="muted">Aplikasi belum tersimpan di perangkat ini. Sambungkan internet sekali, lalu setelah itu Al-Miftah bisa dibuka tanpa internet (kuis tetap butuh koneksi agar nilai dan XP-mu tersimpan).</p>
+<p><button class="btn" id="rt" type="button">Coba lagi</button></p><p class="muted" id="st" role="status"></p></main>
+<script>
+const b=document.getElementById('rt'),s=document.getElementById('st');
+async function tryAgain(){
+  b.disabled=true;s.textContent='Memeriksa koneksi…';
+  try{await fetch('/api/ping',{cache:'no-store'});location.replace('/');return}catch(e){}
+  s.textContent='Masih belum terhubung. Akan dicoba lagi otomatis.';b.disabled=false;
+}
+b.onclick=tryAgain;addEventListener('online',tryAgain);
+</script></body></html>
