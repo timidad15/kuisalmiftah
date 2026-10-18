@@ -258,7 +258,12 @@ create table if not exists user_achievements (
 
 -- Total Gold bonus di luar XP rekor dan hadiah pencapaian:
 -- hadiah spin dari keempat event harian ditambah baris gold_grants.
-create or replace function gold_total_bonus(uid int) returns int
+-- Dibuat hanya bila belum ada: fungsi lama di database (nama parameter bisa berbeda) tidak diganti.
+do $do$
+begin
+  if to_regprocedure('gold_total_bonus(integer)') is null then
+    execute $q$
+create function gold_total_bonus(uid int) returns int
 language sql stable as $$
   select (
       coalesce((select sum(amount) from gold_grants  where user_id = uid), 0)
@@ -268,6 +273,9 @@ language sql stable as $$
     + coalesce((select sum(prize)  from daily_oral   where user_id = uid and spun), 0)
   )::int
 $$;
+    $q$;
+  end if;
+end $do$;
 
 
 -- ---------------------------------------------------------------------
