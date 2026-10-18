@@ -4,8 +4,8 @@
 --  Disusun dari seluruh query di backend (functions/api/[[path]].js).
 --  Aman dijalankan berulang kali (create ... if not exists), jadi boleh
 --  dijalankan di database kosong maupun yang sudah berisi. Di database
---  lama, bagian "Penyesuaian database lama" di akhir menambah kolom yang
---  mungkin belum ada tanpa menghapus data.
+--  lama, bagian "Penyesuaian database lama" di akhir menambah kolom dan
+--  memperbaiki tipe/default tanpa menghapus data.
 --
 --  Cara pakai: tempel seluruh isi file ke Neon > SQL Editor > Run.
 --
@@ -29,10 +29,11 @@ create table if not exists users (
   pass_hash  text        not null,                 -- PBKDF2
   salt       text        not null,                 -- base64url
   role       text        not null default 'student' check (role in ('student', 'admin')),
-  avatar     text        not null default '🙂',
-  fx         text,                                  -- pilihan tampilan profil
-  fxa        text        not null default 'confetti', -- efek jawaban benar yang dipakai
-  fxn        text,                                  -- efek nama yang dipakai (null = tidak ada)
+  avatar     text        not null default 'a1',     -- kunci emoji a1..a12
+  fx         int,                                   -- pilihan efek foto 0-11 (null = otomatis)
+  fxa        text,                                  -- efek jawaban benar yang dipakai (null = confetti)
+  fxn        text,                                  -- gaya nama yang dipakai (null = polos)
+  pet        text,                                  -- hewan pendamping (null = p_kucing)
   on_board   boolean     not null default true,     -- tampil di leaderboard (relevan untuk admin)
   photo_v    int,                                   -- versi foto, untuk cache; null = tidak punya foto
   use_photo  boolean     not null default false,
@@ -148,6 +149,7 @@ create table if not exists oral_attempts (
   created_at timestamptz not null default now()
 );
 create index if not exists oral_attempts_user_time on oral_attempts (user_id, created_at);
+create index if not exists oral_attempts_user_item on oral_attempts (user_id, item_id);
 
 -- Pemakaian API Groq (kuota dan token)
 create table if not exists ai_usage (
@@ -298,20 +300,86 @@ create index if not exists player_reports_status on player_reports (status);
 
 
 -- ---------------------------------------------------------------------
---  7. Penyesuaian database lama (aman dijalankan di database kosong)
---     Menambah kolom yang mungkin belum ada karena fitur ditambahkan bertahap.
+--  7. Penyesuaian database lama (aman dijalankan di database kosong
+--     maupun yang sudah benar). Menambah kolom yang belum ada dan
+--     memperbaiki tipe/default agar cocok dengan kode.
 -- ---------------------------------------------------------------------
-alter table users         add column if not exists fxa       text    not null default 'confetti';
 alter table users         add column if not exists fxn       text;
+alter table users         add column if not exists pet       text;
 alter table users         add column if not exists on_board  boolean not null default true;
 alter table users         add column if not exists photo_v   int;
 alter table users         add column if not exists use_photo boolean not null default false;
 alter table users         add column if not exists badges    text[]  not null default '{}';
 alter table users         add column if not exists created_at timestamptz not null default now();
+alter table users         add column if not exists fxa       text;
 alter table endless_runs  add column if not exists cur_run   int     not null default 0;
 alter table oral_attempts add column if not exists ai        boolean not null default false;
 alter table oral_attempts add column if not exists detail    jsonb;
 alter table question_reports add column if not exists accepted boolean not null default false;
+
+-- fxa: kode menyimpan null untuk efek bawaan (confetti)
+alter table users alter column fxa drop not null;
+alter table users alter column fxa drop default;
+
+-- fx: kode menyimpan angka 0-11 (hanya diubah bila masih bertipe teks)
+do $$
+begin
+  if (select data_type from information_schema.columns
+      where table_schema = 'public' and table_name = 'users' and column_name = 'fx') = 'text' then
+    alter table users alter column fx type int
+      using (case when fx ~ '^[0-9]+$' then fx::int end);
+  end if;
+end $$;
+
+-- avatar: server hanya menerima a1..a12
+alter table users alter column avatar set default 'a1';
+update users set avatar = 'a1' where avatar !~ '^a([1-9]|1[0-2])$';
+
+
+-- ---------------------------------------------------------------------
+--  7b. Latihan tanpa batas: Poin Latihan, liga mingguan, Latihan Cerdas, misi harian
+-- ---------------------------------------------------------------------
+-- "Jilid saya" (tier) dipakai untuk memisahkan liga mingguan dan memilih soal event harian.
+-- Diisi otomatis oleh kode saat murid membuka aplikasi.
+alter table users add column if not exists tier smallint not null default 1;
+
+-- Satu baris per murid per hari (WIB). pts = Poin Latihan (dibatasi per hari), correct = semua jawaban benar hari itu
+-- (tanpa batas, dipakai misi), sessions = sesi Latihan Cerdas selesai, fixed = soal yang pernah salah lalu dijawab benar,
+-- fresh = soal yang baru pertama kali dijawab.
+create table if not exists practice_days (
+  user_id  int  not null references users(id) on delete cascade,
+  day      date not null,
+  pts      int  not null default 0,
+  correct  int  not null default 0,
+  sessions int  not null default 0,
+  fixed    int  not null default 0,
+  fresh    int  not null default 0,
+  primary key (user_id, day)
+);
+create index if not exists practice_days_day on practice_days (day);
+
+-- Riwayat per soal per murid (jadwal ulang Leitner): box 0 = salah/perlu diulang sekarang, 1-4 = makin kuat.
+create table if not exists q_history (
+  user_id     int         not null references users(id) on delete cascade,
+  question_id int         not null,
+  box         smallint    not null default 0,
+  right_n     int         not null default 0,
+  wrong_n     int         not null default 0,
+  last_at     timestamptz not null default now(),
+  due_at      timestamptz not null default now(),
+  primary key (user_id, question_id)
+);
+create index if not exists q_history_due on q_history (user_id, due_at);
+
+-- Sesi Latihan Cerdas yang sudah dikirim (nonce unik mencegah kirim ganda)
+create table if not exists practice_runs (
+  nonce      text        primary key,
+  user_id    int         not null references users(id) on delete cascade,
+  total      int         not null,
+  correct    int         not null,
+  created_at timestamptz not null default now()
+);
+create index if not exists practice_runs_user on practice_runs (user_id);
 
 
 -- ---------------------------------------------------------------------
