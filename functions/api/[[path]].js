@@ -7,6 +7,17 @@ const J = (o, s = 200) => new Response(JSON.stringify(o), { status: s, headers: 
 const bad = (m, s = 400) => J({ error: m }, s);
 // Efek (toko): harga efek jawaban benar (gold). 'confetti' bawaan dan gratis. Gold = XP rekor x GOLD_RATE, dikurangi total belanja.
 const GOLD_RATE = 1;                               // Gold dari XP rekor: 1 XP = 1 Gold
+// ---- Latihan tanpa batas (Poin Latihan, Latihan Cerdas, misi, liga mingguan) ----
+const PP_PER = 5, PP_CAP = 300;                    // Poin Latihan per jawaban benar, dan batas poin per hari (300 = 60 jawaban benar)
+const plLevel = t => Math.floor(Math.sqrt(Math.max(0, t) / 50)) + 1;   // Level 1 = 0 poin, 2 = 50, 3 = 200, 4 = 450, ... tanpa batas
+const plNeed = L => 50 * (L - 1) * (L - 1);        // total poin yang dibutuhkan untuk mencapai level L
+const LEIT = [0, 1, 3, 7, 14];                     // jeda ulang (hari) menurut box Leitner 0-4
+const PRAC_N = [10, 15, 20], PRAC_DUE = 0.6;       // pilihan panjang sesi; porsi maksimal soal ulangan di awal sesi
+const MIS = [ // misi harian: k = kunci, t = target, g = Gold
+  { k: 'm1', t: 20, g: 30, n: 'Jawab benar 20 soal', d: 'Dari mode apa pun, termasuk mengulang.' },
+  { k: 'm2', t: 1, g: 30, n: 'Selesaikan 1 Latihan Cerdas', d: 'Soal diambil dari jilidmu, soal yang pernah salah didahulukan.' },
+  { k: 'm3', t: 5, g: 40, n: 'Perbaiki 5 soal yang pernah salah', d: 'Jawab benar soal yang sebelumnya salah.' }];
+const MIS_ALL = 50;                                // bonus Gold bila ketiga misi selesai
 const TCAP = 2000;                                 // batas XP Tathbiq yang dihitung ke total XP/rank (skor mentah tetap dicatat dan punya papan sendiri)
 // Gold tambahan di luar XP rekor dan hadiah spin. Dicatat di tabel gold_grants (satu baris per pemberian) dan ikut dihitung lewat gold_total_bonus().
 const STARTER_GOLD = 500;                          // Gold awal untuk murid yang baru mendaftar
@@ -57,7 +68,9 @@ const evCfg = async sql => {
 // <ach-pure>
 const STREAK_SKIP_DOW = 5; // hari yang tidak memutus streak (0 = Ahad ... 5 = Jumat, libur madrasah). Isi -1 untuk mematikan.
 const AG = { Umum: 25, Langka: 75, Epik: 150, Legendaris: 300, Mitos: 500 }; // Gold hadiah per tingkat, sekali per pencapaian
-const ACH_GROUPS = ['Konsistensi', 'Ketepatan', 'Tathbiq', 'Efek & Hoki', 'Profil & Komunitas', 'Peringkat'];
+const ACH_GROUPS = ['Konsistensi', 'Ketepatan', 'Tathbiq', 'Efek & Hoki', 'Profil & Komunitas', 'Peringkat', 'Sorof'];
+// Level Kuis Sorof sebagai [kode jilid, tingkat XP] urut Pra Tathbiq, Tathbiq 1-5 (harus sama dengan SOROF_LV di bawah; ditulis ulang di sini agar blok ini tetap mandiri)
+const SOROF_BEST = [[6, 'easy'], [7, 'easy'], [8, 'medium'], [9, 'medium'], [10, 'hard'], [11, 'hard']];
 const LEGEND_ITEMS = new Set(['lightning', 'comet', 'galaxy', 'n_blaze', 'n_frost', 'n_glitch', 'n_rainbow']); // item Legendaris + Mitos di menu Efek (harus sama dengan tier di index.html)
 // A(kunci, grup, nama, deskripsi, ikon, tingkat, metrik, target, { h: tersembunyi, ok: syarat tambahan })
 const A = (k, g, n, d, i, t, m, need, o = {}) => ({ k, g, n, d, i, t, gold: AG[t], m, need, h: o.h ? 1 : 0, np: o.np ? 1 : 0, ok: o.ok });
@@ -99,6 +112,18 @@ const ACH = [
   A('rank2', 5, 'Peringkat Dua', 'Capai peringkat 2 di Leaderboard (Semua)', '🥈', 'Legendaris', 'rankScore', 2, { np: 1 }),
   A('rank1', 5, 'Juara Umum', 'Capai peringkat 1 di Leaderboard (Semua)', '🥇', 'Mitos', 'rankScore', 3, { np: 1 }),
   A('eagle', 4, 'Mata Elang', 'Laporkan soal yang salah, lalu admin menerimanya (soal diperbaiki atau dihapus)', '🦅', 'Langka', 'accepted', 1),
+  // ---- Sorof (grup 6): memakai nilai terbaik tiap level Sorof (jilid 6-11), jadi murid lama otomatis ikut terbuka saat pencapaiannya dihitung ----
+  A('sorof1', 6, 'Langkah Pertama Sorof', 'Selesaikan (lulus) 1 level Kuis Sorof', '🧩', 'Umum', 'sorofPass', 1),
+  A('sorof3', 6, 'Penempuh Sorof', 'Selesaikan 3 level Kuis Sorof', '📖', 'Langka', 'sorofPass', 3),
+  A('sorof6', 6, 'Khatam Sorof', 'Selesaikan semua 6 level Kuis Sorof, dari Pra Tathbiq sampai Tathbiq 5', '🏅', 'Epik', 'sorofPass', 6),
+  A('sorofP1', 6, 'Sorof Sempurna', 'Raih nilai 100 di salah satu level Kuis Sorof', '🎯', 'Langka', 'sorofPerf', 1),
+  A('sorofP6', 6, 'Mumtaz Sorof', 'Raih nilai 100 di semua 6 level Kuis Sorof', '💯', 'Mitos', 'sorofPerf', 6),
+  A('tashrif', 6, 'Ahli Tashrif', 'Raih nilai minimal 90 di Tathbiq 4 dan Tathbiq 5 (bentuk fi\'il untuk 14 dhamir)', '🧠', 'Legendaris', 'sorofT45', 2),
+  A('sorofC100', 6, 'Seratus Sorof', 'Kumpulkan 100 jawaban benar di Kuis Sorof', '📘', 'Umum', 'sorofCorrect', 100),
+  A('sorofC500', 6, 'Lima Ratus Sorof', 'Kumpulkan 500 jawaban benar di Kuis Sorof', '📗', 'Langka', 'sorofCorrect', 500),
+  A('sorofC1000', 6, 'Seribu Sorof', 'Kumpulkan 1000 jawaban benar di Kuis Sorof', '📚', 'Epik', 'sorofCorrect', 1000),
+  A('sorofD1', 6, 'Sorof Harian Perdana', 'Lulus event Sorof Harian', '🌞', 'Umum', 'sorofDaily', 1),
+  A('sorofD7', 6, 'Rajin Sorof Harian', 'Lulus event Sorof Harian sebanyak 7 kali', '📆', 'Epik', 'sorofDaily', 7),
 ];
 const ACHBY = Object.fromEntries(ACH.map(a => [a.k, a]));
 const achMini = a => ({ k: a.k, n: a.n, i: a.i, t: a.t, g: a.gold });
@@ -129,6 +154,11 @@ function calcMetrics(raw, today) {
     rankScore: raw.rank && raw.rank.players >= RANK_MIN_PLAYERS && raw.rank.xp >= RANK_MIN_XP && raw.rank.pos <= 3 ? 4 - raw.rank.pos : 0,
     jackpot: raw.jackpot ? 1 : 0, photo: raw.photo ? 1 : 0, age: raw.age || 0, active: new Set(raw.days).size, accepted: raw.accepted,
     perfAll: J4.reduce((s, j) => s + LV.filter(l => perf(j, l)).length, 0),
+    // Sorof: level lulus = XP terbaik >= PASS_PCT% dari maksimum tingkatnya (sama dengan aturan quest selesai di klien); sempurna = XP penuh
+    sorofPass: SOROF_BEST.filter(([j, l]) => (b[j + ':' + l] || 0) >= XPMAX[l] * PASS_PCT / 100).length,
+    sorofPerf: SOROF_BEST.filter(([j, l]) => (b[j + ':' + l] || 0) >= XPMAX[l]).length,
+    sorofT45: SOROF_BEST.slice(4).filter(([j, l]) => (b[j + ':' + l] || 0) >= XPMAX[l] * 0.9).length,
+    sorofCorrect: raw.sorofCorrect || 0, sorofDaily: raw.sorofDaily || 0,
   };
   for (const l of LV) m['perf_' + l] = J4.filter(j => perf(j, l)).length;
   for (const j of J4) m['mj' + j] = LV.every(l => perf(j, l)) ? 1 : 0;
@@ -435,13 +465,13 @@ export async function onRequest({ request, env, params, waitUntil }) {
     const cf = await evCfg(sql);
     const [best, [a1], [im], days, ddays, [en], own, [mi], [st], [rp], have, [ub], [rk]] = await sql.transaction([
       bestOf(id),
-      sql`select coalesce(sum(correct) filter (where jilid < 12), 0)::int c, (count(*) filter (where jilid between 1 and 4 and score >= ${PASS_PCT} and (created_at at time zone 'Asia/Jakarta')::time between time '03:45' and time '05:30'))::int subuh from attempts where user_id = ${id}`,
+      sql`select coalesce(sum(correct) filter (where jilid < 12), 0)::int c, coalesce(sum(correct) filter (where jilid between 6 and 11), 0)::int sc, (count(*) filter (where jilid between 1 and 4 and score >= ${PASS_PCT} and (created_at at time zone 'Asia/Jakarta')::time between time '03:45' and time '05:30'))::int subuh from attempts where user_id = ${id}`,
       sql`select exists(select 1 from (select score - lag(score) over (partition by jilid, level order by created_at) d from attempts where user_id = ${id} and jilid between 1 and 4) t where d >= 30) v`,
-      sql`select to_char(d, 'YYYY-MM-DD') d from (select (created_at at time zone 'Asia/Jakarta')::date d from attempts where user_id = ${id} and (jilid = 0 or score >= ${PASS_PCT}) union select day d from daily where user_id = ${id} and done union select day d from daily_fast where user_id = ${id} and done union select day d from daily_sorof where user_id = ${id} and done union select day d from daily_oral where user_id = ${id} and done) t order by d`,
+      sql`select to_char(d, 'YYYY-MM-DD') d from (select (created_at at time zone 'Asia/Jakarta')::date d from attempts where user_id = ${id} and (jilid = 0 or score >= ${PASS_PCT}) union select day d from daily where user_id = ${id} and done union select day d from daily_fast where user_id = ${id} and done union select day d from daily_sorof where user_id = ${id} and done union select day d from daily_oral where user_id = ${id} and done union select day d from practice_days where user_id = ${id} and correct >= 10) t order by d`,
       sql`select to_char(day, 'YYYY-MM-DD') d from daily where user_id = ${id} and done and score >= ${cf.daily.pass} order by day`,
       sql`select coalesce(max(n), 0)::int maxn, coalesce(bool_or(lives = 3 and n >= 31), false) clean from endless_runs where user_id = ${id}`,
       sql`select item from purchases where user_id = ${id}`,
-      sql`select (exists(select 1 from daily where user_id = ${id} and prize >= 1000) or exists(select 1 from daily_fast where user_id = ${id} and prize >= 1000) or exists(select 1 from daily_sorof where user_id = ${id} and prize >= 1000) or exists(select 1 from daily_oral where user_id = ${id} and prize >= 1000)) jp, exists(select 1 from daily_fast where user_id = ${id} and done and score >= 100) fp, (select photo_v is not null from users where id = ${id}) photo, (select floor(extract(epoch from now() - created_at) / 86400)::int from users where id = ${id}) age`,
+      sql`select (exists(select 1 from daily where user_id = ${id} and prize >= 1000) or exists(select 1 from daily_fast where user_id = ${id} and prize >= 1000) or exists(select 1 from daily_sorof where user_id = ${id} and prize >= 1000) or exists(select 1 from daily_oral where user_id = ${id} and prize >= 1000)) jp, exists(select 1 from daily_fast where user_id = ${id} and done and score >= 100) fp, (select photo_v is not null from users where id = ${id}) photo, (select count(*) from daily_sorof where user_id = ${id} and done and score >= ${cf.sorof.pass})::int sd, (select floor(extract(epoch from now() - created_at) / 86400)::int from users where id = ${id}) age`,
       sql`select coalesce(max(best_run), 0)::int r from user_stats where user_id = ${id}`,
       sql`select count(*)::int n from question_reports where user_id = ${id} and accepted`,
       sql`select key, unlocked_at, gold, seen from user_achievements where user_id = ${id}`,
@@ -454,7 +484,7 @@ export async function onRequest({ request, env, params, waitUntil }) {
             select sum(b.xp) total from (
               select a.user_id, max(case when a.level = 'endless' then least(a.score, ${TCAP}::int)::numeric else round((case a.level when 'easy' then 100 when 'medium' then 200 else 300 end) * a.correct::numeric / a.total) end)::int xp
               from attempts a join users u on u.id = a.user_id where u.role <> 'admin' or u.on_board group by a.user_id, a.jilid, a.level) b group by b.user_id) t) r`]);
-    return { best, correct: a1.c, subuh: a1.subuh, improved: im.v, days: days.map(r => r.d), ddays: ddays.map(r => r.d), maxn: en.maxn, clean: en.clean,
+    return { best, correct: a1.c, sorofCorrect: a1.sc, sorofDaily: mi.sd, subuh: a1.subuh, improved: im.v, days: days.map(r => r.d), ddays: ddays.map(r => r.d), maxn: en.maxn, clean: en.clean,
       items: own.map(r => r.item), jackpot: mi.jp, fastPerf: mi.fp, rank: rk || null, photo: mi.photo, age: mi.age, bestRun: st.r, accepted: rp.n, have, badges: ub ? ub.badges : [] };
   };
   // Buka semua pencapaian yang sudah memenuhi syarat (termasuk milik murid lama = backfill otomatis). Hadiah Gold dicatat di user_achievements.gold.
@@ -477,12 +507,65 @@ export async function onRequest({ request, env, params, waitUntil }) {
 
   // Pemilihan soal: soal ber-bab diprioritaskan dan diambil bergiliran per (jilid, bab) supaya semua bab tercakup;
   // kekurangannya diisi soal tanpa bab secara acak. Urutan akhir diacak. j = 0 berarti semua jilid; excl = id yang dilewati.
-  const pickQs = (j, n, excl = []) => sql`select id, q, a, b, c, d, answer from (
+  const pickQs = (j, n, excl = [], mx = 4) => sql`select id, q, a, b, c, d, answer from (
       select id, q, a, b, c, d, answer from (
         select id, q, a, b, c, d, answer, bab is null as nb,
           case when bab is null then 0 else row_number() over (partition by jilid, lower(bab) order by random()) end as rk
-        from questions where (${j}::int = 0 or jilid = ${j}::int) and id <> all(${excl}::int[])) t
+        from questions where (${j}::int = 0 and (${mx}::int >= 4 or jilid <= ${mx}::int) or jilid = ${j}::int) and id <> all(${excl}::int[])) t
       order by nb, rk, random() limit ${n}) s order by random()`;
+
+
+  // ---------- Latihan tanpa batas ----------
+  // "Jilid saya" = jilid tertinggi yang sudah dibuka: 1 + jumlah jilid berurutan yang selesai, atau jilid tertinggi yang pernah lulus di satu level (maks 4).
+  const tierOf = rows => {
+    const d = jilidDone(rows); let lead = 0; while (lead < 4 && d[lead]) lead++;
+    let top = 1; for (const r of rows) if (r.jilid >= 1 && r.jilid <= 4 && XPMAX[r.level] && r.xp >= XPMAX[r.level] * PASS_PCT / 100) top = Math.max(top, r.jilid);
+    return Math.min(4, Math.max(1 + lead, top));
+  };
+  // Jumlah level Sorof yang dibuka (urut Pra Tathbiq ... Tathbiq 5): level lulus berurutan + 1, minimal 2 supaya soal tetap beragam.
+  const sorofOpen = rows => {
+    const b = {}; for (const r of rows) b[r.jilid + ':' + r.level] = r.xp;
+    let lead = 0; while (lead < SOROF_BEST.length && (b[SOROF_BEST[lead][0] + ':' + SOROF_BEST[lead][1]] || 0) >= XPMAX[SOROF_BEST[lead][1]] * PASS_PCT / 100) lead++;
+    return Math.min(SOROF_BEST.length, Math.max(2, lead + 1));
+  };
+  const myScope = async id => { // jilid dan level Sorof yang dibuka murid ini (admin: semua)
+    const rows = await bestOf(id), [u] = await sql`select role from users where id = ${id}`;
+    return u && u.role === 'admin' ? { mx: 4, so: SOROF_BEST.length, rows } : { mx: tierOf(rows), so: sorofOpen(rows), rows };
+  };
+  // Catat hasil per soal (jadwal ulang Leitner). Mengembalikan jumlah soal yang diperbaiki (dulu salah, kini benar) dan soal baru.
+  const recHist = async (id, ids, oks) => {
+    try {
+      const m = new Map(); ids.forEach((q, i) => m.set(+q, !!oks[i])); // satu baris per soal
+      const qi = [...m.keys()], qo = qi.map(q => m.get(q));
+      if (!qi.length) return { fixed: 0, fresh: 0 };
+      const prev = await sql`select question_id, box from q_history where user_id = ${id}::int and question_id = any(${qi}::int[])`;
+      const pb = new Map(prev.map(r => [r.question_id, r.box]));
+      let fixed = 0, fresh = 0; qi.forEach((q, i) => { if (!pb.has(q)) fresh++; else if (qo[i] && pb.get(q) === 0) fixed++; });
+      await sql`insert into q_history (user_id, question_id, box, right_n, wrong_n, last_at, due_at)
+        select ${id}::int, t.q, case when t.ok then 1 else 0 end, case when t.ok then 1 else 0 end, case when t.ok then 0 else 1 end, now(),
+          now() + make_interval(days => case when t.ok then (${LEIT}::int[])[2] else 0 end)
+        from unnest(${qi}::int[], ${qo}::boolean[]) as t(q, ok)
+        on conflict (user_id, question_id) do update set
+          box = case when excluded.right_n > 0 then least(q_history.box + 1, 4) else 0 end,
+          right_n = q_history.right_n + excluded.right_n, wrong_n = q_history.wrong_n + excluded.wrong_n, last_at = now(),
+          due_at = now() + make_interval(days => case when excluded.right_n > 0 then (${LEIT}::int[])[least(q_history.box + 1, 4) + 1] else 0 end)`;
+      return { fixed, fresh };
+    } catch (e) { console.error('recHist', e); return { fixed: 0, fresh: 0 }; }
+  };
+  // Tambah Poin Latihan hari ini (batas PP_CAP per hari) dan penghitung misi. Kegagalan di sini tidak boleh menggagalkan aksi utamanya.
+  const award = async (id, o = {}) => {
+    try {
+      const c = Math.max(0, o.correct | 0), add = Math.min(c * PP_PER, PP_CAP);
+      if (!c && !o.sessions) return { gain: 0, today: null };
+      const [, [r]] = await sql.transaction([
+        sql`insert into practice_days (user_id, day) values (${id}::int, (now() at time zone 'Asia/Jakarta')::date) on conflict do nothing`,
+        sql`update practice_days n set pts = least(o.pts + ${add}::int, ${PP_CAP}::int), correct = o.correct + ${c}::int, sessions = o.sessions + ${o.sessions | 0}::int,
+            fixed = o.fixed + ${o.fixed | 0}::int, fresh = o.fresh + ${o.fresh | 0}::int
+          from practice_days o where o.user_id = n.user_id and o.day = n.day and n.user_id = ${id}::int and n.day = (now() at time zone 'Asia/Jakarta')::date
+          returning o.pts as before, n.pts as after`]);
+      return r ? { gain: r.after - r.before, today: r.after, cap: PP_CAP } : { gain: 0, today: null };
+    } catch (e) { console.error('award', e); return { gain: 0, today: null }; }
+  };
 
   let who = 0; // id pemanggil yang sudah terautentikasi (dipakai penanganan error di bawah)
   try {
@@ -560,8 +643,8 @@ export async function onRequest({ request, env, params, waitUntil }) {
         }
       } catch (e) { got = 0; }
       // satu round trip untuk tiga query
-      const [[usr], best, [t], [sp], [bn], [rq], [ag], un, [tr]] = await sql.transaction([
-        sql`select username, role, avatar, fx, fxa, fxn, pet, on_board, photo_v, use_photo, badges from users where id = ${uid}`,
+      const [[usr], best, [t], [sp], [bn], [rq], [ag], un, [tr], [pq]] = await sql.transaction([
+        sql`select username, role, avatar, fx, fxa, fxn, pet, on_board, photo_v, use_photo, badges, tier from users where id = ${uid}`,
         bestOf(uid),
         sql`select least(ceil(coalesce(max(n), 0) / 10.0), 7)::int as s from endless_runs where user_id = ${uid}`,
         sql`select coalesce(sum(price), 0)::int s from purchases where user_id = ${uid}`,
@@ -569,11 +652,15 @@ export async function onRequest({ request, env, params, waitUntil }) {
         sql`select case when (select role from users where id = ${uid}) = 'admin' then (select count(distinct question_id) from question_reports where status = 'open') else 0 end::int n`,
         sql`select coalesce(sum(gold), 0)::int s from user_achievements where user_id = ${uid}`,
         sql`select key from user_achievements where user_id = ${uid} and not seen`,
-        sql`select coalesce(max(score), 0)::int s from attempts where user_id = ${uid} and level = 'endless'`]);
+        sql`select coalesce(max(score), 0)::int s from attempts where user_id = ${uid} and level = 'endless'`,
+        sql`select coalesce(sum(pts), 0)::int total, coalesce(sum(pts) filter (where day = (now() at time zone 'Asia/Jakarta')::date), 0)::int today,
+            coalesce(sum(pts) filter (where day >= date_trunc('week', now() at time zone 'Asia/Jakarta')::date), 0)::int week from practice_days where user_id = ${uid}`]);
       if (!usr) return bad('Silakan masuk dulu', 401);
+      const ti = usr.role === 'admin' ? 4 : tierOf(best), lv = plLevel(pq.total);
+      if (ti !== usr.tier) { try { await sql`update users set tier = ${ti}::smallint where id = ${uid}`; } catch (e) { console.error(e); } }
       const ach = jilidDone(best);
       const xpTot = best.reduce((a, r) => a + r.xp, 0), ri = Math.max(0, RANK_MIN.filter(m => m <= xpTot).length - 1);
-      return J({ rankGot: got, rankPay: usr.role === 'admin' ? 0 : RANK_PAY[ri], pays: RANK_PAY, starter: STARTER_GOLD, reports: rq.n, username: usr.username, role: usr.role, avatar: usr.avatar, photo: usr.photo_v, usePhoto: usr.use_photo, fxp: usr.fx, fxa: usr.fxa, fxn: usr.fxn, pet: usr.pet, board: usr.on_board, spent: sp.s, bonus: bn.s + ag.s, bd: badgeInfo(usr.badges), unseen: un.map(r => ACHBY[r.key]).filter(Boolean).map(achMini), rate: GOLD_RATE, tcap: TCAP, tathRaw: tr.s, tstage: t.s, pass: PASS_PCT, ach, tathbiq: usr.role === 'admin' || ach.every(Boolean), best: Object.fromEntries(best.map(r => [r.jilid + ':' + r.level, r.xp])) });
+      return J({ tier: ti, pl: { total: pq.total, lvl: lv, base: plNeed(lv), next: plNeed(lv + 1), today: pq.today, week: pq.week, cap: PP_CAP, per: PP_PER }, rankGot: got, rankPay: usr.role === 'admin' ? 0 : RANK_PAY[ri], pays: RANK_PAY, starter: STARTER_GOLD, reports: rq.n, username: usr.username, role: usr.role, avatar: usr.avatar, photo: usr.photo_v, usePhoto: usr.use_photo, fxp: usr.fx, fxa: usr.fxa, fxn: usr.fxn, pet: usr.pet, board: usr.on_board, spent: sp.s, bonus: bn.s + ag.s, bd: badgeInfo(usr.badges), unseen: un.map(r => ACHBY[r.key]).filter(Boolean).map(achMini), rate: GOLD_RATE, tcap: TCAP, tathRaw: tr.s, tstage: t.s, pass: PASS_PCT, ach, tathbiq: usr.role === 'admin' || ach.every(Boolean), best: Object.fromEntries(best.map(r => [r.jilid + ':' + r.level, r.xp])) });
     }
 
     if (route === 'GET quiz') {
@@ -607,11 +694,15 @@ export async function onRequest({ request, env, params, waitUntil }) {
       }
       LB.clear();
       // rekor jawaban benar beruntun (urutan soal sesuai token); pencatatan ini tidak boleh menggagalkan hasil kuis
+      let hs = { fixed: 0, fresh: 0 };
       try {
-        const kq = await sql`select id, answer from questions where id = any(${t.ids}::int[])`, run = maxRun(t.ids, an, Object.fromEntries(kq.map(k => [k.id, k.answer])));
+        const kq = await sql`select id, answer from questions where id = any(${t.ids}::int[])`, key = Object.fromEntries(kq.map(k => [k.id, k.answer])), run = maxRun(t.ids, an, key);
         if (run > 0) await sql`insert into user_stats (user_id, best_run) values (${uid}::int, ${run}::int) on conflict (user_id) do update set best_run = greatest(user_stats.best_run, excluded.best_run)`;
+        const seenIds = t.ids.filter(id => key[id] && /^[ABCD]$/.test(an[id])); // soal yang tidak dijawab tidak dicatat
+        hs = await recHist(uid, seenIds, seenIds.map(id => an[id] === key[id]));
       } catch (e) { console.error(e); }
-      return J({ correct: row.correct, total, score: row.score, xp: Math.round(XP[t.l] * row.correct / total), ach: await evalAch(uid) });
+      const pl = await award(uid, { correct: row.correct, ...hs });
+      return J({ correct: row.correct, total, score: row.score, xp: Math.round(XP[t.l] * row.correct / total), pl, ach: await evalAch(uid) });
     }
 
     if (route === 'POST endless/start') {
@@ -648,8 +739,10 @@ export async function onRequest({ request, env, params, waitUntil }) {
       if (ids.length < ch.length) return bad('Jawaban tidak valid');
       const key = Object.fromEntries((await sql`select id, answer from questions where id = any(${ids}::int[])`).map(k => [k.id, k.answer]));
       let { lives, score, correct, n } = r, over = false, run = r.cur_run || 0, bestRun = 0;
+      const hId = [], hOk = [];
       for (let i = 0; i < ch.length; i++) {
         if (key[ids[i]]) { // soal yang dihapus admin dilewati
+          hId.push(ids[i]); hOk.push(key[ids[i]] === ch[i]);
           if (key[ids[i]] === ch[i]) { score += 10 * Math.ceil(n / 10); correct++; if (++run > bestRun) bestRun = run; }
           else { run = 0; if (--lives <= 0) { over = true; break; } }
         }
@@ -666,7 +759,8 @@ export async function onRequest({ request, env, params, waitUntil }) {
       if (!upd.length) return bad('Jawaban ini sudah dikirim', 409);
       LB.clear();
       if (bestRun > 0) { try { await sql`insert into user_stats (user_id, best_run) values (${uid}::int, ${bestRun}::int) on conflict (user_id) do update set best_run = greatest(user_stats.best_run, excluded.best_run)`; } catch (e) { console.error(e); } }
-      return J({ lives, score, correct, over: done, ach: await evalAch(uid) });
+      const hs = await recHist(uid, hId, hOk), pl = await award(uid, { correct: correct - r.correct, ...hs });
+      return J({ lives, score, correct, over: done, pl, ach: await evalAch(uid) });
     }
 
     if (route === 'POST password') {
@@ -875,7 +969,8 @@ export async function onRequest({ request, env, params, waitUntil }) {
     }
     if (route === 'POST daily/start') {
       if (!cf.daily.on) return bad(OFF, 403);
-      const qs = await pickQs(0, cf.daily.n);
+      const sc = await myScope(uid); let qs = await pickQs(0, cf.daily.n, [], sc.mx);
+      if (qs.length < cf.daily.n) qs = await pickQs(0, cf.daily.n); // bank jilidmu belum cukup: lengkapi dari semua jilid
       if (qs.length < cf.daily.n) return bad('Soal belum cukup untuk kuis harian (minimal ' + cf.daily.n + ' soal)');
       // baris dibuat saat mulai: satu kesempatan per hari, tidak bisa diulang walau halaman ditutup
       const [r] = await sql`insert into daily (user_id, day) values (${uid}, (now() at time zone 'Asia/Jakarta')::date) on conflict do nothing returning day::text as d`;
@@ -894,14 +989,21 @@ export async function onRequest({ request, env, params, waitUntil }) {
         update daily set done = true, correct = c.n, score = round(c.n * 100.0 / ${total}::int)::int from c
         where user_id = ${uid} and day = ${t.day}::date and not done returning correct, score`;
       if (!row) return bad('Kuis harian ini sudah diselesaikan', 409);
-      return J({ correct: row.correct, total, score: row.score, pass: row.score >= cf.daily.pass, ach: await evalAch(uid) });
+      let hs = { fixed: 0, fresh: 0 };
+      try {
+        const kq = await sql`select id, answer from questions where id = any(${t.ids}::int[])`, key = Object.fromEntries(kq.map(k => [k.id, k.answer])), seenIds = t.ids.filter(id => key[id] && /^[ABCD]$/.test(an[id]));
+        hs = await recHist(uid, seenIds, seenIds.map(id => an[id] === key[id]));
+      } catch (e) { console.error(e); }
+      const pl = await award(uid, { correct: row.correct, ...hs });
+      return J({ correct: row.correct, total, score: row.score, pass: row.score >= cf.daily.pass, pl, ach: await evalAch(uid) });
     }
     // ---------- Cepat Tepat: 10 soal, batas waktu per soal 10 detik turun ke 5 detik ----------
     // Satu kesempatan per hari (baris dibuat saat mulai). Klien mengirim waktu jawab tiap soal; server memeriksa batas per soal
     // dan total waktu sejak mulai (anti-curang kasar, setara kuis lain: kunci jawaban memang ikut dikirim ke klien).
     if (route === 'POST daily/fast/start') {
       if (!cf.fast.on) return bad(OFF, 403);
-      const qs = await pickQs(0, FAST_LIM.length);
+      const sc = await myScope(uid); let qs = await pickQs(0, FAST_LIM.length, [], sc.mx);
+      if (qs.length < FAST_LIM.length) qs = await pickQs(0, FAST_LIM.length);
       if (qs.length < FAST_LIM.length) return bad('Soal belum cukup untuk Cepat Tepat (minimal ' + FAST_LIM.length + ' soal)');
       const [r] = await sql`insert into daily_fast (user_id, day) values (${uid}, (now() at time zone 'Asia/Jakarta')::date) on conflict do nothing returning day::text as d`;
       if (!r) return bad('Cepat Tepat hari ini sudah kamu ambil. Kembali lagi besok!', 409);
@@ -921,18 +1023,27 @@ export async function onRequest({ request, env, params, waitUntil }) {
         update daily_fast set done = true, correct = c.n, score = round(c.n * 100.0 / ${total}::int)::int from c
         where user_id = ${uid} and day = ${t.day}::date and not done returning correct, score`;
       if (!row) return bad('Cepat Tepat ini sudah diselesaikan', 409);
-      return J({ correct: row.correct, total, score: row.score, pass: row.score >= cf.fast.pass, ach: await evalAch(uid) });
+      const pl = await award(uid, { correct: row.correct });
+      return J({ correct: row.correct, total, score: row.score, pass: row.score >= cf.fast.pass, pl, ach: await evalAch(uid) });
     }
     // ---------- Sorof Harian: soal Sorof acak dari semua level yang tersedia, sekali sehari ----------
     if (route === 'POST daily/sorof/start') {
       if (!cf.sorof.on) return bad(OFF, 403);
       const n = cf.sorof.n, per = await sql`select lv, count(*)::int n from sorof_words where active group by lv`;
-      const lvs = per.filter(r => SOROF_LV[r.lv] && r.n >= SOROF_MIN).map(r => r.lv);
+      const sc = await myScope(uid), allLv = per.filter(r => SOROF_LV[r.lv] && r.n >= SOROF_MIN).map(r => r.lv);
+      const open = SOROF_BEST.slice(0, sc.so).map(([j]) => Object.keys(SOROF_LV).find(k => SOROF_LV[k].j === j));
+      let lvs = allLv.filter(l => open.includes(l));
+      if (!lvs.length) lvs = allLv; // level yang dibuka belum punya bank soal: pakai semua level yang ada
       if (!lvs.length) return bad('Bank soal Sorof belum tersedia');
       const rows = await sql.transaction(lvs.map(l => sql`select grup, forms from sorof_words where active and lv = ${l}::text order by random() limit ${n * 3}`));
       const seen = new Set(), quota = Math.ceil(n / lvs.length) + 2;
       let pool = []; lvs.forEach((l, i) => { for (const x of genSorof(rows[i], l, Math.random, quota)) if (!seen.has(x.q)) { seen.add(x.q); pool.push(x); } });
       pool = shuffle(pool, Math.random).slice(0, n);
+      if (pool.length < n && lvs.length < allLv.length) { // level yang dibuka belum cukup soal: lengkapi dari level lain
+        const more = allLv.filter(l => !lvs.includes(l)), rows2 = await sql.transaction(more.map(l => sql`select grup, forms from sorof_words where active and lv = ${l}::text order by random() limit ${n * 3}`));
+        more.forEach((l, i) => { for (const x of genSorof(rows2[i], l, Math.random, n)) if (!seen.has(x.q)) { seen.add(x.q); pool.push(x); } });
+        pool = shuffle(pool, Math.random).slice(0, n);
+      }
       if (pool.length < n) return bad('Soal Sorof belum cukup untuk event harian');
       const [r] = await sql`insert into daily_sorof (user_id, day) values (${uid}::int, (now() at time zone 'Asia/Jakarta')::date) on conflict do nothing returning day::text as d`;
       if (!r) return bad('Sorof Harian hari ini sudah kamu ambil. Kembali lagi besok!', 409);
@@ -948,13 +1059,16 @@ export async function onRequest({ request, env, params, waitUntil }) {
       const [row] = await sql`update daily_sorof set done = true, correct = ${correct}::int, score = ${Math.round(correct * 100 / total)}::int
         where user_id = ${uid}::int and day = ${t.day}::date and not done returning correct, score`;
       if (!row) return bad('Sorof Harian ini sudah diselesaikan', 409);
-      return J({ correct: row.correct, total, score: row.score, pass: row.score >= cf.sorof.pass, ach: await evalAch(uid) });
+      const pl = await award(uid, { correct: row.correct });
+      return J({ correct: row.correct, total, score: row.score, pass: row.score >= cf.sorof.pass, pl, ach: await evalAch(uid) });
     }
     // ---------- Lisan Harian: beberapa lafadz acak dari seluruh jilid, dinilai seperti Kuis Lisan, sekali sehari ----------
     // Tidak memakai kuota latihan harian (ORAL_DAY_MAX) dan tidak masuk oral_attempts; hasil per lafadz disimpan di daily_oral.res = { idLafadz: [benar, total] }.
     if (route === 'POST daily/oral/start') {
       if (!cf.oral.on) return bad(OFF, 403);
-      const rows = await sql`select id, lafadz, steps from oral_items where active order by random() limit ${cf.oral.n}::int`;
+      const sc = await myScope(uid);
+      let rows = await sql`select id, lafadz, steps from oral_items where active and jilid <= ${sc.mx}::int order by random() limit ${cf.oral.n}::int`;
+      if (rows.length < cf.oral.n) rows = await sql`select id, lafadz, steps from oral_items where active order by random() limit ${cf.oral.n}::int`;
       if (!rows.length) return bad('Belum ada soal lisan');
       const [r] = await sql`insert into daily_oral (user_id, day) values (${uid}::int, (now() at time zone 'Asia/Jakarta')::date) on conflict do nothing returning day::text as d`;
       if (!r) return bad('Lisan Harian hari ini sudah kamu ambil. Kembali lagi besok!', 409);
@@ -977,7 +1091,8 @@ export async function onRequest({ request, env, params, waitUntil }) {
       const [u2] = await sql`update daily_oral set res = res || jsonb_build_object(${String(id)}::text, jsonb_build_array(${correct}::int, ${g.steps.length}::int))
         where user_id = ${uid}::int and day = ${t.day}::date and not done and not jsonb_exists(res, ${String(id)}::text) returning 1 as x`;
       if (!u2) return bad('Lafadz ini sudah dinilai', 409);
-      return J({ correct, total: g.steps.length, ai: g.ai, steps: g.steps.map((st, i) => ({ q: st.q, s: g.an[i], ok: g.res[i].ok, fb: g.res[i].fb, model: st.a[0] })) });
+      const pl = await award(uid, { correct });
+      return J({ correct, total: g.steps.length, ai: g.ai, pl, steps: g.steps.map((st, i) => ({ q: st.q, s: g.an[i], ok: g.res[i].ok, fb: g.res[i].fb, model: st.a[0] })) });
     }
     if (route === 'POST daily/oral/finish') {
       const t = await verify(String(body.token || ''), S);
@@ -1015,6 +1130,115 @@ export async function onRequest({ request, env, params, waitUntil }) {
       const [u] = await USE[md](row.d, prize);
       if (!u) return bad('Spin sudah dipakai', 409);
       return J({ prize, rare: prize >= RARE, pity: prize >= RARE ? 0 : y.n + 1, ach: await evalAch(uid) });
+    }
+
+
+    // ---------- Latihan Cerdas, misi harian, liga mingguan ----------
+    // Status Latihan Cerdas untuk kartu di Beranda: berapa soal jatuh tempo diulang, berapa yang masih lemah, berapa yang belum pernah dicoba (hanya dari jilid yang dibuka).
+    if (route === 'GET practice') {
+      const sc = await myScope(uid);
+      const [[h], [bk], [td]] = await sql.transaction([
+        sql`select count(*) filter (where h.due_at <= now())::int due, count(*) filter (where h.box = 0)::int weak
+          from q_history h join questions q on q.id = h.question_id where h.user_id = ${uid}::int and q.jilid <= ${sc.mx}::int`,
+        sql`select count(*)::int bank, count(*) filter (where not exists (select 1 from q_history h where h.user_id = ${uid}::int and h.question_id = q.id))::int fresh from questions q where q.jilid <= ${sc.mx}::int`,
+        sql`select coalesce(sum(pts), 0)::int pts, coalesce(sum(sessions), 0)::int sessions from practice_days where user_id = ${uid}::int and day = (now() at time zone 'Asia/Jakarta')::date`]);
+      return J({ mx: sc.mx, due: h.due, weak: h.weak, bank: bk.bank, fresh: bk.fresh, today: td.pts, sessions: td.sessions, cap: PP_CAP, sizes: PRAC_N });
+    }
+    if (route === 'POST practice/start') {
+      const sc = await myScope(uid), j = +body.jilid || 0, n = PRAC_N.includes(+body.n) ? +body.n : PRAC_N[1];
+      if (j && !(j >= 1 && j <= sc.mx)) return bad('Jilid ini belum terbuka untukmu', 403);
+      const jmin = j || 1, jmax = j || sc.mx, dq = Math.ceil(n * PRAC_DUE);
+      // Urutan: (1) soal jatuh tempo, paling lemah dulu, sampai kuota ulangan; (2) soal yang belum pernah dicoba; (3) sisa soal jatuh tempo; (4) soal yang paling lama tidak dilihat.
+      // Bank yang kecil tidak membuat sesi habis: bila semua sudah dikuasai, soal lama tetap muncul lagi (urut dari yang paling lama).
+      const rows = await sql`select id, q, a, b, c, d, answer, pri from (
+          select id, q, a, b, c, d, answer, pri, case when pri = 0 and rn <= ${dq}::int then 0 when pri = 1 then 1 when pri = 0 then 2 else 3 end ord, rn from (
+            select q.id, q.q, q.a, q.b, q.c, q.d, q.answer,
+              case when h.question_id is null then 1 when h.due_at <= now() then 0 else 2 end pri,
+              row_number() over (partition by case when h.question_id is null then 1 when h.due_at <= now() then 0 else 2 end
+                order by (case when h.due_at <= now() then h.box end) nulls last, (case when h.due_at > now() then h.last_at end) nulls last, random()) rn
+            from questions q left join q_history h on h.question_id = q.id and h.user_id = ${uid}::int
+            where q.jilid between ${jmin}::int and ${jmax}::int) t
+          order by ord, rn limit ${n}::int) s order by random()`;
+      if (rows.length < 5) return bad('Soal untuk jilid ini belum cukup. Coba lagi setelah admin menambah soal.');
+      const token = await sign({ k: 'prac', uid, ids: rows.map(x => x.id), nonce: crypto.randomUUID(), t0: Date.now(), exp: Date.now() + 72e5 }, S);
+      const mix = { review: rows.filter(x => x.pri === 0).length, fresh: rows.filter(x => x.pri === 1).length, again: rows.filter(x => x.pri === 2).length };
+      return J({ questions: rows.map(({ pri, ...x }) => x), token, mix, n: rows.length });
+    }
+    if (route === 'POST practice/submit') {
+      const t = await verify(String(body.token || ''), S);
+      if (!t || t.k !== 'prac' || t.uid !== uid || !Array.isArray(t.ids)) return bad('Sesi latihan tidak valid atau kedaluwarsa');
+      const total = t.ids.length;
+      if (Date.now() - (t.t0 || 0) < total * 1000) return bad('Terlalu cepat. Baca soal dengan teliti, lalu kirim lagi.', 429);
+      const an = body.answers && typeof body.answers === 'object' ? body.answers : {};
+      const kq = await sql`select id, answer from questions where id = any(${t.ids}::int[])`, key = Object.fromEntries(kq.map(k => [k.id, k.answer]));
+      const seenIds = t.ids.filter(id => key[id] && /^[ABCD]$/.test(an[id])), oks = seenIds.map(id => an[id] === key[id]), correct = oks.filter(Boolean).length;
+      const ins = await sql`insert into practice_runs (nonce, user_id, total, correct) values (${t.nonce}::text, ${uid}::int, ${total}::int, ${correct}::int) on conflict do nothing returning nonce`;
+      if (!ins.length) return bad('Latihan ini sudah pernah dikirim', 409);
+      const hs = await recHist(uid, seenIds, oks), pl = await award(uid, { correct, sessions: 1, ...hs });
+      return J({ correct, total, score: Math.round(correct * 100 / total), fixed: hs.fixed, fresh: hs.fresh, pl, ach: await evalAch(uid) });
+    }
+
+    // Misi harian: tiga misi tetap, hadiah Gold kecil, direset tiap hari WIB. Misi ketiga menyesuaikan kondisi murid
+    // (perbaiki soal salah; bila belum ada, coba soal baru; bila bank habis, jawab benar 40 soal) supaya selalu bisa diselesaikan.
+    const misState = async id => {
+      const kinds = [...MIS.map(m => 'ms_' + m.k), 'ms_all'];
+      const [[d], [bk], cl] = await sql.transaction([
+        sql`select correct, sessions, fixed, fresh from practice_days where user_id = ${id}::int and day = (now() at time zone 'Asia/Jakarta')::date`,
+        sql`select (select count(*)::int from q_history where user_id = ${id}::int and box = 0) weak,
+          (select count(*)::int from questions q where q.jilid <= (select tier from users where id = ${id}::int) and not exists (select 1 from q_history h where h.user_id = ${id}::int and h.question_id = q.id)) fresh`,
+        sql`select kind from gold_grants where user_id = ${id}::int and day = (now() at time zone 'Asia/Jakarta')::date and kind = any(${kinds}::text[])`]);
+      const x = d || { correct: 0, sessions: 0, fixed: 0, fresh: 0 }, got = new Set(cl.map(r => r.kind));
+      const v3 = bk.weak + x.fixed >= 5 ? 'fix' : bk.fresh + x.fresh >= 5 ? 'fresh' : 'c40';
+      const list = MIS.map(m => {
+        let n = m.n, dsc = m.d, t = m.t, v = m.k === 'm1' ? x.correct : m.k === 'm2' ? x.sessions : x.fixed;
+        if (m.k === 'm3' && v3 === 'fresh') { n = 'Coba 5 soal baru'; dsc = 'Jawab 5 soal yang belum pernah kamu kerjakan.'; v = x.fresh; }
+        if (m.k === 'm3' && v3 === 'c40') { n = 'Jawab benar 40 soal'; dsc = 'Semua soal jilidmu sudah pernah dicoba. Ulangi dan kuatkan!'; t = 40; v = x.correct; }
+        return { k: m.k, n, d: dsc, t, g: m.g, v: Math.min(v, t), done: v >= t, claimed: got.has('ms_' + m.k) };
+      });
+      return { list, all: { g: MIS_ALL, ready: list.every(m => m.done), claimed: got.has('ms_all') } };
+    };
+    if (route === 'GET missions') return J(await misState(uid));
+    if (route === 'POST missions/claim') {
+      const k = String(body.k || ''), m0 = MIS.find(m => m.k === k);
+      if (!m0) return bad('Misi tidak dikenal');
+      const [u] = await sql`select role from users where id = ${uid}`;
+      if (!u || u.role === 'admin') return bad('Akun admin tidak ikut misi harian', 403);
+      let st = await misState(uid); const m = st.list.find(x => x.k === k);
+      if (!m.done) return bad('Misi ini belum selesai', 409);
+      let gold = 0;
+      const r1 = await sql`insert into gold_grants (user_id, kind, day, amount) values (${uid}::int, ${'ms_' + k}::text, (now() at time zone 'Asia/Jakarta')::date, ${m.g}::int) on conflict do nothing returning amount`;
+      if (!r1.length) return bad('Hadiah misi ini sudah diambil', 409);
+      gold += m.g; m.claimed = true;
+      if (st.list.every(x => x.claimed) && !st.all.claimed) { // ketiganya sudah diambil: bonus
+        const r2 = await sql`insert into gold_grants (user_id, kind, day, amount) values (${uid}::int, 'ms_all', (now() at time zone 'Asia/Jakarta')::date, ${MIS_ALL}::int) on conflict do nothing returning amount`;
+        if (r2.length) { gold += MIS_ALL; st.all.claimed = true; }
+      }
+      return J({ gold, ...st });
+    }
+
+    // Liga mingguan: Poin Latihan minggu ini (Senin 00.00 WIB sampai Minggu), dipisah per "jilid saya" (tier) supaya adil.
+    if (route === 'GET league') {
+      const [me1] = await sql`select tier from users where id = ${uid}`;
+      const tq = url.searchParams.get('tier'), t = tq === null || tq === '' ? (me1 ? me1.tier : 1) : Math.max(0, Math.min(4, +tq || 0));
+      const ck = 'L|' + t, hit = LB.get(ck);
+      let rows;
+      if (hit && hit.t > Date.now()) rows = hit.v;
+      else {
+        rows = await sql`with wk as (select date_trunc('week', now() at time zone 'Asia/Jakarta')::date d)
+          select rank() over (order by sum(p.pts) desc)::int as rank, u.username, u.avatar, u.fx as pick, u.fxn as nm, case when u.use_photo then u.photo_v end as ph, u.badges, u.tier, sum(p.pts)::int as pts
+          from practice_days p join users u on u.id = p.user_id, wk
+          where p.day >= wk.d and (u.role <> 'admin' or u.on_board) and (${t}::int = 0 or u.tier = ${t}::int)
+          group by u.id order by rank, u.username limit 50`;
+        for (const r of rows) { r.fx = r.pick == null ? 0 : r.pick; delete r.pick; r.bd = badgeInfo(r.badges); delete r.badges; }
+        if (LB.size > 60) LB.clear();
+        LB.set(ck, { t: Date.now() + LB_TTL, v: rows });
+      }
+      const [mine] = await sql`with wk as (select date_trunc('week', now() at time zone 'Asia/Jakarta')::date d),
+        w as (select p.user_id, sum(p.pts)::int s from practice_days p join users u on u.id = p.user_id, wk where p.day >= wk.d and (u.role <> 'admin' or u.on_board) and (${t}::int = 0 or u.tier = ${t}::int) group by p.user_id),
+        me as (select coalesce((select s from w where user_id = ${uid}::int), 0) s)
+        select me.s as pts, ((select count(*) from w where w.s > me.s)::int + 1) as pos, (select count(*) from w)::int as players from me`;
+      const wibNow = Date.now() + 252e5, ends = 7 * 864e5 - (((new Date(wibNow).getUTCDay() + 6) % 7) * 864e5 + wibNow % 864e5);
+      return J({ rows, tier: t, mine: { pts: mine.pts, pos: mine.pts > 0 ? mine.pos : null, players: mine.players }, ends, mytier: me1 ? me1.tier : 1 });
     }
 
     if (route === 'GET leaderboard') {
@@ -1165,7 +1389,8 @@ export async function onRequest({ request, env, params, waitUntil }) {
         values (${uid}::int, ${it.id}::int, ${it.jilid}::int, ${correct}::int, ${steps.length}::int, ${JSON.stringify(detail)}::jsonb, ${g.ai}::boolean, ${nonce}::text)
         on conflict (nonce) do nothing returning id`;
       if (!ins.length) return bad('Lafadz ini sudah dinilai', 409);
-      return J({ correct, total: steps.length, ai: g.ai,
+      const pl = await award(uid, { correct });
+      return J({ correct, total: steps.length, ai: g.ai, pl,
         steps: steps.map((st, i) => ({ q: st.q, s: an[i], ok: res[i].ok, fb: res[i].fb, model: st.a[0] })) });
     }
 
@@ -1232,7 +1457,8 @@ export async function onRequest({ request, env, params, waitUntil }) {
         const run = maxRun(order, an, key);
         if (run > 0) await sql`insert into user_stats (user_id, best_run) values (${uid}::int, ${run}::int) on conflict (user_id) do update set best_run = greatest(user_stats.best_run, excluded.best_run)`;
       } catch (e) { console.error(e); }
-      return J({ correct: row.correct, total, score: row.score, xp: Math.round(XPMAX[L.xl] * row.correct / total), ach: await evalAch(uid) });
+      const pl = await award(uid, { correct: row.correct });
+      return J({ correct: row.correct, total, score: row.score, xp: Math.round(XPMAX[L.xl] * row.correct / total), pl, ach: await evalAch(uid) });
     }
 
     // ---------- Khusus admin ----------
