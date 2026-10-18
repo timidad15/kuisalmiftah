@@ -537,9 +537,13 @@ html[data-pet=p_unta] .fb.no::before,html[data-pet=p_gajah] .fb.no::before{anima
 html[data-pet=p_lebah] .fb.no::before,html[data-pet=p_paus] .fb.no::before{animation:pf-sink .6s forwards}
 @media(prefers-reduced-motion:reduce){.fb::before{animation:none!important}}
 /* ===== Mode offline ===== */
-.plh{display:flex;gap:14px;align-items:center;margin-bottom:10px}.plv{flex:none;width:66px;height:66px;border-radius:18px;background:linear-gradient(135deg,var(--lime),var(--accent));color:var(--on);display:grid;place-items:center;text-align:center;line-height:1;padding:8px 0}.plv small{display:block;font-size:.56rem;font-weight:700;opacity:.9;margin-bottom:2px}.plv b{font-size:1.7rem}.plb{flex:1;min-width:0}.pcap{display:flex;justify-content:space-between;gap:8px;font-size:.82rem;color:var(--muted);margin-top:5px}
-.pst{display:flex;gap:8px;flex-wrap:wrap;margin:0 0 12px}.prac .tabs{margin-bottom:8px}.prac .row{align-items:center}
-.mrow{display:flex;gap:12px;align-items:center;padding:10px 0;border-bottom:1px solid var(--line)}.mrow:last-of-type{border:0}.mtx{flex:1;min-width:0}.mtx small.muted{display:block;margin:0}.mtx .bar{height:6px;margin:6px 0 2px}.mrow.ok{opacity:.65}.mall{margin-top:8px;font-weight:700;color:var(--muted);text-align:center;font-size:.9rem}
+.lvrow{display:flex;align-items:center;gap:10px;margin:10px 0 2px}.lvrow .lvb{flex:none;font-weight:800;font-size:.9rem;padding:2px 12px;border-radius:999px;background:linear-gradient(135deg,#F4577A,#A3123A);color:#fff}.lvrow .prog{flex:1;height:8px}.lvrow .prog i{background:linear-gradient(90deg,#FB7185,#F4577A)}.lvrow small{flex:none;color:var(--muted);font-weight:600}
+.cdy{margin-top:14px}.cdr{display:flex;justify-content:space-between;gap:8px;font-size:.88rem;margin-bottom:6px}.cdr span{color:var(--muted);font-weight:600}.cdy .bar{margin-bottom:6px}
+.patur{margin-top:12px;border-top:1px dashed var(--line);padding-top:10px}.patur>summary{cursor:pointer;list-style:none;font-weight:600;color:var(--muted);font-size:.9rem}.patur>summary::-webkit-details-marker{display:none}.patur>summary::after{content:' ▾'}.patur[open]>summary::after{content:' ▴'}.patur .tabs{margin:10px 0 0}
+.mis{padding:0;margin-bottom:22px;border-left:5px solid #F4577A}.mis>summary{display:flex;align-items:center;gap:12px;padding:12px 16px;cursor:pointer;list-style:none}.mis>summary::-webkit-details-marker{display:none}.mis>summary::after{content:'▾';color:var(--muted);margin-left:2px}.mis[open]>summary::after{content:'▴'}
+.mis .mi{font-size:1.5rem;line-height:1}.mis .mt{flex:1;min-width:0;display:flex;flex-direction:column;line-height:1.3}.mis .mt small{color:var(--muted)}.mis .mn{font-weight:800;color:#A3123A;background:color-mix(in srgb,#F4577A 16%,var(--surface));padding:2px 12px;border-radius:999px}.mis .mgo{font-weight:800;font-size:.85rem;color:#fff;background:linear-gradient(135deg,#F4577A,#A3123A);padding:3px 12px;border-radius:999px;animation:pop .6s}
+.mis .mbody{padding:0 16px 12px}
+.mrow{display:flex;gap:12px;align-items:center;padding:10px 0;border-top:1px solid var(--line)}.mtx{flex:1;min-width:0}.mtx small.muted{display:block;margin:0}.mtx .bar{height:6px;margin:6px 0 2px}.mtx .bar i{background:#F4577A}.mrow.ok{opacity:.65}.mall{margin-top:6px;font-weight:700;color:var(--muted);text-align:center;font-size:.88rem}
 .lgi{margin:0 0 12px}.lgme{display:flex;justify-content:space-between;gap:10px;flex-wrap:wrap;font-weight:700;margin:0 0 12px}
 #offbar{display:flex;align-items:center;justify-content:center;gap:10px;flex-wrap:wrap;flex:none;padding:8px 14px;background:#B45309;color:#fff;font-weight:600;font-size:.88rem;line-height:1.35;text-align:center}
 #offbar[hidden]{display:none}#offbar.ok{background:#1A7A3C}
@@ -1621,7 +1625,7 @@ function vDailyResult(r, wrong, nm = 'Kuis Harian', need = DAILY_PASS) {
 
 /* ---------- Kuis Lisan (murid) ---------- */
 /* Kuis Lisan: kartu jilid + tiga level. Satu sumber tampilan untuk Beranda (tab Kuis Lisan) dan halaman Kuis Lisan. Jumlah lafadz per level datang dari server (d.lv). */
-let homeTab = 'tulis'; try { homeTab = ['lisan', 'sorof'].includes(localStorage.getItem('ht')) ? localStorage.getItem('ht') : 'tulis'; } catch (e) {}
+let homeTab = 'cerdas'; try { homeTab = ['cerdas', 'tulis', 'lisan', 'sorof'].includes(localStorage.getItem('ht')) ? localStorage.getItem('ht') : 'cerdas'; } catch (e) {}
 const setHomeTab = t => { homeTab = t; try { localStorage.setItem('ht', t); } catch (e) {} };
 let oralCache = null, sorofCache = null;
 const OLV = { easy: ['Mudah', '🌱', 'e'], medium: ['Sedang', '⚡', 'm'], hard: ['Sulit', '🔥', 'h'] };
@@ -1718,7 +1722,7 @@ function vOralQuiz(d, j, daily) {
 }
 
 /* ---------- Beranda ---------- */
-const JC = { 1: ['#C5DA2B', '#6F8A0A', '#1b2400'], 2: ['#2BA3E6', '#0E5C9C', '#04263f'], 3: ['#A94BC0', '#6A2A94', '#2a0a36'], 4: ['#F5A31A', '#B85C00', '#2b1500'], 6: ['#14B8A6', '#0F766E', '#021f1c'] };
+const JC = { 1: ['#C5DA2B', '#6F8A0A', '#1b2400'], 2: ['#2BA3E6', '#0E5C9C', '#04263f'], 3: ['#A94BC0', '#6A2A94', '#2a0a36'], 4: ['#F5A31A', '#B85C00', '#2b1500'], 6: ['#14B8A6', '#0F766E', '#021f1c'], 9: ['#F4577A', '#A3123A', '#ffffff'] };
 const jst = j => `--c:${JC[j][0]};--d:${JC[j][1]};--fg:${JC[j][2]}`;
 /* Quest selesai = level yang mencapai batas lulus (aturan persennya ada di server: PASS_PCT). Jilid selesai = 3 level selesai. Tathbiq terbuka = 4 jilid selesai. */
 const PASS = () => me.pass || 60;
@@ -1750,17 +1754,16 @@ function vHome() {
         <div class="xpb"><h1><span id="tx">0</span> <small>XP</small></h1><span class="gold">${GL} ${gold()}</span></div></div>
       <div class="prog"><i id="pg"></i></div>
       <div class="cap"><span>${nx ? (nx[0] - tot) + ' XP lagi menuju ' + nx[1] : 'Tingkat tertinggi tercapai!'}</span><span>${tot}${nx ? ' / ' + nx[0] : ''} XP</span></div>
+      ${me.pl ? `<div class="lvrow" title="Level naik dari Poin Latihan: tiap jawaban benar di mode apa pun"><span class="lvb">⭐ Level ${me.pl.lvl}</span><div class="prog"><i style="width:${Math.min(100, (me.pl.total - me.pl.base) / Math.max(1, me.pl.next - me.pl.base) * 100)}%;transition:none"></i></div><small>${me.pl.next - me.pl.total} poin lagi</small></div>` : ''}
       <div class="track" style="--p:${p};--n:${RANKS.length}">${RANKS.map((r, n) => `<div class="stp ${n < ri ? 'done' : n === ri ? 'cur' : 'lock'}" style="--rc:${r[3]}"><span class="dot">${RI(n, 46)}</span><b>${r[1]}</b><small>${r[0]} XP</small></div>`).join('')}</div>
     </div>
-    <div class="sec"><h2>Latihan Cerdas</h2><span>Main sebanyak yang kamu mau</span></div>
-    <div class="card prac" id="prac"><p class="muted">Memuat…</p></div>
-    <div id="mis"></div>
+    <details class="card mis" id="mis"><summary><span class="mi">🎯</span><span class="mt"><b>Misi hari ini</b><small>Memuat…</small></span></summary><div class="mbody"></div></details>
     <div class="sec"><h2>Tantangan Harian</h2><span>Sekali sehari, menangkan hadiah ${GL}</span></div>
     <div class="dch" id="chk"><div class="dhd"><b id="chn">Memuat…</b><span class="dnav"><button class="dar" id="dprev" aria-label="Sebelumnya">‹</button><button class="dar" id="dnext" aria-label="Berikutnya">›</button></span></div>
       <div class="dtrack" id="dtrack">${[['dly', '🎯', 'Kuis Harian', 'Soal acak, spin hadiah'], ['fast', '⚡', 'Cepat Tepat', 'Tiap soal berpacu dengan waktu'], ['sorof', '🧩', 'Sorof Harian', "Sighot dan bentuk fi'il"], ['oral', '🗣️', 'Lisan Harian', 'Praktek lafadz']].map(([k, ic, n, h]) => `<div class="dsl" data-k="${k}"><span class="dic">${ic}</span><div class="dtx"><h3>${n}</h3><p class="muted">${h}</p><small id="cs_${k}">…</small></div><button class="btn" data-go="${k}">Buka</button></div>`).join('')}</div>
       <div class="ddots" id="ddots">${[0, 1, 2, 3].map(i => `<i data-i="${i}"></i>`).join('')}</div></div>
     <div class="sec"><h2>Latihan</h2><span>Pilih jenis kuis, lalu jilid dan levelnya</span></div>
-    <div class="tabs htabs"><button data-ht="tulis">✍️ Kuis Tulis</button><button data-ht="lisan">🗣️ Kuis Lisan</button><button data-ht="sorof">🧩 Kuis Sorof</button></div>
+    <div class="tabs htabs"><button data-ht="cerdas">🧠 Cerdas</button><button data-ht="tulis">✍️ Tulis</button><button data-ht="lisan">🗣️ Lisan</button><button data-ht="sorof">🧩 Sorof</button></div>
     <div id="hpane"></div>`;
   $('#pethome').onclick = e => { pli = (pli + 1) % PP[5].length; $('#petln').textContent = PP[5][pli]; petAct(e.currentTarget); SFX.pet(pid); };
   petLive(V);
@@ -1783,6 +1786,16 @@ function vHome() {
     pane.classList.toggle('sw', !!swap);
     pane.style.minHeight = pane.offsetHeight + 'px';
     const settle = () => { pane.style.minHeight = ''; };
+    if (my === 'cerdas') { // tab Cerdas: tampil dari data terakhir, lalu diperbarui diam-diam
+      const hadP = !!pracCache;
+      if (hadP) { pane.innerHTML = panePrac(pracCache); bindPrac(pane, pracCache); settle(); } else pane.innerHTML = '<p class="muted">Memuat…</p>';
+      let d; try { d = await api('practice'); } catch (e) { if (!hadP && homeTab === my && $('#hpane') === pane) pane.textContent = e.message; settle(); return; }
+      if (homeTab !== my || $('#hpane') !== pane) return;
+      const changed = JSON.stringify(d) !== JSON.stringify(pracCache);
+      pracCache = d;
+      if (changed) { pane.classList.add('sw'); pane.innerHTML = panePrac(d); bindPrac(pane, d); }
+      settle(); return;
+    }
     if (my === 'tulis') {
       pane.innerHTML = paneTulis();
       $('#endStart').onclick = async () => { try { vEndless(await api('endless/start', {})); } catch (e) { alert(e.message); } };
@@ -1835,7 +1848,7 @@ function vHome() {
     dots.forEach(d => d.onclick = () => to(+d.dataset.i));
     V.querySelectorAll('[data-go]').forEach(b => b.onclick = () => go('daily')); mark(); }
   setTimeout(() => { const g = $('#pg'); if (g) { g.style.background = rk[3]; g.style.width = frac * 100 + '%'; } }, 80);
-  loadPrac(); loadMis();
+  loadMis();
   // status kuis harian dimuat belakangan agar beranda tampil langsung
   api('daily').then(d => {
     setEvp(d);
@@ -1870,32 +1883,43 @@ function applyPl(pl) { // dipanggil dari api() untuk setiap hasil kuis yang memb
     if (p.lvl > o) setTimeout(() => toast(`Level Latihan naik: <b>Level ${p.lvl}</b>!`, '🆙'), 700);
   } else if (pl.today != null && pl.today >= (pl.cap || 300) && !capSaid) { capSaid = true; toast(`Batas Poin Latihan hari ini (${pl.cap || 300}) tercapai. Kamu tetap boleh berlatih!`, '✅'); }
 }
-async function loadPrac() {
-  const box = $('#prac'); if (!box) return;
-  let d; try { d = await api('practice'); } catch (e) { if (box.isConnected) box.textContent = e.message; return; }
-  if (!box.isConnected) return;
+let pracCache = null;
+const pracHint = d => {
+  const sc = pracJ ? 'Jilid ' + pracJ : d.mx > 1 ? 'Jilid 1–' + d.mx : 'Jilid 1';
+  return d.due > 0 ? `🔁 <b>${d.due} soal</b> perlu diulang${d.weak ? ` (${d.weak} masih lemah)` : ''}. Ayo kuatkan ingatanmu!`
+    : d.fresh > 0 ? `🆕 <b>${d.fresh} soal baru</b> menunggumu di ${sc}.`
+    : '✨ Semua soal sudah pernah kamu coba. Latihan ini mengulang yang paling lama tidak muncul.';
+};
+/* Isi tab Cerdas di Beranda: satu kartu berwarna mawar (seperti kartu Jilid di tab Tulis), tiga pilihan panjang sebagai tombol berwarna, dan bilah poin hari ini. */
+function panePrac(d) {
   if (pracJ > d.mx) pracJ = 0;
-  const p = me.pl || { total: 0, lvl: 1, base: 0, next: 50, today: 0, week: 0, cap: d.cap, per: 5 }; p.today = d.today;
-  const frac = Math.min(1, (p.total - p.base) / Math.max(1, p.next - p.base));
-  box.innerHTML = `<div class="plh"><div class="plv"><small>LEVEL</small><b>${p.lvl}</b></div><div class="plb"><div class="prog"><i style="width:${frac * 100}%;transition:none"></i></div><div class="pcap"><span>${p.next - p.total} poin lagi ke Level ${p.lvl + 1}</span><span>${p.total} poin</span></div></div></div>
-    <p class="muted">Soal dari ${d.mx > 1 ? 'Jilid 1–' + d.mx : 'Jilid 1'}. Soal yang pernah salah atau lama tidak muncul didahulukan, lalu soal baru. Tanpa batas: ulangi sebanyak yang kamu mau. Tiap jawaban benar = ${p.per || 5} Poin Latihan.</p>
-    <div class="pst"><span class="chip">🔁 ${d.due} siap diulang</span><span class="chip">⚠️ ${d.weak} masih lemah</span><span class="chip">🆕 ${d.fresh} belum dicoba</span></div>
-    ${d.mx > 1 ? `<div class="tabs sub">${[0, ...Array.from({ length: d.mx }, (_, i) => i + 1)].map(j => `<button data-pj="${j}" class="${j === pracJ ? 'on' : ''}">${j ? 'Jilid ' + j : 'Semua yang dibuka'}</button>`).join('')}</div>` : ''}
-    <div class="tabs sub">${d.sizes.map(n => `<button data-pn="${n}" class="${n === pracN ? 'on' : ''}">${n} soal</button>`).join('')}</div>
-    <div class="row"><small class="muted" style="margin:0">Hari ini ${d.today}/${d.cap} poin${d.today >= d.cap ? ' ✅ batas tercapai, tetap boleh berlatih' : ''} · minggu ini ${p.week} poin</small><button class="btn" id="pgo">🧠 Mulai Latihan</button></div>`;
-  box.querySelectorAll('[data-pn]').forEach(b => b.onclick = () => { pracN = +b.dataset.pn; box.querySelectorAll('[data-pn]').forEach(x => x.classList.toggle('on', x === b)); });
-  box.querySelectorAll('[data-pj]').forEach(b => b.onclick = () => { pracJ = +b.dataset.pj; box.querySelectorAll('[data-pj]').forEach(x => x.classList.toggle('on', x === b)); });
-  $('#pgo').onclick = () => startPrac();
+  const per = (me.pl && me.pl.per) || 5, pct = Math.min(100, d.today / d.cap * 100);
+  const LB3 = [['e', '🌱', 'Singkat'], ['m', '⚡', 'Biasa'], ['h', '🔥', 'Panjang']];
+  return `<p class="muted hnote">Bisa diulang tanpa batas. Soal yang pernah salah didahulukan. Tiap jawaban benar = ${per} Poin Latihan.</p>
+    <div class="card jc" style="${jst(9)}"><div class="jh"><span class="tag">🧠 Latihan Cerdas</span><span class="jst">${d.mx > 1 ? 'Jilid 1–' + d.mx : 'Jilid 1'}</span></div>
+      <p class="muted ostat">${pracHint(d)}</p>
+      <div class="lvls">${d.sizes.map((n, i) => `<button class="lvl ${LB3[i][0]}" data-pn="${n}"><span class="ic">${LB3[i][1]}</span><b>${LB3[i][2]}</b><small>${n} soal</small><span class="xp">+${n * per} poin</span></button>`).join('')}</div>
+      <div class="cdy"><div class="cdr"><span>Poin hari ini</span><b>${d.today} / ${d.cap}${d.today >= d.cap ? ' ✅' : ''}</b></div><div class="bar"><i style="width:${pct}%"></i></div>${d.today >= d.cap ? '<small class="muted">Batas poin hari ini tercapai, tapi kamu tetap boleh berlatih.</small>' : ''}</div>
+      ${d.mx > 1 ? `<details class="patur"><summary>⚙️ Pilih jilid: <b>${pracJ ? 'Jilid ' + pracJ : 'Semua yang dibuka'}</b></summary><div class="tabs sub">${[0, ...Array.from({ length: d.mx }, (_, i) => i + 1)].map(j => `<button data-pj="${j}" class="${j === pracJ ? 'on' : ''}">${j ? 'Jilid ' + j : 'Semua'}</button>`).join('')}</div></details>` : ''}
+    </div>`;
 }
-async function startPrac() {
-  try { vPractice(await api('practice/start', { n: pracN, jilid: pracJ })); } catch (e) { alert(e.message); }
+function bindPrac(pane, d) {
+  pane.querySelectorAll('[data-pn]').forEach(b => b.onclick = () => startPrac(+b.dataset.pn));
+  pane.querySelectorAll('[data-pj]').forEach(b => b.onclick = () => { pracJ = +b.dataset.pj; pane.innerHTML = panePrac(d); bindPrac(pane, d); pane.querySelector('.patur').open = true; });
 }
+async function startPrac(n) {
+  if (n) pracN = n;
+  try { setHomeTab('cerdas'); vPractice(await api('practice/start', { n: pracN, jilid: pracJ })); } catch (e) { alert(e.message); }
+}
+/* Misi Harian: satu baris ringkas di bawah kartu rank; ketuk untuk membuka daftar misi. */
 async function loadMis() {
-  const box = $('#mis'); if (!box || ADM()) return;
-  let d; try { d = await api('missions'); } catch (e) { return; }
+  const box = $('#mis'); if (!box || ADM()) { if (box) box.remove(); return; }
+  let d; try { d = await api('missions'); } catch (e) { box.remove(); return; }
   if (!box.isConnected) return;
+  const done = d.list.filter(m => m.done).length, ready = d.list.filter(m => m.done && !m.claimed).length, allc = d.list.every(m => m.claimed);
+  box.querySelector('summary').innerHTML = `<span class="mi">🎯</span><span class="mt"><b>Misi hari ini</b><small>${allc ? 'Semua hadiah sudah diambil 🎉' : done + ' dari ' + d.list.length + ' selesai'}</small></span>${ready ? `<span class="mgo">🎁 ${ready} hadiah siap</span>` : `<span class="mn">${done}/${d.list.length}</span>`}`;
   const row = m => `<div class="mrow${m.claimed ? ' ok' : ''}"><div class="mtx"><b>${esc(m.n)}</b><small class="muted">${esc(m.d)}</small><div class="bar"><i style="width:${m.v / m.t * 100}%"></i></div><small>${m.v}/${m.t}</small></div>${m.claimed ? '<span class="chip">✅ Diambil</span>' : m.done ? `<button class="btn" data-mc="${m.k}">Ambil ${GL} ${m.g}</button>` : `<span class="chip">${GL} ${m.g}</span>`}</div>`;
-  box.innerHTML = `<div class="sec"><h2>Misi Harian</h2><span>Diperbarui tiap hari pukul 00.00 WIB</span></div><div class="card mis">${d.list.map(row).join('')}<div class="mall">${d.all.claimed ? '🎉 Bonus semua misi sudah diambil' : `Ambil hadiah ketiga misi: bonus ${GL} ${d.all.g}`}</div></div>`;
+  box.querySelector('.mbody').innerHTML = d.list.map(row).join('') + `<div class="mall">${d.all.claimed ? '🎉 Bonus semua misi sudah diambil' : `Ambil hadiah ketiga misi: bonus ${GL} ${d.all.g}`}</div>`;
   box.querySelectorAll('[data-mc]').forEach(b => b.onclick = async () => {
     b.disabled = true;
     try {
@@ -1908,7 +1932,7 @@ function vPractice(d) {
   const qs = d.questions, wrong = [], ans = {}; let i = 0, streak = 0;
   const draw = () => {
     const q = qs[i];
-    V.innerHTML = `<div class="card"><div class="bar"><i style="width:${i / qs.length * 100}%"></i></div>
+    V.innerHTML = `<div class="card jc" style="${jst(9)}"><div class="bar"><i style="width:${i / qs.length * 100}%"></i></div>
       <div class="meta"><span class="muted">🧠 Latihan Cerdas · Soal ${i + 1}/${qs.length}</span><span class="chip" id="cb">🔥 ${streak}</span></div>
       ${rptRow(q.id)}<h2 dir="auto" id="qt"></h2><div>` +
       ['a', 'b', 'c', 'd'].map((k, n) => `<button class="opt" style="--i:${n}" data-k="${k.toUpperCase()}" dir="auto"><b>${k.toUpperCase()}</b><span>${esc(q[k])}</span></button>`).join('') +
@@ -1935,7 +1959,7 @@ function vPractice(d) {
 }
 function vPracticeResult(r, wrong) {
   const em = r.score >= 90 ? '🏆' : r.score >= 70 ? '🎉' : r.score >= 40 ? '👍' : '💪', g = r.pl && r.pl.gain;
-  V.innerHTML = `<div class="card res"><div class="big">${em}</div><span class="tag">Hasil Latihan Cerdas</span><h1>${r.correct} / ${r.total}</h1>
+  V.innerHTML = `<div class="card res jc" style="${jst(9)}"><div class="big">${em}</div><span class="tag">Hasil Latihan Cerdas</span><h1>${r.correct} / ${r.total}</h1>
     <p class="muted">Nilai ${r.score}.${r.fixed ? ' 🛠️ ' + r.fixed + ' soal lemah berhasil kamu perbaiki.' : ''}${r.fresh ? ' 🆕 ' + r.fresh + ' soal baru dicoba.' : ''}${wrong.length ? ' Soal yang salah akan muncul lagi lebih cepat.' : ''}</p>
     <span class="chip pop">${g > 0 ? '+' + g + ' Poin Latihan' : 'Batas poin hari ini tercapai, tapi belajarmu tetap tercatat'}</span>
     <div class="row"><button class="btn ghost" id="hm">Kembali</button><button class="btn" id="again">🧠 Latihan lagi</button></div></div>` +
@@ -2205,7 +2229,7 @@ const GUIDE = {
     <li><b>Pencapaian rank:</b> Bronze, Silver, Gold, Platinum, Diamond, dan Legend diraih dari total XP. Tiga teratas di leaderboard mendapat bingkai khusus: api 🔥 (juara 1), petir ⚡ (juara 2), dan percikan aura ✨ (juara 3).</li>
     <li><b>Gold dan Efek:</b> tiap rekor baru memberi Gold sebanyak XP-nya.@@GOLDINFO@@ Belanjakan di menu <b>Efek</b> untuk efek yang muncul saat jawabanmu benar, lengkap dengan suara khasnya (bisa dimatikan di Profil > Setelan), dari yang sederhana sampai petir dan galaksi. Efek bisa dicoba dulu, dan membeli tidak mengurangi XP atau rankmu.</li>
     <li><b>Tantangan Harian:</b> ada empat event, masing-masing sekali sehari dan tidak bisa diulang: <b>Kuis Harian</b> (soal acak dari jilid yang sudah kamu buka), <b>Cepat Tepat</b> (tiap soal berbatas waktu), <b>Sorof Harian</b> (soal Sorof acak), dan <b>Lisan Harian</b> (beberapa lafadz acak). Nilai di atas batas lulus tiap event (diatur admin, awalnya 80) memberi satu kali spin hadiah Gold, sampai 1000! Jangan tutup halaman sebelum selesai, karena kesempatan hari itu langsung terpakai.</li>
-    <li><b>Latihan Cerdas dan Level:</b> di Beranda ada Latihan Cerdas yang <b>bisa dimainkan tanpa batas</b>, sekalipun kamu baru di Jilid 1. Soalnya diambil dari jilid yang sudah kamu buka: soal yang pernah salah atau sudah lama tidak muncul didahulukan, lalu soal baru. Tiap jawaban benar di mode apa pun, termasuk mengulang, memberi <b>Poin Latihan</b> (maks 300 per hari) yang menaikkan <b>Level</b> tanpa batas. Rank tetap menunjukkan seberapa banyak kurikulum yang kamu kuasai.</li>
+    <li><b>Latihan Cerdas dan Level:</b> di Beranda ada tab <b>🧠 Cerdas</b> (Latihan Cerdas) yang <b>bisa dimainkan tanpa batas</b>, sekalipun kamu baru di Jilid 1. Soalnya diambil dari jilid yang sudah kamu buka: soal yang pernah salah atau sudah lama tidak muncul didahulukan, lalu soal baru. Tiap jawaban benar di mode apa pun, termasuk mengulang, memberi <b>Poin Latihan</b> (maks 300 per hari) yang menaikkan <b>Level</b> tanpa batas. Rank tetap menunjukkan seberapa banyak kurikulum yang kamu kuasai.</li>
     <li><b>Misi Harian dan Liga Mingguan:</b> tiga misi kecil tiap hari memberi Gold. Di Leaderboard ada tab <b>Liga Mingguan</b>: peringkat Poin Latihan minggu ini (reset Senin 00.00 WIB), dipisah menurut jilid yang sudah dibuka, jadi murid Jilid 1 bersaing dengan sesama murid Jilid 1.</li>
     <li><b>Kuis Lisan:</b> latihan praktek lafadz. Kamu diberi satu lafadz Arab lalu menjawab pertanyaan berurutan (kalimat apa, tandanya, mu'rab atau mabni, i'rab, dan alasannya) dengan tulisanmu sendiri, boleh bahasa Indonesia atau Arab. Jawaban dinilai dari maksudnya, jadi tidak harus sama persis dengan kunci. XP dihitung seperti kuis tulis: 100/200/300 XP (Mudah/Sedang/Sulit) dikali persen langkah yang benar dalam satu sesi, dan hanya rekor terbaik tiap jilid dan level yang dihitung. Selesaikan sampai halaman hasil agar XP tercatat.</li>
     <li><b>Pencapaian dan lencana:</b> menu <b>Pencapaian</b> berisi puluhan target, dari streak harian, nilai sempurna, jawaban beruntun, koleksi Efek, sampai khatam Kuis Sorof. Tiap pencapaian memberi Gold sekali, ada juga yang tersembunyi. Di <b>Profil</b> kamu bisa memasang sampai 3 lencana yang tampil di leaderboard dan profilmu. Hari Jumat tidak memutus streak.</li></ul>`,
